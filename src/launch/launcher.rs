@@ -45,3 +45,12 @@ impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, New, U, V> {
         Ok(next)
     }
 }
+
+impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, Started, U, V> {
+    pub fn update_data(&mut self, data: &[u8]) -> Result<()> {
+        let launch_update_data = LaunchUpdateData::new(data);
+        let mut cmd = Command::from(self.sev, &launch_update_data);
+        LAUNCH_UPDATE_DATA.ioctl(self.kvm, &mut cmd)?;
+        Ok(())
+    }
+}

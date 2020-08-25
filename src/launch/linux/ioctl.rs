@@ -14,6 +14,7 @@ impl_const_id! {
     pub Id => u32;
     Init = 0,
     LaunchStart<'_> = 2,
+    LaunchUpdateData<'_> = 3,
 }
 
 const KVM: Group = Group::new(0xAE);
@@ -36,6 +37,10 @@ pub const INIT: Ioctl<WriteRead, &Command<Init>> = unsafe { ENC_OP.lie() };
 
 /// Create encrypted guest context.
 pub const LAUNCH_START: Ioctl<WriteRead, &Command<LaunchStart>> = unsafe { ENC_OP.lie() };
+
+/// Encrypt guest data with its VEK.
+pub const LAUNCH_UPDATE_DATA: Ioctl<WriteRead, &Command<LaunchUpdateData>> =
+    unsafe { ENC_OP.lie() };
 
 #[repr(C)]
 pub struct Command<'a, T: Id> {
