@@ -17,6 +17,7 @@ impl_const_id! {
     LaunchUpdateData<'_> = 3,
     LaunchSecret<'_> = 5,
     LaunchMeasure<'_> = 6,
+    LaunchFinish = 7,
 }
 
 const KVM: Group = Group::new(0xAE);
@@ -49,6 +50,10 @@ pub const LAUNCH_SECRET: Ioctl<WriteRead, &Command<LaunchSecret>> = unsafe { ENC
 
 /// Get the guest's measurement.
 pub const LAUNCH_MEASUREMENT: Ioctl<WriteRead, &Command<LaunchMeasure>> = unsafe { ENC_OP.lie() };
+
+/// Complete the SEV launch flow and transition the guest into
+/// the ready state.
+pub const LAUNCH_FINISH: Ioctl<WriteRead, &Command<LaunchFinish>> = unsafe { ENC_OP.lie() };
 
 #[repr(C)]
 pub struct Command<'a, T: Id> {

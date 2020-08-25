@@ -83,4 +83,10 @@ impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, Measured, U, V> {
         LAUNCH_SECRET.ioctl(self.kvm, &mut cmd)?;
         Ok(())
     }
+
+    pub fn finish(self) -> Result<Handle> {
+        let mut cmd = Command::from(self.sev, &LaunchFinish);
+        LAUNCH_FINISH.ioctl(self.kvm, &mut cmd)?;
+        Ok(self.state.0)
+    }
 }
