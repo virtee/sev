@@ -13,6 +13,7 @@ use std::os::unix::io::AsRawFd;
 impl_const_id! {
     pub Id => u32;
     Init = 0,
+    LaunchStart<'_> = 2,
 }
 
 const KVM: Group = Group::new(0xAE);
@@ -32,6 +33,9 @@ const ENC_OP: Ioctl<WriteRead, &c_ulong> = unsafe { KVM.write_read(0xBA) };
 
 /// Initialize the SEV platform context.
 pub const INIT: Ioctl<WriteRead, &Command<Init>> = unsafe { ENC_OP.lie() };
+
+/// Create encrypted guest context.
+pub const LAUNCH_START: Ioctl<WriteRead, &Command<LaunchStart>> = unsafe { ENC_OP.lie() };
 
 #[repr(C)]
 pub struct Command<'a, T: Id> {
