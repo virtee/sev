@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+mod common;
+
 use sev::{certs::sev::Usage, firmware::Firmware, Build, Version};
 
 #[cfg_attr(not(all(has_sev, feature = "dangerous_tests")), ignore)]
@@ -7,6 +9,7 @@ use sev::{certs::sev::Usage, firmware::Firmware, Build, Version};
 fn platform_reset() {
     let mut fw = Firmware::open().unwrap();
     fw.platform_reset().unwrap();
+    common::rm_cached_chain();
 }
 
 #[cfg_attr(not(has_sev), ignore)]
@@ -31,6 +34,7 @@ fn platform_status() {
 fn pek_generate() {
     let mut fw = Firmware::open().unwrap();
     fw.pek_generate().unwrap();
+    common::rm_cached_chain();
 }
 
 #[cfg_attr(not(has_sev), ignore)]
@@ -46,6 +50,7 @@ fn pek_csr() {
 fn pdh_generate() {
     let mut fw = Firmware::open().unwrap();
     fw.pdh_generate().unwrap();
+    common::rm_cached_chain();
 }
 
 #[cfg_attr(not(has_sev), ignore)]
