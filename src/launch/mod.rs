@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(target_os = "linux")]
+mod linux;
+
 use super::*;
 use bitflags::bitflags;
 
