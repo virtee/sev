@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{Measurement, Start};
+use super::{Measurement, Secret, Start};
 
 use crate::kvm::types::*;
 use crate::launch::linux::ioctl::*;
@@ -75,5 +75,12 @@ impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, Started, U, V> {
 impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, Measured, U, V> {
     pub fn measurement(&self) -> Measurement {
         self.state.1
+    }
+
+    pub fn inject(&mut self, secret: Secret, guest: usize) -> Result<()> {
+        let launch_secret = LaunchSecret::new(&secret.header, guest, &secret.ciphertext[..]);
+        let mut cmd = Command::from(self.sev, &launch_secret);
+        LAUNCH_SECRET.ioctl(self.kvm, &mut cmd)?;
+        Ok(())
     }
 }
