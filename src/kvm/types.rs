@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::certs::sev;
-use crate::launch::{Policy, Session};
+use crate::launch::{Measurement, Policy, Session};
 
 use std::marker::PhantomData;
-use std::mem::size_of_val;
+use std::mem::{size_of_val, MaybeUninit};
 
 /// Initialize the SEV platform context.
 #[repr(C)]
@@ -58,6 +58,24 @@ impl<'a> LaunchUpdateData<'a> {
         Self {
             addr: data.as_ptr() as _,
             len: data.len() as _,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+/// Get the guest's measurement.
+#[repr(C)]
+pub struct LaunchMeasure<'a> {
+    addr: u64,
+    len: u32,
+    _phantom: PhantomData<&'a Measurement>,
+}
+
+impl<'a> LaunchMeasure<'a> {
+    pub fn new(measurement: &'a mut MaybeUninit<Measurement>) -> Self {
+        Self {
+            addr: measurement.as_mut_ptr() as _,
+            len: size_of_val(measurement) as _,
             _phantom: PhantomData,
         }
     }

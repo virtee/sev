@@ -15,6 +15,7 @@ impl_const_id! {
     Init = 0,
     LaunchStart<'_> = 2,
     LaunchUpdateData<'_> = 3,
+    LaunchMeasure<'_> = 6,
 }
 
 const KVM: Group = Group::new(0xAE);
@@ -41,6 +42,9 @@ pub const LAUNCH_START: Ioctl<WriteRead, &Command<LaunchStart>> = unsafe { ENC_O
 /// Encrypt guest data with its VEK.
 pub const LAUNCH_UPDATE_DATA: Ioctl<WriteRead, &Command<LaunchUpdateData>> =
     unsafe { ENC_OP.lie() };
+
+/// Get the guest's measurement.
+pub const LAUNCH_MEASUREMENT: Ioctl<WriteRead, &Command<LaunchMeasure>> = unsafe { ENC_OP.lie() };
 
 #[repr(C)]
 pub struct Command<'a, T: Id> {
