@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+//! The `sev` crate provides an implementation of AMD SEV APIs.
+
 #![deny(clippy::all)]
 #![allow(unknown_lints)]
 #![allow(clippy::identity_op)]
