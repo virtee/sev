@@ -1,0 +1,56 @@
+on: [push, pull_request]
+name: test
+jobs:
+  sw:
+    name: sw ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: ${{ matrix.profile.flag }} --features=${{ matrix.features }}
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain:
+          - nightly
+          - beta
+          - stable
+          - 1.42.0
+        profile:
+          - name: debug
+          - name: release
+            flag: --release
+        features:
+          -
+          - openssl
+  hw:
+    name: hw ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
+    runs-on: [self-hosted, linux, sev]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: ${{ matrix.profile.flag }} --features=dangerous_tests,${{ matrix.features }}
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain:
+          - nightly
+        profile:
+          - name: debug
+          - name: release
+            flag: --release
+        features:
+          -
+          - openssl

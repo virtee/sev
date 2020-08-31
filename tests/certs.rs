@@ -7,6 +7,7 @@ use ::sev::certs::*;
 use codicon::Decoder;
 
 #[test]
+#[cfg(feature = "openssl")]
 fn test_for_verify_false_positive() {
     // https://github.com/enarx/enarx/issues/520
     let naples_cek = sev::Certificate::decode(&mut &naples::CEK[..], ()).unwrap();
