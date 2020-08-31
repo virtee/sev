@@ -15,6 +15,7 @@ use codicon::Decoder;
 use kvm_bindings::kvm_userspace_memory_region;
 use kvm_ioctls::{Kvm, VcpuExit};
 use mmarinus::{perms, Kind, Map};
+use serial_test::serial;
 
 use std::convert::TryFrom;
 use std::fs::File;
@@ -68,6 +69,7 @@ fn get_cert_chain(sev: &mut Firmware) -> Chain {
 
 #[cfg_attr(not(has_sev), ignore)]
 #[test]
+#[serial]
 fn sev() {
     let mut sev = Firmware::open().unwrap();
     let build = sev.platform_status().unwrap().build;

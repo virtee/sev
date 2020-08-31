@@ -4,8 +4,11 @@ mod common;
 
 use sev::{certs::sev::Usage, firmware::Firmware, Build, Version};
 
+use serial_test::serial;
+
 #[cfg_attr(not(all(has_sev, feature = "dangerous_tests")), ignore)]
 #[test]
+#[serial]
 fn platform_reset() {
     let mut fw = Firmware::open().unwrap();
     fw.platform_reset().unwrap();
@@ -31,6 +34,7 @@ fn platform_status() {
 
 #[cfg_attr(not(all(has_sev, feature = "dangerous_tests")), ignore)]
 #[test]
+#[serial]
 fn pek_generate() {
     let mut fw = Firmware::open().unwrap();
     fw.pek_generate().unwrap();
@@ -47,6 +51,7 @@ fn pek_csr() {
 
 #[cfg_attr(not(all(has_sev, feature = "dangerous_tests")), ignore)]
 #[test]
+#[serial]
 fn pdh_generate() {
     let mut fw = Firmware::open().unwrap();
     fw.pdh_generate().unwrap();
@@ -73,6 +78,7 @@ fn pdh_cert_export() {
 #[cfg(feature = "openssl")]
 #[cfg_attr(not(all(has_sev, feature = "dangerous_tests")), ignore)]
 #[test]
+#[serial]
 fn pek_cert_import() {
     use sev::certs::{sev::Certificate, Signer, Verifiable};
 
