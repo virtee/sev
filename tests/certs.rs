@@ -3,12 +3,12 @@
 mod naples;
 mod rome;
 
-use ::sev::certs::*;
-use codicon::Decoder;
-
 #[test]
 #[cfg(feature = "openssl")]
 fn test_for_verify_false_positive() {
+    use ::sev::certs::*;
+    use codicon::Decoder;
+
     // https://github.com/enarx/enarx/issues/520
     let naples_cek = sev::Certificate::decode(&mut &naples::CEK[..], ()).unwrap();
     let rome_ask = ca::Certificate::decode(&mut &builtin::rome::ASK[..], ()).unwrap();

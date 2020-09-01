@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
-use ::sev::certs::builtin::rome::ASK;
 
 #[test]
 fn decode() {
@@ -21,6 +20,8 @@ fn encode() {
 #[cfg(feature = "openssl")]
 #[test]
 fn verify() {
+    use ::sev::certs::builtin::rome::ASK;
+
     let ask = ca::Certificate::decode(&mut ASK, ()).unwrap();
     let cek = sev::Certificate::decode(&mut CEK, ()).unwrap();
 
