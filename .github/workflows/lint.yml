@@ -45,3 +45,15 @@ jobs:
           override: true
       - run: cargo install cargo-readme
       - run: cargo readme > README.md && git diff --exit-code
+
+  check-spdx-headers:
+    runs-on: ubuntu-latest
+    steps:
+    - name: checkout
+      uses: actions/checkout@v2
+    - uses: enarx/spdx@master
+      with:
+        extensions: >
+          {
+            \"rs\": [\"Apache-2.0\"]
+          }
