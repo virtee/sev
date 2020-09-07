@@ -64,10 +64,10 @@ impl<U: Copy + Into<crate::certs::Usage>> PartialEq<U> for Certificate {
     }
 }
 
-impl codicon::Decoder for Certificate {
+impl codicon::Decoder<()> for Certificate {
     type Error = Error;
 
-    fn decode(reader: &mut impl Read, params: ()) -> Result<Self> {
+    fn decode(mut reader: impl Read, params: ()) -> Result<Self> {
         Ok(match u32::from_le(reader.load()?) {
             1 => Certificate {
                 v1: v1::Certificate::decode(reader, params)?,
@@ -77,10 +77,10 @@ impl codicon::Decoder for Certificate {
     }
 }
 
-impl codicon::Encoder for Certificate {
+impl codicon::Encoder<()> for Certificate {
     type Error = Error;
 
-    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<()> {
+    fn encode(&self, mut writer: impl Write, _: ()) -> Result<()> {
         match self.version() {
             1 => unsafe { writer.save(&self.v1) },
             _ => Err(ErrorKind::InvalidInput.into()),
@@ -92,7 +92,7 @@ impl codicon::Encoder for Certificate {
 impl codicon::Encoder<Body> for Certificate {
     type Error = Error;
 
-    fn encode(&self, writer: &mut impl Write, _: Body) -> Result<()> {
+    fn encode(&self, mut writer: impl Write, _: Body) -> Result<()> {
         match self.version() {
             1 => unsafe { writer.save(&self.v1.body) },
             _ => Err(ErrorKind::InvalidInput.into()),

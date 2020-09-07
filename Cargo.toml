@@ -26,7 +26,7 @@ dangerous_tests = []
 
 [dependencies]
 openssl = { version = "0.10", optional = true }
-bitflags = "1.2.1"
-codicon = "2.1.0"
+bitflags = "1.2"
+codicon = "3.0"
 bitfield = "0.13"
 iocuddle = "0.1"

@@ -19,7 +19,7 @@ macro_rules! prv_decoder {
             impl codicon::Decoder<&$cert> for PrivateKey<$usage> {
                 type Error = Error;
 
-                fn decode(reader: &mut impl Read, params: &$cert) -> Result<Self> {
+                fn decode(mut reader: impl Read, params: &$cert) -> Result<Self> {
                     let mut buf = Vec::new();
                     reader.read_to_end(&mut buf)?;
 
@@ -46,10 +46,10 @@ prv_decoder! {
     ca::Certificate => ca::Usage
 }
 
-impl<U> codicon::Encoder for PrivateKey<U> {
+impl<U> codicon::Encoder<()> for PrivateKey<U> {
     type Error = Error;
 
-    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<()> {
+    fn encode(&self, mut writer: impl Write, _: ()) -> Result<()> {
         let buf = self.key.private_key_to_der()?;
         writer.write_all(&buf)
     }

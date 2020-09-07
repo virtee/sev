@@ -11,26 +11,26 @@ pub struct Chain {
     pub cek: Certificate,
 }
 
-impl codicon::Decoder for Chain {
+impl codicon::Decoder<()> for Chain {
     type Error = Error;
 
-    fn decode(reader: &mut impl Read, _: ()) -> Result<Self> {
-        let pdh = Certificate::decode(reader, ())?;
+    fn decode(mut reader: impl Read, _: ()) -> Result<Self> {
+        let pdh = Certificate::decode(&mut reader, ())?;
         if Usage::try_from(&pdh)? != Usage::PDH {
             return Err(ErrorKind::InvalidInput.into());
         }
 
-        let pek = Certificate::decode(reader, ())?;
+        let pek = Certificate::decode(&mut reader, ())?;
         if Usage::try_from(&pek)? != Usage::PEK {
             return Err(ErrorKind::InvalidInput.into());
         }
 
-        let oca = Certificate::decode(reader, ())?;
+        let oca = Certificate::decode(&mut reader, ())?;
         if Usage::try_from(&oca)? != Usage::OCA {
             return Err(ErrorKind::InvalidInput.into());
         }
 
-        let cek = Certificate::decode(reader, ())?;
+        let cek = Certificate::decode(&mut reader, ())?;
         if Usage::try_from(&cek)? != Usage::CEK {
             return Err(ErrorKind::InvalidInput.into());
         }
@@ -39,14 +39,14 @@ impl codicon::Decoder for Chain {
     }
 }
 
-impl codicon::Encoder for Chain {
+impl codicon::Encoder<()> for Chain {
     type Error = Error;
 
-    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<()> {
-        self.pdh.encode(writer, ())?;
-        self.pek.encode(writer, ())?;
-        self.oca.encode(writer, ())?;
-        self.cek.encode(writer, ())
+    fn encode(&self, mut writer: impl Write, _: ()) -> Result<()> {
+        self.pdh.encode(&mut writer, ())?;
+        self.pek.encode(&mut writer, ())?;
+        self.oca.encode(&mut writer, ())?;
+        self.cek.encode(&mut writer, ())
     }
 }
 

@@ -9,22 +9,22 @@ pub struct Chain {
     pub sev: sev::Chain,
 }
 
-impl codicon::Decoder for Chain {
+impl codicon::Decoder<()> for Chain {
     type Error = Error;
 
-    fn decode(reader: &mut impl Read, _: ()) -> Result<Self> {
-        let sev = sev::Chain::decode(reader, ())?;
-        let ca = ca::Chain::decode(reader, ())?;
+    fn decode(mut reader: impl Read, _: ()) -> Result<Self> {
+        let sev = sev::Chain::decode(&mut reader, ())?;
+        let ca = ca::Chain::decode(&mut reader, ())?;
         Ok(Self { ca, sev })
     }
 }
 
-impl codicon::Encoder for Chain {
+impl codicon::Encoder<()> for Chain {
     type Error = Error;
 
-    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<()> {
-        self.sev.encode(writer, ())?;
-        self.ca.encode(writer, ())
+    fn encode(&self, mut writer: impl Write, _: ()) -> Result<()> {
+        self.sev.encode(&mut writer, ())?;
+        self.ca.encode(&mut writer, ())
     }
 }
 
