@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
+//! An implementation of the SEV launch process as a type-state machine.
+//! This ensures (at compile time) that the right steps are called in the
+//! right order.
+
 use super::{Measurement, Secret, Start};
 
 use crate::kvm::types::*;
@@ -13,6 +17,7 @@ pub struct New;
 pub struct Started(Handle);
 pub struct Measured(Handle, Measurement);
 
+/// Facilitates the correct execution of the SEV launch process.
 pub struct Launcher<'a, T, U: AsRawFd, V: AsRawFd> {
     state: T,
     kvm: &'a mut U,
@@ -20,6 +25,7 @@ pub struct Launcher<'a, T, U: AsRawFd, V: AsRawFd> {
 }
 
 impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, New, U, V> {
+    /// Begin the SEV launch process.
     pub fn new(kvm: &'a mut U, sev: &'a mut V) -> Result<Self> {
         let launcher = Launcher {
             kvm,
@@ -33,6 +39,7 @@ impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, New, U, V> {
         Ok(launcher)
     }
 
+    /// Create an encrypted guest context.
     pub fn start(self, start: Start) -> Result<Launcher<'a, Started, U, V>> {
         let mut launch_start = LaunchStart::new(&start.policy, &start.cert, &start.session);
         let mut cmd = Command::from_mut(self.sev, &mut launch_start);
@@ -49,6 +56,7 @@ impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, New, U, V> {
 }
 
 impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, Started, U, V> {
+    /// Encrypt guest data with its VEK.
     pub fn update_data(&mut self, data: &[u8]) -> Result<()> {
         let launch_update_data = LaunchUpdateData::new(data);
         let mut cmd = Command::from(self.sev, &launch_update_data);
@@ -56,6 +64,7 @@ impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, Started, U, V> {
         Ok(())
     }
 
+    /// Request a measurement from the SEV firmware.
     pub fn measure(self) -> Result<Launcher<'a, Measured, U, V>> {
         let mut measurement = MaybeUninit::uninit();
         let mut launch_measure = LaunchMeasure::new(&mut measurement);
@@ -73,10 +82,16 @@ impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, Started, U, V> {
 }
 
 impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, Measured, U, V> {
+    /// Get the measurement that the SEV platform recorded.
     pub fn measurement(&self) -> Measurement {
         self.state.1
     }
 
+    /// Inject a secret into the guest.
+    ///
+    /// ## Remarks
+    ///
+    /// This should only be called after a successful attestation flow.
     pub fn inject(&mut self, secret: Secret, guest: usize) -> Result<()> {
         let launch_secret = LaunchSecret::new(&secret.header, guest, &secret.ciphertext[..]);
         let mut cmd = Command::from(self.sev, &launch_secret);
@@ -84,6 +99,7 @@ impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, Measured, U, V> {
         Ok(())
     }
 
+    /// Complete the SEV launch process.
     pub fn finish(self) -> Result<Handle> {
         let mut cmd = Command::from(self.sev, &LaunchFinish);
         LAUNCH_FINISH.ioctl(self.kvm, &mut cmd)?;
