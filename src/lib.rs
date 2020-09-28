@@ -32,12 +32,10 @@
 //! [`launch`]: ./launch/index.html
 
 #![deny(clippy::all)]
+#![deny(missing_docs)]
 #![allow(unknown_lints)]
 #![allow(clippy::identity_op)]
 #![allow(clippy::unreadable_literal)]
-// TODO: https://github.com/enarx/enarx/issues/347
-#![deny(missing_docs)]
-#![allow(missing_docs)]
 
 pub mod certs;
 pub mod firmware;
