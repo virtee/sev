@@ -2,6 +2,7 @@
 
 //! A simple const generics substitute.
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! impl_const_id {
     (
