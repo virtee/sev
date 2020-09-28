@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+//! For operating on OCA certificates.
+
 mod cert;
 mod chain;
 
@@ -8,12 +10,16 @@ pub use chain::Chain;
 
 use super::*;
 
+/// Denotes the usage of the certificate.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Usage(u32);
 
 impl Usage {
+    /// AMD Root Key.
     pub const ARK: Usage = Usage(super::Usage::ARK.0);
+
+    /// AMD Signing Key.
     pub const ASK: Usage = Usage(super::Usage::ASK.0);
 }
 

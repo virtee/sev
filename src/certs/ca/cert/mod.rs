@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
+//! Operations that can be done on an OCA certificate.
+
 mod v1;
 
 use super::*;
 
+/// An OCA certificate.
 #[repr(C)]
 pub union Certificate {
     version: u32,

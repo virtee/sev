@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+//! For operating on SEV certificates.
+
 mod cert;
 mod chain;
 
@@ -8,14 +10,22 @@ pub use chain::Chain;
 
 use super::*;
 
+/// Denotes the usage of a SEV certificate.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Usage(u32);
 
 impl Usage {
+    /// Owner Certificate Authority.
     pub const OCA: Usage = Usage(super::Usage::OCA.0);
+
+    /// Chip Endorsement Key.
     pub const CEK: Usage = Usage(super::Usage::CEK.0);
+
+    /// Platform Endorsement Key.
     pub const PEK: Usage = Usage(super::Usage::PEK.0);
+
+    /// Platform Diffie-Hellman (PDH).
     pub const PDH: Usage = Usage(super::Usage::PDH.0);
 }
 

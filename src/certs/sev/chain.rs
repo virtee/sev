@@ -1,13 +1,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
+//! For operating on the SEV platform certificate chain.
+
 use super::*;
 
+/// The SEV certificate chain.
 #[repr(C)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct Chain {
+    /// The Platform Diffie-Hellman certificate.
     pub pdh: Certificate,
+
+    /// The certificate for the PEK.
     pub pek: Certificate,
+
+    /// The certificate for the OCA.
     pub oca: Certificate,
+
+    /// The certificate for the CEK.
     pub cek: Certificate,
 }
 

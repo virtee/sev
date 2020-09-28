@@ -1,11 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
+//! For operating on OCA certificate chains.
+
 use super::*;
 
+/// A complete OCA certificate chain.
 #[repr(C)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct Chain {
+    /// The AMD Signing Key certificate.
     pub ask: Certificate,
+
+    /// The AMD Root Key certificate.
     pub ark: Certificate,
 }
 

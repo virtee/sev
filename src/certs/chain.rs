@@ -1,11 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
+//! Utilities for operating on entire certificate chains.
+
 use super::*;
 
+/// A complete certificate chain.
 #[repr(C)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct Chain {
+    /// The Certificate Authority chain.
     pub ca: ca::Chain,
+
+    /// The SEV platform chain.
     pub sev: sev::Chain,
 }
 

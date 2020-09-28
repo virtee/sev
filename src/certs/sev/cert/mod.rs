@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
+//! Operations that can be done on an SEV certificate.
+
 mod v1;
 
 use super::*;
 
+/// An SEV certificate.
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union Certificate {
@@ -200,6 +203,7 @@ impl Signer<Certificate> for PrivateKey<Usage> {
 
 impl Certificate {
     #[cfg(feature = "openssl")]
+    /// Generates a private key and its public certificate.
     pub fn generate(usage: Usage) -> Result<(Self, PrivateKey<Usage>)> {
         let (crt, prv) = v1::Certificate::generate(usage)?;
         Ok((Certificate { v1: crt }, prv))
