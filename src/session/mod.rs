@@ -1,15 +1,27 @@
 // SPDX-License-Identifier: Apache-2.0
 
+//! Utilities for creating a secure channel and facilitating the
+//! attestation process between the tenant and the AMD SP.
+
 mod key;
 
 use super::*;
 use openssl::*;
 use std::io::*;
 
+/// Represents a brand-new secure channel with the AMD SP.
 pub struct Initialized;
+
+/// Indicates the Session is currently accepting data to include
+/// in its measurement for comparison against the AMD SP's measurement.
 pub struct Measuring(hash::Hasher);
+
+/// Denotes an agreeable measurement with the AMD SP.
 pub struct Verified(launch::Measurement);
 
+/// Describes a secure channel with the AMD SP.
+///
+/// This is required for facilitating an SEV launch and attestation.
 pub struct Session<T> {
     policy: launch::Policy,
     tek: key::Key,
@@ -68,6 +80,7 @@ impl Session<Initialized> {
         })
     }
 
+    /// Produces data needed to initiate the SEV launch sequence.
     pub fn start(&self, chain: certs::Chain) -> Result<launch::Start> {
         use certs::*;
 
@@ -87,6 +100,10 @@ impl Session<Initialized> {
         })
     }
 
+    /// Transitions to a measuring state.
+    ///
+    /// Any measureable data submitted to the AMD SP should also be included
+    /// in the `Session` to easily compare against the AMD SP's measurement.
     pub fn measure(self) -> Result<Session<Measuring>> {
         Ok(Session {
             policy: self.policy,
@@ -96,6 +113,7 @@ impl Session<Initialized> {
         })
     }
 
+    /// Verifies the AMD SP's measurement.
     pub fn verify(
         self,
         digest: &[u8],
@@ -125,10 +143,15 @@ impl Session<Initialized> {
 }
 
 impl Session<Measuring> {
+    /// Adds additional data to the digest.
+    ///
+    /// Everything measured by the AMD SP should also be measured by
+    /// the `Session` to ensure both measurements are the same.
     pub fn update_data(&mut self, data: &[u8]) -> std::io::Result<()> {
         Ok(self.data.0.update(data)?)
     }
 
+    /// Verifies the session's measurement against the AMD SP's measurement.
     pub fn verify(mut self, build: Build, msr: launch::Measurement) -> Result<Session<Verified>> {
         let digest = self.data.0.finish()?;
         let session = Session {
@@ -143,6 +166,7 @@ impl Session<Measuring> {
 }
 
 impl Session<Verified> {
+    /// Creates a packet for a secret to be injected into the guest.
     pub fn secret(&self, flags: launch::HeaderFlags, data: &[u8]) -> Result<launch::Secret> {
         let mut iv = [0u8; 16];
         rand::rand_bytes(&mut iv)?;
