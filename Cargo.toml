@@ -29,6 +29,7 @@ openssl = { version = "0.10", optional = true }
 bitflags = "1.2"
 codicon = "3.0"
 bitfield = "0.13"
+dirs = "3.0"
 iocuddle = "0.1"
 
 [dev-dependencies]

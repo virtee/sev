@@ -18,6 +18,8 @@ pub mod launch;
 pub mod session;
 mod util;
 
+pub use util::cached_chain;
+
 #[cfg(feature = "openssl")]
 use certs::sev;
 use certs::{builtin, ca};

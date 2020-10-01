@@ -2,8 +2,7 @@
 
 #![cfg(feature = "openssl")]
 
-mod common;
-
+use sev::cached_chain;
 use sev::certs::Chain;
 use sev::firmware::Firmware;
 use sev::launch::{HeaderFlags, Launcher, Policy};
@@ -45,26 +44,25 @@ fn __get_cert_chain(sev: &mut Firmware) -> Chain {
 }
 
 fn get_cert_chain(sev: &mut Firmware) -> Chain {
-    let cached_chain = common::cached_chain_path().unwrap();
+    cached_chain::get().unwrap_or_else(|_| {
+        use codicon::Encoder;
 
-    File::open(cached_chain.clone())
-        .and_then(|mut f| Chain::decode(&mut f, ()))
-        .unwrap_or_else(|_| {
-            use codicon::Encoder;
+        let chain = __get_cert_chain(sev);
 
-            let chain = __get_cert_chain(sev);
+        let time = std::time::Instant::now().elapsed().as_nanos();
+        let tmp_path = format!("sev-{}.chain", time);
+        let mut tmp_file = File::create(&tmp_path).unwrap();
+        chain.encode(&mut tmp_file, ()).unwrap();
 
-            let time = std::time::Instant::now().elapsed().as_nanos();
-            let tmp_path = format!("sev-{}.chain", time);
-            let mut tmp_file = File::create(&tmp_path).unwrap();
-            chain.encode(&mut tmp_file, ()).unwrap();
+        let save_to = cached_chain::path();
+        let save_to = save_to.first().unwrap();
 
-            let directories = cached_chain.parent().unwrap();
-            std::fs::create_dir_all(directories).unwrap();
-            std::fs::rename(tmp_path, cached_chain).unwrap();
+        let directories = save_to.parent().unwrap();
+        std::fs::create_dir_all(directories).unwrap();
+        std::fs::rename(tmp_path, save_to).unwrap();
 
-            chain
-        })
+        chain
+    })
 }
 
 #[cfg_attr(not(has_sev), ignore)]
