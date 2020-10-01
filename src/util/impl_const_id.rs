@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-//! Helpful primitives for developing the crate.
+//! A simple const generics substitute.
 
-/// A simple const generics substitute.
 #[macro_export]
 macro_rules! impl_const_id {
     (
