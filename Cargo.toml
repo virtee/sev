@@ -22,7 +22,8 @@ is-it-maintained-open-issues = { repository = "enarx/sev" }
 
 [features]
 default = []
-dangerous_hw_tests = []
+hw_tests = []
+dangerous_hw_tests = ["hw_tests"]
 
 [dependencies]
 openssl = { version = "0.10", optional = true }
