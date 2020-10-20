@@ -26,7 +26,7 @@ const CODE: &[u8] = &[
 fn __get_cert_chain(sev: &mut Firmware) -> Chain {
     let mut platform = sev.pdh_cert_export().unwrap();
 
-    let id = sev.get_identifer().unwrap();
+    let id = sev.get_identifier().unwrap();
     let url = format!("https://kdsintf.amd.com/cek/id/{}", id);
 
     let mut resp = reqwest::blocking::get(&url)

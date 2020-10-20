@@ -110,7 +110,7 @@ impl Firmware {
     ///
     /// This is especially helpful for sending AMD an HTTP request to fetch
     /// the signed CEK certificate.
-    pub fn get_identifer(&mut self) -> Result<Identifier, Indeterminate<Error>> {
+    pub fn get_identifier(&mut self) -> Result<Identifier, Indeterminate<Error>> {
         let mut bytes = [0u8; 64];
         let mut id = GetId::new(&mut bytes);
 

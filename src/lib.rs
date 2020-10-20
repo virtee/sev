@@ -116,7 +116,7 @@ impl std::fmt::Display for Build {
 /// let chain = firmware.pdh_cert_export()
 ///     .expect("unable to export SEV certificates");
 ///
-/// let id = firmware.get_identifer().expect("error fetching identifier");
+/// let id = firmware.get_identifier().expect("error fetching identifier");
 ///
 /// // NOTE: Requesting a signed CEK from AMD's KDS has been omitted for
 /// // brevity.
