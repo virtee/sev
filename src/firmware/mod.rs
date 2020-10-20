@@ -102,6 +102,16 @@ pub enum Error {
 
     /// Feature is unsupported.
     Unsupported,
+
+    /// A given parameter is invalid.
+    InvalidParam,
+
+    /// The SEV firmware has run out of a resource required to carry out the
+    /// command.
+    ResourceLimit,
+
+    /// The SEV platform observed a failed integrity check.
+    SecureDataInvalid,
 }
 
 impl From<std::io::Error> for Error {
@@ -144,6 +154,9 @@ impl From<u32> for Indeterminate<Error> {
             19 => Error::HardwarePlatform,
             20 => Error::HardwareUnsafe,
             21 => Error::Unsupported,
+            22 => Error::InvalidParam,
+            23 => Error::ResourceLimit,
+            24 => Error::SecureDataInvalid,
             _ => return Indeterminate::Unknown,
         })
     }
