@@ -22,8 +22,8 @@ fn encode() {
 fn verify() {
     use ::sev::certs::builtin::naples::ASK;
 
-    let ask = ca::Certificate::decode(&mut ASK, ()).unwrap();
-    let cek = sev::Certificate::decode(&mut CEK, ()).unwrap();
+    let ask = ca::Certificate::decode(ASK, ()).unwrap();
+    let cek = sev::Certificate::decode(CEK, ()).unwrap();
 
     (&ask, &cek).verify().unwrap();
     //assert!((&cek, &ask).verify().is_err());

@@ -21,8 +21,8 @@ fn encode() {
 #[cfg(feature = "openssl")]
 #[test]
 fn verify() {
-    let ark = ca::Certificate::decode(&mut ARK, ()).unwrap();
-    let ask = ca::Certificate::decode(&mut ASK, ()).unwrap();
+    let ark = ca::Certificate::decode(ARK, ()).unwrap();
+    let ask = ca::Certificate::decode(ASK, ()).unwrap();
 
     (&ark, &ask).verify().unwrap();
     assert!((&ask, &ark).verify().is_err());

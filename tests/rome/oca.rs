@@ -20,7 +20,7 @@ fn encode() {
 #[cfg(feature = "openssl")]
 #[test]
 fn verify() {
-    let oca = sev::Certificate::decode(&mut OCA, ()).unwrap();
+    let oca = sev::Certificate::decode(OCA, ()).unwrap();
     (&oca, &oca).verify().unwrap();
 }
 
