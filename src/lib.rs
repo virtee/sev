@@ -52,13 +52,15 @@ use util::{TypeLoad, TypeSave};
 use certs::sev;
 use certs::{builtin, ca};
 
+use serde::{Deserialize, Serialize};
+
 #[cfg(feature = "openssl")]
 use std::convert::TryFrom;
 use std::io::{Read, Write};
 
 /// Information about the SEV platform version.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Version {
     /// The major version number.
     pub major: u8,
@@ -75,7 +77,7 @@ impl std::fmt::Display for Version {
 
 /// A description of the SEV platform's build information.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Build {
     /// The version information.
     pub version: Version,

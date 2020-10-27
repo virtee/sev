@@ -14,10 +14,11 @@ pub use launcher::Launcher;
 
 use super::*;
 use bitflags::bitflags;
+use serde::{Deserialize, Serialize};
 
 bitflags! {
     /// Configurable SEV Policy options.
-    #[derive(Default)]
+    #[derive(Default, Deserialize, Serialize)]
     pub struct PolicyFlags: u16 {
         /// When set, debugging the guest is forbidden.
         const NO_DEBUG        = 0b00000001u16.to_le();
@@ -44,7 +45,7 @@ bitflags! {
 /// Describes a policy that the AMD Secure Processor will
 /// enforce.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Policy {
     /// The various policy optons are encoded as bit flags.
     pub flags: PolicyFlags,
@@ -56,7 +57,7 @@ pub struct Policy {
 /// A secure channel between the tenant and the AMD Secure
 /// Processor.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Session {
     /// Used for deriving a shared secret between the tenant
     /// and the AMD SP.
@@ -110,7 +111,7 @@ impl codicon::Encoder<()> for Start {
 
 bitflags! {
     /// Additional descriptions of the secret header packet.
-    #[derive(Default)]
+    #[derive(Default, Deserialize, Serialize)]
     pub struct HeaderFlags: u32 {
         /// If set, the contents of the packet are compressed and
         /// the AMD SP must decompress them.
@@ -121,7 +122,7 @@ bitflags! {
 /// The header for a data packet that contains secret information
 /// to be injected into the guest.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Header {
     /// Describes the secret packet (for example: if it is
     /// compressed).
@@ -136,7 +137,7 @@ pub struct Header {
 
 /// A packet containing secret information to be injected
 /// into the guest.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Secret {
     /// The header for this packet.
     pub header: Header,
@@ -167,7 +168,7 @@ impl codicon::Encoder<()> for Secret {
 
 /// A measurement of the SEV guest.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Measurement {
     /// The measurement.
     pub measure: [u8; 32],
