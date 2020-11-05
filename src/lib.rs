@@ -46,6 +46,7 @@ pub mod session;
 mod util;
 
 pub use util::cached_chain;
+use util::{TypeLoad, TypeSave};
 
 #[cfg(feature = "openssl")]
 use certs::sev;
@@ -53,6 +54,7 @@ use certs::{builtin, ca};
 
 #[cfg(feature = "openssl")]
 use std::convert::TryFrom;
+use std::io::{Read, Write};
 
 /// Information about the SEV platform version.
 #[repr(C)]
@@ -85,6 +87,22 @@ pub struct Build {
 impl std::fmt::Display for Build {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}.{}", self.version, self.build)
+    }
+}
+
+impl codicon::Decoder<()> for Build {
+    type Error = std::io::Error;
+
+    fn decode(mut reader: impl Read, _: ()) -> std::io::Result<Self> {
+        reader.load()
+    }
+}
+
+impl codicon::Encoder<()> for Build {
+    type Error = std::io::Error;
+
+    fn encode(&self, mut writer: impl Write, _: ()) -> std::io::Result<()> {
+        writer.save(self)
     }
 }
 
