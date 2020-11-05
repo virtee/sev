@@ -145,6 +145,26 @@ pub struct Secret {
     pub ciphertext: Vec<u8>,
 }
 
+impl codicon::Decoder<()> for Secret {
+    type Error = std::io::Error;
+
+    fn decode(mut reader: impl Read, _: ()) -> std::io::Result<Self> {
+        let header = reader.load()?;
+        let mut ciphertext = vec![];
+        let _ = reader.read_to_end(&mut ciphertext)?;
+        Ok(Self { header, ciphertext })
+    }
+}
+
+impl codicon::Encoder<()> for Secret {
+    type Error = std::io::Error;
+
+    fn encode(&self, mut writer: impl Write, _: ()) -> std::io::Result<()> {
+        writer.save(&self.header)?;
+        writer.write_all(&self.ciphertext)
+    }
+}
+
 /// A measurement of the SEV guest.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
