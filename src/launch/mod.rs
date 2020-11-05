@@ -155,3 +155,19 @@ pub struct Measurement {
     /// A random nonce.
     pub mnonce: [u8; 16],
 }
+
+impl codicon::Decoder<()> for Measurement {
+    type Error = std::io::Error;
+
+    fn decode(mut reader: impl Read, _: ()) -> std::io::Result<Self> {
+        reader.load()
+    }
+}
+
+impl codicon::Encoder<()> for Measurement {
+    type Error = std::io::Error;
+
+    fn encode(&self, mut writer: impl Write, _: ()) -> std::io::Result<()> {
+        writer.save(self)
+    }
+}
