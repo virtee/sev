@@ -6,6 +6,7 @@ pub mod builtin;
 pub mod ca;
 mod chain;
 pub mod sev;
+#[cfg(feature = "openssl")]
 mod util;
 
 #[cfg(feature = "openssl")]
@@ -16,7 +17,8 @@ use std::io::*;
 
 pub use chain::Chain;
 
-#[allow(unused_imports)]
+use crate::util::*;
+#[cfg(feature = "openssl")]
 use util::*;
 
 #[cfg(feature = "openssl")]
