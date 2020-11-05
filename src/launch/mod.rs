@@ -79,7 +79,8 @@ pub struct Session {
 }
 
 /// Used to establish a secure session with the AMD SP.
-#[derive(Debug, PartialEq, Eq)]
+#[repr(C)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Start {
     /// The tenant's policy for this SEV guest.
     pub policy: Policy,
@@ -89,6 +90,22 @@ pub struct Start {
 
     /// A secure channel with the AMD SP.
     pub session: Session,
+}
+
+impl codicon::Decoder<()> for Start {
+    type Error = std::io::Error;
+
+    fn decode(mut reader: impl Read, _: ()) -> std::io::Result<Self> {
+        reader.load()
+    }
+}
+
+impl codicon::Encoder<()> for Start {
+    type Error = std::io::Error;
+
+    fn encode(&self, mut writer: impl Write, _: ()) -> std::io::Result<()> {
+        writer.save(self)
+    }
 }
 
 bitflags! {
