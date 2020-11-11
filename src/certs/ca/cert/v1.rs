@@ -9,10 +9,10 @@ const NAPLES_ARK_SIG: &[u8] = include_bytes!("../../../../tests/naples/ark.cert.
 const NAPLES_ARK: Preamble = Preamble {
     ver: 1u32.to_le(),
     data: Data {
-        kid: 122178821951678173525318614033703090459u128.to_le(),
-        sid: 122178821951678173525318614033703090459u128.to_le(),
+        kid: *b"\x1b\xb9\x87\xc3\x59\x49\x46\x06\xb1\x74\x94\x56\x01\xc9\xea\x5b",
+        sid: *b"\x1b\xb9\x87\xc3\x59\x49\x46\x06\xb1\x74\x94\x56\x01\xc9\xea\x5b",
         usage: Usage::ARK,
-        reserved: 0,
+        reserved: [0; 16],
         psize: 2048u32.to_le(),
         msize: 2048u32.to_le(),
     },
@@ -36,10 +36,10 @@ impl Into<hash::MessageDigest> for Size {
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Data {
-    pub kid: u128,
-    pub sid: u128,
+    pub kid: [u8; 16],
+    pub sid: [u8; 16],
     pub usage: Usage,
-    pub reserved: u128,
+    pub reserved: [u8; 16],
     pub psize: u32,
     pub msize: u32,
 }

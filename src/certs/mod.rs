@@ -50,7 +50,7 @@ pub trait Signer<T> {
 
 #[cfg(feature = "openssl")]
 struct Signature {
-    id: Option<u128>,
+    id: Option<[u8; 16]>,
     sig: Vec<u8>,
     kind: pkey::Id,
     hash: hash::MessageDigest,
@@ -60,7 +60,7 @@ struct Signature {
 #[cfg(feature = "openssl")]
 /// Represents a private key.
 pub struct PrivateKey<U> {
-    id: Option<u128>,
+    id: Option<[u8; 16]>,
     key: pkey::PKey<pkey::Private>,
     hash: hash::MessageDigest,
     usage: U,
@@ -68,7 +68,7 @@ pub struct PrivateKey<U> {
 
 #[cfg(feature = "openssl")]
 struct PublicKey<U> {
-    id: Option<u128>,
+    id: Option<[u8; 16]>,
     key: pkey::PKey<pkey::Public>,
     hash: hash::MessageDigest,
     usage: U,
