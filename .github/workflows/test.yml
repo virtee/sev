@@ -41,7 +41,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: test
-          args: ${{ matrix.profile.flag }} --features=dangerous_hw_tests,${{ matrix.features }}
+          args: ${{ matrix.profile.flag }} --features=${{ matrix.features }}
     strategy:
       fail-fast: false
       matrix:
@@ -54,3 +54,4 @@ jobs:
         features:
           -
           - openssl
+          - hw_tests
