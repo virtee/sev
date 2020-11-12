@@ -16,6 +16,7 @@ fn rm_cached_chain() {
 }
 
 #[cfg_attr(not(all(has_sev, feature = "dangerous_hw_tests")), ignore)]
+#[ignore]
 #[test]
 #[serial]
 fn platform_reset() {
@@ -42,6 +43,7 @@ fn platform_status() {
 }
 
 #[cfg_attr(not(all(has_sev, feature = "dangerous_hw_tests")), ignore)]
+#[ignore]
 #[test]
 #[serial]
 fn pek_generate() {
@@ -59,6 +61,7 @@ fn pek_csr() {
 }
 
 #[cfg_attr(not(all(has_sev, feature = "dangerous_hw_tests")), ignore)]
+#[ignore]
 #[test]
 #[serial]
 fn pdh_generate() {
@@ -86,6 +89,7 @@ fn pdh_cert_export() {
 
 #[cfg(feature = "openssl")]
 #[cfg_attr(not(all(has_sev, feature = "dangerous_hw_tests")), ignore)]
+#[ignore]
 #[test]
 #[serial]
 fn pek_cert_import() {
