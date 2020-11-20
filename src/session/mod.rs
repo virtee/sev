@@ -140,6 +140,20 @@ impl Session<Initialized> {
             data: Verified(msr),
         })
     }
+
+    /// Skip verifying the measurement
+    ///
+    /// # Safety
+    ///
+    /// This method must only be used in tests or unattested workflows.
+    pub unsafe fn mock_verify(self, msr: launch::Measurement) -> Result<Session<Verified>> {
+        Ok(Session {
+            policy: self.policy,
+            tek: self.tek,
+            tik: self.tik,
+            data: Verified(msr),
+        })
+    }
 }
 
 impl Session<Measuring> {
