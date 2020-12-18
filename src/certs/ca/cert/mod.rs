@@ -4,6 +4,11 @@
 
 mod v1;
 
+use std::mem::size_of;
+
+use serde::{de, ser};
+use serde_bytes::{ByteBuf, Bytes};
+
 use super::*;
 
 /// An OCA certificate.
@@ -99,6 +104,31 @@ impl codicon::Encoder<Body> for Certificate {
             1 => unsafe { self.v1.encode(writer, Body) },
             _ => Err(ErrorKind::InvalidInput.into()),
         }
+    }
+}
+
+impl<'de> de::Deserialize<'de> for Certificate {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        use codicon::Decoder;
+
+        let bytes = ByteBuf::deserialize(deserializer)?;
+        Self::decode(bytes.as_slice(), ()).map_err(serde::de::Error::custom)
+    }
+}
+
+impl ser::Serialize for Certificate {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        use std::slice::from_raw_parts;
+
+        let bytes = unsafe { from_raw_parts(self as *const Self as *const u8, size_of::<Self>()) };
+        let bytes = Bytes::new(bytes);
+        bytes.serialize(serializer)
     }
 }
 
