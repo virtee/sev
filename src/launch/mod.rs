@@ -81,7 +81,7 @@ pub struct Session {
 
 /// Used to establish a secure session with the AMD SP.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Start {
     /// The tenant's policy for this SEV guest.
     pub policy: Policy,
