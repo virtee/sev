@@ -2,11 +2,13 @@
 
 //! Utilities for operating on entire certificate chains.
 
+use serde::{Deserialize, Serialize};
+
 use super::*;
 
 /// A complete certificate chain.
 #[repr(C)]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Chain {
     /// The Certificate Authority chain.
     pub ca: ca::Chain,
