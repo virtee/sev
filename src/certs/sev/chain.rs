@@ -2,11 +2,13 @@
 
 //! For operating on the SEV platform certificate chain.
 
+use serde::{Deserialize, Serialize};
+
 use super::*;
 
 /// The SEV certificate chain.
 #[repr(C)]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Chain {
     /// The Platform Diffie-Hellman certificate.
     pub pdh: Certificate,
