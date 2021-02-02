@@ -166,8 +166,8 @@ impl From<Generation> for ca::Chain {
         };
 
         ca::Chain {
-            ask: ca::Certificate::decode(&mut &ask[..], ()).unwrap(),
-            ark: ca::Certificate::decode(&mut &ark[..], ()).unwrap(),
+            ask: ca::Certificate::decode(&mut &*ask, ()).unwrap(),
+            ark: ca::Certificate::decode(&mut &*ark, ()).unwrap(),
         }
     }
 }
