@@ -8,6 +8,7 @@ mod types;
 
 use super::*;
 use std::fmt::Debug;
+use std::{error, io};
 
 use bitflags::bitflags;
 
@@ -36,7 +37,7 @@ pub enum Indeterminate<T: Debug> {
 pub enum Error {
     /// Something went wrong when communicating with the "outside world"
     /// (kernel, SEV platform).
-    IoError(std::io::Error),
+    IoError(io::Error),
 
     /// The platform state is invalid for this command.
     InvalidPlatformState,
@@ -114,17 +115,75 @@ pub enum Error {
     SecureDataInvalid,
 }
 
-impl From<std::io::Error> for Error {
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let err_description = match self {
+            Error::IoError(_) => "I/O Error",
+            Error::InvalidPlatformState => "Invalid platform state",
+            Error::InvalidGuestState => "Invalid guest state",
+            Error::InvalidConfig => "Platform configuration invalid",
+            Error::InvalidLen => "Memory buffer too small",
+            Error::AlreadyOwned => "Platform is already owned",
+            Error::InvalidCertificate => "Invalid certificate",
+            Error::PolicyFailure => "Policy failure",
+            Error::Inactive => "Guest is inactive",
+            Error::InvalidAddress => "Provided address is invalid",
+            Error::BadSignature => "Provided signature is invalid",
+            Error::BadMeasurement => "Provided measurement is invalid",
+            Error::AsidOwned => "ASID is already owned",
+            Error::InvalidAsid => "ASID is invalid",
+            Error::WbinvdRequired => "WBINVD instruction required",
+            Error::DfFlushRequired => "DF_FLUSH invocation required",
+            Error::InvalidGuest => "Guest handle is invalid",
+            Error::InvalidCommand => "Issued command is invalid",
+            Error::Active => "Guest is active",
+            Error::HardwarePlatform => {
+                "Hardware condition occured, safe to re-allocate parameter buffers"
+            }
+            Error::HardwareUnsafe => {
+                "Hardware condition occured, unsafe to re-allocate parameter buffers"
+            }
+            Error::Unsupported => "Feature is unsupported",
+            Error::InvalidParam => "Given parameter is invalid",
+            Error::ResourceLimit => {
+                "SEV firmware has run out of required resources to carry out command"
+            }
+            Error::SecureDataInvalid => "SEV platform observed a failed integrity check",
+        };
+        write!(f, "{}", err_description)
+    }
+}
+
+impl error::Error for Error {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        match self {
+            Error::IoError(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+impl From<io::Error> for Error {
     #[inline]
-    fn from(error: std::io::Error) -> Error {
+    fn from(error: io::Error) -> Error {
         Error::IoError(error)
     }
 }
 
-impl From<std::io::Error> for Indeterminate<Error> {
+impl From<io::Error> for Indeterminate<Error> {
     #[inline]
-    fn from(error: std::io::Error) -> Indeterminate<Error> {
+    fn from(error: io::Error) -> Indeterminate<Error> {
         Indeterminate::Known(error.into())
+    }
+}
+
+impl From<Indeterminate<Error>> for io::Error {
+    #[inline]
+    fn from(indeterminate: Indeterminate<Error>) -> io::Error {
+        match indeterminate {
+            Indeterminate::Known(e) => io::Error::new(io::ErrorKind::Other, e),
+            Indeterminate::Unknown => io::Error::new(io::ErrorKind::Other, "unknown SEV error"),
+        }
     }
 }
 
@@ -132,7 +191,7 @@ impl From<u32> for Indeterminate<Error> {
     #[inline]
     fn from(error: u32) -> Indeterminate<Error> {
         Indeterminate::Known(match error {
-            0 => std::io::Error::last_os_error().into(),
+            0 => io::Error::last_os_error().into(),
             1 => Error::InvalidPlatformState,
             2 => Error::InvalidGuestState,
             3 => Error::InvalidConfig,
