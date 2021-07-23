@@ -154,6 +154,9 @@ pub enum Generation {
 
     /// Second generation EPYC (SEV, SEV-ES).
     Rome,
+
+    /// Third generation EPYC (SEV, SEV-ES, SEV-SNP).
+    Milan,
 }
 
 impl From<Generation> for ca::Chain {
@@ -163,6 +166,7 @@ impl From<Generation> for ca::Chain {
         let (ark, ask) = match generation {
             Generation::Naples => (builtin::naples::ARK, builtin::naples::ASK),
             Generation::Rome => (builtin::rome::ARK, builtin::rome::ASK),
+            Generation::Milan => (builtin::milan::ARK, builtin::milan::ASK),
         };
 
         ca::Chain {
@@ -181,11 +185,14 @@ impl TryFrom<&sev::Chain> for Generation {
 
         let naples: ca::Chain = Generation::Naples.into();
         let rome: ca::Chain = Generation::Rome.into();
+        let milan: ca::Chain = Generation::Milan.into();
 
         Ok(if (&naples.ask, &schain.cek).verify().is_ok() {
             Generation::Naples
         } else if (&rome.ask, &schain.cek).verify().is_ok() {
             Generation::Rome
+        } else if (&milan.ask, &schain.cek).verify().is_ok() {
+            Generation::Milan
         } else {
             return Err(());
         })
