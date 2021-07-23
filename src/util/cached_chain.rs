@@ -55,8 +55,7 @@ pub fn sys() -> Option<PathBuf> {
 pub fn path() -> Vec<PathBuf> {
     vec![env_var(), home(), sys()]
         .into_iter()
-        .filter(|p| p.is_some())
-        .map(|p| p.unwrap())
+        .flatten()
         .collect()
 }
 
