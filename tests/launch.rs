@@ -19,8 +19,9 @@ use serial_test::serial;
 use std::convert::TryFrom;
 use std::fs::File;
 
-const CODE: &[u8] = &[
-    0xf4, // hlt
+// has to be a multiple of 16
+const CODE: &[u8; 16] = &[
+    0xf4; 16 // hlt
 ];
 
 fn __get_cert_chain(sev: &mut Firmware) -> Chain {
