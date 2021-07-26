@@ -37,12 +37,12 @@ impl codicon::Encoder<()> for Chain {
 }
 
 #[cfg(feature = "openssl")]
-impl Verifiable for Chain {
-    type Output = sev::Certificate;
+impl<'a> Verifiable for &'a Chain {
+    type Output = &'a sev::Certificate;
 
-    fn verify(self) -> Result<sev::Certificate> {
+    fn verify(self) -> Result<Self::Output> {
         let ask = self.ca.verify()?;
-        (&ask, &self.sev.cek).verify()?;
+        (ask, &self.sev.cek).verify()?;
         self.sev.verify()
     }
 }
