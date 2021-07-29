@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::firmware::{Error, Indeterminate};
 use crate::impl_const_id;
 use crate::kvm::types::*;
 use iocuddle::*;
@@ -82,6 +83,13 @@ impl<'a, T: Id> Command<'a, T> {
             error: 0,
             sev_fd: sev.as_raw_fd() as _,
             _phantom: PhantomData,
+        }
+    }
+
+    pub fn encapsulate(&self, err: std::io::Error) -> Indeterminate<Error> {
+        match self.error {
+            0 => Indeterminate::<Error>::from(err),
+            _ => Indeterminate::<Error>::from(self.error as u32),
         }
     }
 }
