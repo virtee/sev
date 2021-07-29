@@ -13,8 +13,13 @@ use std::io::Result;
 use std::mem::MaybeUninit;
 use std::os::unix::io::AsRawFd;
 
+/// Launcher type-state that indicates a brand new launch.
 pub struct New;
+
+/// Launcher type-state that indicates an in-progress launch.
 pub struct Started(Handle);
+
+/// Launcher type-state that indicates the availability of a measurement.
 pub struct Measured(Handle, Measurement);
 
 /// Facilitates the correct execution of the SEV launch process.

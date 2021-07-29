@@ -10,7 +10,7 @@ mod launcher;
 #[cfg(target_os = "linux")]
 mod linux;
 
-pub use launcher::Launcher;
+pub use launcher::{Launcher, Measured, New, Started};
 
 use super::*;
 use bitflags::bitflags;
