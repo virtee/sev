@@ -115,7 +115,7 @@ fn sev() {
     let session = session.verify(build, measurement).unwrap();
     let secret = session.secret(HeaderFlags::default(), CODE).unwrap();
 
-    launcher.inject(secret, address_space.addr()).unwrap();
+    launcher.inject(&secret, address_space.addr()).unwrap();
 
     let _handle = launcher.finish().unwrap();
 

@@ -99,7 +99,7 @@ impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, Measured, U, V> {
     /// ## Remarks
     ///
     /// This should only be called after a successful attestation flow.
-    pub fn inject(&mut self, secret: Secret, guest: usize) -> Result<()> {
+    pub fn inject(&mut self, secret: &Secret, guest: usize) -> Result<()> {
         let launch_secret = LaunchSecret::new(&secret.header, guest, &secret.ciphertext[..]);
         let mut cmd = Command::from(self.sev, &launch_secret);
         LAUNCH_SECRET
