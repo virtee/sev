@@ -173,7 +173,9 @@ impl TryFrom<&Certificate> for PublicKey<Usage> {
 
     fn try_from(value: &Certificate) -> Result<Self> {
         match value.version() {
-            1 => PublicKey::try_from(unsafe { &value.v1.body.data.key }),
+            1 => PublicKey::try_from(unsafe {
+                &std::ptr::addr_of!(value.v1.body.data.key).read_unaligned()
+            }),
             _ => Err(ErrorKind::InvalidInput.into()),
         }
     }

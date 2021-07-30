@@ -21,7 +21,7 @@ jobs:
           - nightly
           - beta
           - stable
-          - 1.42.0
+          - 1.51.0
         profile:
           - name: debug
           - name: release
