@@ -6,8 +6,8 @@ pub trait FromLe: Sized {
     fn from_le(value: &[u8]) -> Result<Self>;
 }
 
-pub trait IntoLe<T> {
-    fn into_le(&self) -> T;
+pub trait AsLeBytes<T> {
+    fn as_le_bytes(&self) -> T;
 }
 
 impl FromLe for openssl::bn::BigNum {
@@ -19,8 +19,8 @@ impl FromLe for openssl::bn::BigNum {
     }
 }
 
-impl IntoLe<[u8; 72]> for openssl::bn::BigNumRef {
-    fn into_le(&self) -> [u8; 72] {
+impl AsLeBytes<[u8; 72]> for openssl::bn::BigNumRef {
+    fn as_le_bytes(&self) -> [u8; 72] {
         let mut buf = [0u8; 72];
 
         for (i, b) in self.to_vec().iter().rev().cloned().enumerate() {
@@ -31,8 +31,8 @@ impl IntoLe<[u8; 72]> for openssl::bn::BigNumRef {
     }
 }
 
-impl IntoLe<[u8; 512]> for openssl::bn::BigNumRef {
-    fn into_le(&self) -> [u8; 512] {
+impl AsLeBytes<[u8; 512]> for openssl::bn::BigNumRef {
+    fn as_le_bytes(&self) -> [u8; 512] {
         let mut buf = [0u8; 512];
 
         for (i, b) in self.to_vec().iter().rev().cloned().enumerate() {

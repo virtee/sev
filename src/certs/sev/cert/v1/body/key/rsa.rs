@@ -71,8 +71,8 @@ impl TryFrom<&PubKey> for pkey::PKey<pkey::Public> {
 impl PubKey {
     pub fn generate(bits: u32) -> Result<(Self, rsa::Rsa<pkey::Private>)> {
         let prv = rsa::Rsa::generate(bits)?;
-        let n = prv.n().into_le();
-        let e = prv.e().into_le();
+        let n = prv.n().as_le_bytes();
+        let e = prv.e().as_le_bytes();
         Ok((
             Self {
                 modulus_size: bits.to_le(),

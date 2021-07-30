@@ -70,8 +70,8 @@ impl TryFrom<&ec::EcKey<pkey::Private>> for PubKey {
             .affine_coordinates_gfp(g, &mut x, &mut y, &mut c)?;
         Ok(Self {
             g: group::Group::try_from(g)?,
-            x: x.into_le(),
-            y: y.into_le(),
+            x: x.as_le_bytes(),
+            y: y.as_le_bytes(),
         })
     }
 }

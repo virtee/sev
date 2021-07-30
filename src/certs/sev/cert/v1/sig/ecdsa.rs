@@ -42,8 +42,8 @@ impl From<ecdsa::EcdsaSig> for Signature {
     #[inline]
     fn from(value: ecdsa::EcdsaSig) -> Self {
         Signature {
-            r: value.r().into_le(),
-            s: value.s().into_le(),
+            r: value.r().as_le_bytes(),
+            s: value.s().as_le_bytes(),
         }
     }
 }

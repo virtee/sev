@@ -30,7 +30,7 @@ impl Default for Signature {
 impl From<bn::BigNum> for Signature {
     #[inline]
     fn from(value: bn::BigNum) -> Self {
-        Signature(value.into_le())
+        Signature(value.as_le_bytes())
     }
 }
 
