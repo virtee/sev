@@ -59,11 +59,10 @@ impl<U: Copy + Into<Usage>> std::fmt::Display for PublicKey<U> {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         use std::fmt::Error;
 
-        let sig = match self.usage.into() {
-            Usage::CEK | Usage::OCA | Usage::PEK => true,
-            Usage::ARK | Usage::ASK => true,
-            _ => false,
-        };
+        let sig = matches!(
+            self.usage.into(),
+            Usage::CEK | Usage::OCA | Usage::PEK | Usage::ARK | Usage::ASK
+        );
 
         match (sig, self.key.id()) {
             (true, pkey::Id::RSA) => write!(
