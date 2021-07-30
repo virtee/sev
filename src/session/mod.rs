@@ -202,7 +202,7 @@ impl Session<Verified> {
         sig.sign(&mut mac)?;
 
         Ok(launch::Secret {
-            header: launch::Header { flags, mac, iv },
+            header: launch::Header { flags, iv, mac },
             ciphertext,
         })
     }
