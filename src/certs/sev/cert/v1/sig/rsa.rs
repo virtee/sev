@@ -50,7 +50,7 @@ impl TryFrom<&Signature> for bn::BigNum {
 
     #[inline]
     fn try_from(value: &Signature) -> Result<Self> {
-        Ok(bn::BigNum::from_le(&value.0)?)
+        bn::BigNum::from_le(&value.0)
     }
 }
 
