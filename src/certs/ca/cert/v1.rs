@@ -24,11 +24,11 @@ enum Size {
 }
 
 #[cfg(feature = "openssl")]
-impl Into<hash::MessageDigest> for Size {
-    fn into(self) -> hash::MessageDigest {
-        match self {
-            Self::Small => hash::MessageDigest::sha256(),
-            Self::Large => hash::MessageDigest::sha384(),
+impl From<Size> for hash::MessageDigest {
+    fn from(size: Size) -> Self {
+        match size {
+            Size::Small => hash::MessageDigest::sha256(),
+            Size::Large => hash::MessageDigest::sha384(),
         }
     }
 }
