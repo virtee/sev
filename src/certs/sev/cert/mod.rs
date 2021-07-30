@@ -190,7 +190,7 @@ impl Verifiable for (&Certificate, &Certificate) {
 
         let sigs: [Option<Signature>; 2] = self.1.try_into()?;
         for sig in sigs.iter().flatten() {
-            if key.verify(self.1, &sig).is_ok() {
+            if key.verify(self.1, sig).is_ok() {
                 return Ok(());
             }
         }
@@ -208,7 +208,7 @@ impl Verifiable for (&ca::Certificate, &Certificate) {
 
         let sigs: [Option<Signature>; 2] = self.1.try_into()?;
         for sig in sigs.iter().flatten() {
-            if key.verify(self.1, &sig).is_ok() {
+            if key.verify(self.1, sig).is_ok() {
                 return Ok(());
             }
         }

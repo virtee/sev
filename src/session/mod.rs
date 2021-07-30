@@ -87,7 +87,7 @@ impl Session<Initialized> {
         let pdh = chain.verify()?;
         let (crt, prv) = sev::Certificate::generate(sev::Usage::PDH)?;
 
-        let z = key::Key::new(prv.derive(&pdh)?);
+        let z = key::Key::new(prv.derive(pdh)?);
         let mut nonce = [0u8; 16];
         let mut iv = [0u8; 16];
         rand::rand_bytes(&mut nonce)?;
@@ -126,7 +126,7 @@ impl Session<Initialized> {
         sig.update(&[0x04u8])?;
         sig.update(&[build.version.major, build.version.minor, build.build])?;
         sig.update(&self.policy.bytes())?;
-        sig.update(&digest)?;
+        sig.update(digest)?;
         sig.update(&msr.mnonce)?;
 
         if sig.sign_to_vec()? != msr.measure {
