@@ -189,11 +189,9 @@ impl Verifiable for (&Certificate, &Certificate) {
         let key = PublicKey::try_from(self.0)?;
 
         let sigs: [Option<Signature>; 2] = self.1.try_into()?;
-        for sig in sigs.iter() {
-            if let Some(sig) = sig {
-                if key.verify(self.1, &sig).is_ok() {
-                    return Ok(());
-                }
+        for sig in sigs.iter().flatten() {
+            if key.verify(self.1, &sig).is_ok() {
+                return Ok(());
             }
         }
 
@@ -209,11 +207,9 @@ impl Verifiable for (&ca::Certificate, &Certificate) {
         let key: PublicKey<ca::Usage> = self.0.try_into()?;
 
         let sigs: [Option<Signature>; 2] = self.1.try_into()?;
-        for sig in sigs.iter() {
-            if let Some(sig) = sig {
-                if key.verify(self.1, &sig).is_ok() {
-                    return Ok(());
-                }
+        for sig in sigs.iter().flatten() {
+            if key.verify(self.1, &sig).is_ok() {
+                return Ok(());
             }
         }
 
