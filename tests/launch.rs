@@ -3,68 +3,21 @@
 #![cfg(feature = "openssl")]
 
 use sev::cached_chain;
-use sev::certs::Chain;
 use sev::firmware::Firmware;
 use sev::launch::{HeaderFlags, Launcher, Policy};
 use sev::session::Session;
 
-use sev::Generation;
-
-use codicon::Decoder;
 use kvm_bindings::kvm_userspace_memory_region;
 use kvm_ioctls::{Kvm, VcpuExit};
 use mmarinus::{perms, Kind, Map};
 use serial_test::serial;
 
 use std::convert::TryFrom;
-use std::fs::File;
 
 // has to be a multiple of 16
 const CODE: &[u8; 16] = &[
     0xf4; 16 // hlt
 ];
-
-fn __get_cert_chain(sev: &mut Firmware) -> Chain {
-    let mut platform = sev.pdh_cert_export().unwrap();
-
-    let id = sev.get_identifier().unwrap();
-    let url = format!("https://kdsintf.amd.com/cek/id/{}", id);
-
-    let mut resp = reqwest::blocking::get(&url)
-        .unwrap()
-        .error_for_status()
-        .unwrap();
-
-    let mut cek = vec![];
-    let _ = resp.copy_to(&mut cek).unwrap();
-    platform.cek = sev::certs::sev::Certificate::decode(&mut &cek[..], ()).unwrap();
-
-    let ca = Generation::try_from(&platform).unwrap().into();
-
-    Chain { sev: platform, ca }
-}
-
-fn get_cert_chain(sev: &mut Firmware) -> Chain {
-    cached_chain::get().unwrap_or_else(|_| {
-        use codicon::Encoder;
-
-        let chain = __get_cert_chain(sev);
-
-        let time = std::time::Instant::now().elapsed().as_nanos();
-        let tmp_path = format!("sev-{}.chain", time);
-        let mut tmp_file = File::create(&tmp_path).unwrap();
-        chain.encode(&mut tmp_file, ()).unwrap();
-
-        let save_to = cached_chain::path();
-        let save_to = save_to.first().unwrap();
-
-        let directories = save_to.parent().unwrap();
-        std::fs::create_dir_all(directories).unwrap();
-        std::fs::rename(tmp_path, save_to).unwrap();
-
-        chain
-    })
-}
 
 #[cfg_attr(not(has_sev), ignore)]
 #[test]
@@ -72,7 +25,10 @@ fn get_cert_chain(sev: &mut Firmware) -> Chain {
 fn sev() {
     let mut sev = Firmware::open().unwrap();
     let build = sev.platform_status().unwrap().build;
-    let chain = get_cert_chain(&mut sev);
+    let chain = cached_chain::get().expect(
+        r#"could not find certificate chain
+        export with: sevctl export --full ~/.cache/amd-sev/chain"#,
+    );
 
     let policy = Policy::default();
     let session = Session::try_from(policy).unwrap();

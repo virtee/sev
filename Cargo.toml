@@ -40,5 +40,4 @@ dirs = "3.0"
 kvm-bindings = "0.4"
 kvm-ioctls = "0.9"
 mmarinus = "0.2"
-reqwest =  { version = "0.10", features = ["blocking"] }
 serial_test = "0.5"
