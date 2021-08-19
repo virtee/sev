@@ -10,10 +10,10 @@ use super::*;
 use std::fmt::Debug;
 use std::{error, io};
 
-use bitflags::bitflags;
-
 #[cfg(target_os = "linux")]
 pub use linux::Firmware;
+
+pub use types::PlatformStatusFlags;
 
 /// There are a number of error conditions that can occur between this
 /// layer all the way down to the SEV platform. Most of these cases have
@@ -240,18 +240,6 @@ pub enum State {
     Working,
 }
 
-bitflags! {
-    /// Describes the platform state.
-    #[derive(Default)]
-    pub struct Flags: u32 {
-        /// If set, this platform is owned. Otherwise, it is self-owned.
-        const OWNED           = 1 << 0;
-
-        /// If set, encrypted state functionality is present.
-        const ENCRYPTED_STATE = 1 << 8;
-    }
-}
-
 /// Information regarding the SEV platform's current status.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Status {
@@ -265,7 +253,7 @@ pub struct Status {
     ///
     /// These could describe whether encrypted state functionality
     /// is enabled, or whether the platform is self-owned.
-    pub flags: Flags,
+    pub flags: PlatformStatusFlags,
 
     /// The number of valid guests supervised by this platform.
     pub guests: u32,

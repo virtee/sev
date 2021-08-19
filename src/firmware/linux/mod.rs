@@ -34,7 +34,6 @@ impl Firmware {
     pub fn platform_status(&mut self) -> Result<Status, Indeterminate<Error>> {
         let mut info: PlatformStatus = Default::default();
         PLATFORM_STATUS.ioctl(&mut self.0, &mut Command::from_mut(&mut info))?;
-        let config = info.config;
 
         Ok(Status {
             build: Build {
@@ -42,10 +41,10 @@ impl Firmware {
                     major: info.version.major,
                     minor: info.version.minor,
                 },
-                build: config.build() as _,
+                build: info.build,
             },
             guests: info.guest_count,
-            flags: Flags::from_bits_truncate(info.flags.bits().into()),
+            flags: info.flags,
             state: match info.state {
                 0 => State::Uninitialized,
                 1 => State::Initialized,

@@ -14,26 +14,13 @@ pub struct PlatformReset;
 bitflags::bitflags! {
     /// The platform's status flags.
     #[derive(Default)]
-    pub struct PlatformStatusFlags: u8 {
-    /// If set, the platform is externally owned.
-    /// Else, it is self-owned (default state).
-        const OWNER = 1;
+    pub struct PlatformStatusFlags: u32 {
+        /// If set, this platform is owned. Otherwise, it is self-owned.
+        const OWNED           = 1 << 0;
+
+        /// If set, encrypted state functionality is present.
+        const ENCRYPTED_STATE = 1 << 8;
     }
-}
-
-bitfield::bitfield! {
-    /// Contains information that describes how the
-    /// platform is currently configured.
-    #[derive(Clone, Copy, Default, PartialEq, Eq)]
-    pub struct PlatformStatusConfig(u32);
-    impl Debug;
-
-    /// If set, SEV-ES is initialized for the platform.
-    pub encrypted_state, _: 0, 0;
-    reserved, _: 23, 1;
-
-    /// The firmware build ID for this API version.
-    pub build, _: 31, 24;
 }
 
 /// Query SEV platform status.
@@ -56,8 +43,8 @@ pub struct PlatformStatus {
     /// state.
     pub flags: PlatformStatusFlags,
 
-    /// Contains configuration information about the platform.
-    pub config: PlatformStatusConfig,
+    /// The firmware build ID for this API version.
+    pub build: u8,
 
     /// The number of valid guests maintained by the SEV firmware.
     pub guest_count: u32,
