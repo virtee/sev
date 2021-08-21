@@ -56,6 +56,34 @@ pub const LAUNCH_MEASUREMENT: Ioctl<WriteRead, &Command<LaunchMeasure>> = unsafe
 /// the ready state.
 pub const LAUNCH_FINISH: Ioctl<WriteRead, &Command<LaunchFinish>> = unsafe { ENC_OP.lie() };
 
+/// Corresponds to the `KVM_MEMORY_ENCRYPT_REG_REGION` ioctl
+pub const ENC_REG_REGION: Ioctl<Write, &KvmEncRegion> =
+    unsafe { KVM.read::<KvmEncRegion>(0xBB).lie() };
+
+/// Corresponds to the `KVM_MEMORY_ENCRYPT_UNREG_REGION` ioctl
+pub const ENC_UNREG_REGION: Ioctl<Write, &KvmEncRegion> =
+    unsafe { KVM.read::<KvmEncRegion>(0xBC).lie() };
+
+/// Corresponds to the kernel struct `kvm_enc_region`
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, PartialEq)]
+pub struct KvmEncRegion<'a> {
+    addr: u64,
+    size: u64,
+    phantom: PhantomData<&'a [u8]>,
+}
+
+impl<'a> KvmEncRegion<'a> {
+    /// Create a new `KvmEncRegion` referencing some memory assigned to the virtual machine.
+    pub fn new(data: &'a [u8]) -> Self {
+        Self {
+            addr: data.as_ptr() as _,
+            size: data.len() as _,
+            phantom: PhantomData,
+        }
+    }
+}
+
 #[repr(C)]
 pub struct Command<'a, T: Id> {
     code: u32,
