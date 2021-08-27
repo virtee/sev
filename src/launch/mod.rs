@@ -16,6 +16,8 @@ use super::*;
 use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
 
+use crate::kvm::types::*;
+
 bitflags! {
     /// Configurable SEV Policy options.
     #[derive(Default, Deserialize, Serialize)]
@@ -190,5 +192,231 @@ impl codicon::Encoder<()> for Measurement {
 
     fn encode(&self, mut writer: impl Write, _: ()) -> std::io::Result<()> {
         writer.save(self)
+    }
+}
+
+bitflags! {
+    /// Configurable SNP Policy options.
+    #[derive(Default, Deserialize, Serialize)]
+    pub struct SnpPolicyFlags: u16 {
+        /// Enable if SMT is enabled in the host machine.
+        const SMT = 1;
+
+        /// If enabled, association with a migration agent is allowed.
+        const MIGRATE_MA = 1 << 2;
+
+        /// If enabled, debugging is allowed.
+        const DEBUG = 1 << 3;
+    }
+}
+
+/// Describes a policy that the AMD Secure Processor will
+/// enforce.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+pub struct SnpPolicy {
+    /// The various policy optons are encoded as bit flags.
+    pub flags: SnpPolicyFlags,
+
+    /// The desired minimum platform firmware version.
+    pub minfw: Version,
+}
+
+impl SnpPolicy {
+    /// Convert a Policy to it's u64 counterpart.
+    pub fn as_u64(&self) -> u64 {
+        let mut val: u64 = 0;
+
+        let minor_version = u64::from(self.minfw.minor);
+        let mut major_version = u64::from(self.minfw.major);
+
+        /*
+         * According to the SNP firmware spec, bit 1 of the policy flags is reserved and must
+         * always be set to 1. Rather than passing this responsibility off to callers, set this bit
+         * every time an ioctl is issued to the kernel.
+         */
+        let flags = self.flags.bits | 0b10;
+        let mut flags_64 = u64::from(flags);
+
+        major_version <<= 8;
+        flags_64 <<= 16;
+
+        val |= minor_version;
+        val |= major_version;
+        val |= flags_64;
+        val &= 0x00FFFFFF;
+
+        val
+    }
+}
+
+/// Encapsulates the various data needed to begin the launch process.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+pub struct SnpStart<'a> {
+    /// The userspace address of the region to be encrypted.
+    pub ma_uaddr: Option<&'a [u8]>,
+
+    /// Describes a policy that the AMD Secure Processor will enforce.
+    pub policy: SnpPolicy,
+
+    /// Indicates if this guest is associated with a migration agent. Otherwise 0.
+    pub ma_en: bool,
+
+    /// Indicates that this launch flow is launching an IMI for the purpose of guest-assisted migration.
+    pub imi_en: bool,
+
+    /// Hypervisor provided value to indicate guest OS visible workarounds.The format is hypervisor defined.
+    pub gosvw: [u8; 16],
+}
+
+impl<'a> SnpStart<'a> {
+    /// Encapsulate all data needed for the SNP_LAUNCH_START ioctl.
+    pub fn new(
+        ma_uaddr: Option<&'a [u8]>,
+        policy: SnpPolicy,
+        imi_en: bool,
+        gosvw: [u8; 16],
+    ) -> Self {
+        Self {
+            ma_uaddr,
+            policy,
+            ma_en: ma_uaddr.is_some(),
+            imi_en,
+            gosvw,
+        }
+    }
+}
+
+/// Encapsulates the various data needed to begin the update process.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct SnpUpdate<'a> {
+    /// The userspace of address of the encrypted region.
+    pub uaddr: &'a [u8],
+
+    /// Indicates that this page is part of the IMI of the guest.
+    pub imi_page: bool,
+
+    /// Encoded page type.
+    pub page_type: SnpPageType,
+
+    /// VMPL3 permission mask.
+    pub vmpl3_perms: VmplPerms,
+
+    /// VMPL2 permission mask.
+    pub vmpl2_perms: VmplPerms,
+
+    /// VMPL1 permission mask.
+    pub vmpl1_perms: VmplPerms,
+}
+
+impl<'a> SnpUpdate<'a> {
+    /// Encapsulate all data needed for the SNP_LAUNCH_UPDATE ioctl.
+    pub fn new(
+        uaddr: &'a [u8],
+        imi_page: bool,
+        page_type: SnpPageType,
+        perms: (VmplPerms, VmplPerms, VmplPerms),
+    ) -> Self {
+        Self {
+            uaddr,
+            imi_page,
+            page_type,
+            vmpl3_perms: perms.2,
+            vmpl2_perms: perms.1,
+            vmpl1_perms: perms.0,
+        }
+    }
+}
+
+bitflags! {
+    #[derive(Default, Deserialize, Serialize)]
+    /// VMPL permission masks.
+    pub struct VmplPerms: u8 {
+        /// Page is readable by the VMPL.
+        const READ = 1;
+
+        /// Page is writeable by the VMPL.
+        const WRITE = 1 << 1;
+
+        /// Page is executable by the VMPL in CPL3.
+        const EXECUTE_USER = 1 << 2;
+
+        /// Page is executable by the VMPL in CPL2, CPL1, and CPL0.
+        const EXECUTE_SUPERVISOR = 1 << 3;
+    }
+}
+
+/// Encoded page types for a launch update. See Table 58 of the SNP Firmware
+/// specification for further details.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub enum SnpPageType {
+    /// A normal data page.
+    Normal,
+
+    /// A VMSA page.
+    Vmsa,
+
+    /// A page full of zeroes.
+    Zero,
+
+    /// A page that is encrypted but not measured
+    Unmeasured,
+
+    /// A page for the firmware to store secrets for the guest.
+    Secrets,
+
+    /// A page for the hypervisor to provide CPUID function values.
+    Cpuid,
+}
+
+impl SnpPageType {
+    /// Get the encoded value for a page type. See Table 58 of the SNP
+    /// Firmware specification for further details.
+    pub fn value(self) -> u8 {
+        match self {
+            SnpPageType::Normal => 0x1,
+            SnpPageType::Vmsa => 0x2,
+            SnpPageType::Zero => 0x3,
+            SnpPageType::Unmeasured => 0x4,
+            SnpPageType::Secrets => 0x5,
+            SnpPageType::Cpuid => 0x6,
+        }
+    }
+}
+
+/// Encapsulates the data needed to complete a guest launch.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct SnpFinish<'a, 'b> {
+    /// The userspace address of the encrypted region.
+    pub id_block: Option<&'a [u8]>,
+
+    /// The userspace address of the authentication information of the ID block.
+    pub id_auth: Option<&'b [u8]>,
+
+    /// Indicates that the ID block is present.
+    pub id_block_en: bool,
+
+    /// Indicates that the author key is present in the ID authentication information structure.
+    /// Ignored if id_block_en is 0.
+    pub auth_key_en: bool,
+
+    /// Opaque host-supplied data to describe the guest. The firmware does not interpret this
+    /// value.
+    pub host_data: [u8; KVM_SEV_SNP_FINISH_DATA_SIZE],
+}
+
+impl<'a, 'b> SnpFinish<'a, 'b> {
+    /// Encapsulate all data needed for the SNP_LAUNCH_FINISH ioctl.
+    pub fn new(
+        id_block: Option<&'a [u8]>,
+        id_auth: Option<&'b [u8]>,
+        host_data: [u8; KVM_SEV_SNP_FINISH_DATA_SIZE],
+    ) -> Self {
+        Self {
+            id_block,
+            id_auth,
+            id_block_en: id_block.is_some(),
+            auth_key_en: id_auth.is_some(),
+            host_data,
+        }
     }
 }

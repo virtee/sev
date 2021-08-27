@@ -19,6 +19,11 @@ impl_const_id! {
     LaunchSecret<'_> = 5,
     LaunchMeasure<'_> = 6,
     LaunchFinish = 7,
+
+    SnpInit = 256,
+    SnpLaunchStart<'_> = 257,
+    SnpLaunchUpdate<'_> = 258,
+    SnpLaunchFinish<'_> = 259,
 }
 
 const KVM: Group = Group::new(0xAE);
@@ -64,6 +69,18 @@ pub const ENC_REG_REGION: Ioctl<Write, &KvmEncRegion> =
 #[allow(dead_code)]
 pub const ENC_UNREG_REGION: Ioctl<Write, &KvmEncRegion> =
     unsafe { KVM.read::<KvmEncRegion>(0xBC).lie() };
+
+/// Initialize the SEV-SNP platform in KVM.
+pub const SNP_INIT: Ioctl<WriteRead, &Command<SnpInit>> = unsafe { ENC_OP.lie() };
+
+/// Initialize the flow to launch a guest.
+pub const SNP_LAUNCH_START: Ioctl<WriteRead, &Command<SnpLaunchStart>> = unsafe { ENC_OP.lie() };
+
+/// Insert pages into the guest physical address space.
+pub const SNP_LAUNCH_UPDATE: Ioctl<WriteRead, &Command<SnpLaunchUpdate>> = unsafe { ENC_OP.lie() };
+
+/// Complete the guest launch flow.
+pub const SNP_LAUNCH_FINISH: Ioctl<WriteRead, &Command<SnpLaunchFinish>> = unsafe { ENC_OP.lie() };
 
 /// Corresponds to the kernel struct `kvm_enc_region`
 #[repr(C)]
