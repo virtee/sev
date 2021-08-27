@@ -198,3 +198,20 @@ impl TryFrom<&sev::Chain> for Generation {
         })
     }
 }
+
+/// A description of the SEV-SNP platform's build information.
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct SnpBuild {
+    /// The version information.
+    pub version: Version,
+
+    /// The build ID.
+    pub build: u32,
+}
+
+impl std::fmt::Display for SnpBuild {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}.{}", self.version, self.build)
+    }
+}

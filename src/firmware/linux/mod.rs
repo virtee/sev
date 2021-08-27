@@ -117,6 +117,30 @@ impl Firmware {
 
         Ok(Identifier(id.as_slice().to_vec()))
     }
+
+    /// Query the SNP platform status.
+    pub fn snp_platform_status(&mut self) -> Result<SnpStatus, Indeterminate<Error>> {
+        let mut info: SnpPlatformStatus = Default::default();
+        SNP_PLATFORM_STATUS.ioctl(&mut self.0, &mut Command::from_mut(&mut info))?;
+
+        Ok(SnpStatus {
+            build: SnpBuild {
+                version: Version {
+                    major: info.version.major,
+                    minor: info.version.minor,
+                },
+                build: info.build_id,
+            },
+            guests: info.guest_count,
+            tcb_version: info.tcb_version,
+            state: match info.state {
+                0 => State::Uninitialized,
+                1 => State::Initialized,
+                // SNP platforms cannot be in the 'Working' State.
+                _ => return Err(Indeterminate::Unknown),
+            },
+        })
+    }
 }
 
 impl AsRawFd for Firmware {

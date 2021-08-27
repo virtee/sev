@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::Version;
-
 use crate::certs::sev;
+use crate::Version;
 
 use std::marker::PhantomData;
 
@@ -151,4 +150,26 @@ impl<'a> GetId<'a> {
     pub fn as_slice(&self) -> &[u8] {
         unsafe { std::slice::from_raw_parts(self.id_addr as *const u8, self.id_len as _) }
     }
+}
+
+/// Query the SEV-SNP platform status.
+///
+/// (Chapter 8.3; Table 38)
+#[derive(Default)]
+#[repr(C, packed)]
+pub struct SnpPlatformStatus {
+    /// The firmware API version (major.minor)
+    pub version: Version,
+
+    /// The platform state.
+    pub state: u8,
+
+    /// The platform build ID.
+    pub build_id: u32,
+
+    /// The number of valid guests maintained by the SEV-SNP firmware.
+    pub guest_count: u32,
+
+    /// The installed TCB version.
+    pub tcb_version: u64,
 }

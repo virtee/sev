@@ -31,7 +31,7 @@ jobs:
           - openssl
   hw:
     name: hw ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
-    runs-on: [self-hosted, linux, sev]
+    runs-on: [self-hosted, linux, sev-snp]
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1

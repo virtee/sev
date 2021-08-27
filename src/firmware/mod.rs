@@ -6,6 +6,8 @@
 mod linux;
 mod types;
 
+use bitflags::bitflags;
+
 use super::*;
 use std::fmt::Debug;
 use std::{error, io};
@@ -240,6 +242,29 @@ pub enum State {
     Working,
 }
 
+impl std::fmt::Display for State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = match self {
+            State::Uninitialized => "uninitialized",
+            State::Initialized => "initialized",
+            State::Working => "working",
+        };
+        write!(f, "{}", state)
+    }
+}
+
+bitflags! {
+    /// Describes the platform state.
+    #[derive(Default)]
+    pub struct Flags: u32 {
+        /// If set, this platform is owned. Otherwise, it is self-owned.
+        const OWNED           = 1 << 0;
+
+        /// If set, encrypted state functionality is present.
+        const ENCRYPTED_STATE = 1 << 8;
+    }
+}
+
 /// Information regarding the SEV platform's current status.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Status {
@@ -277,4 +302,20 @@ impl std::fmt::Display for Identifier {
 
         Ok(())
     }
+}
+
+/// Information regarding the SEV-SNP platform's current status.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SnpStatus {
+    /// The build number.
+    pub build: SnpBuild,
+
+    /// The platform's current state.
+    pub state: State,
+
+    /// The number of valid guests supervised by this platform.
+    pub guests: u32,
+
+    /// The installed TCB version.
+    pub tcb_version: u64,
 }

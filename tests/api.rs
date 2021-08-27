@@ -119,3 +119,25 @@ fn get_identifier() {
     let id = fw.get_identifier().unwrap();
     assert_ne!(Vec::from(id), vec![0u8; 64]);
 }
+
+#[cfg_attr(not(has_sev), ignore)]
+#[test]
+fn snp_platform_status() {
+    let mut fw = Firmware::open().unwrap();
+    let status = fw.snp_platform_status().unwrap();
+
+    println!(
+        "Platform status ioctl results:\n
+              version (major, minor): {}.{}\n
+              build id: {}\n
+              guests: {}\n
+              tcb version: {}\n
+              state: {}\n",
+        status.build.version.major,
+        status.build.version.minor,
+        status.build.build,
+        status.guests,
+        status.tcb_version,
+        status.state
+    );
+}
