@@ -61,6 +61,7 @@ pub const ENC_REG_REGION: Ioctl<Write, &KvmEncRegion> =
     unsafe { KVM.read::<KvmEncRegion>(0xBB).lie() };
 
 /// Corresponds to the `KVM_MEMORY_ENCRYPT_UNREG_REGION` ioctl
+#[allow(dead_code)]
 pub const ENC_UNREG_REGION: Ioctl<Write, &KvmEncRegion> =
     unsafe { KVM.read::<KvmEncRegion>(0xBC).lie() };
 

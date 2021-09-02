@@ -68,9 +68,13 @@ impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, Started, U, V> {
     pub fn update_data(&mut self, data: &[u8]) -> Result<()> {
         let launch_update_data = LaunchUpdateData::new(data);
         let mut cmd = Command::from(self.sev, &launch_update_data);
+
+        ENC_REG_REGION.ioctl(self.kvm, &KvmEncRegion::new(data))?;
+
         LAUNCH_UPDATE_DATA
             .ioctl(self.kvm, &mut cmd)
             .map_err(|e| cmd.encapsulate(e))?;
+
         Ok(())
     }
 
