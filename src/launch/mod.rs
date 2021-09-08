@@ -252,7 +252,7 @@ impl SnpPolicy {
 /// Encapsulates the various data needed to begin the launch process.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 pub struct SnpStart<'a> {
-    /// The userspace address of the region to be encrypted.
+    /// The userspace address of the migration agent region to be encrypted.
     pub ma_uaddr: Option<&'a [u8]>,
 
     /// Describes a policy that the AMD Secure Processor will enforce.
