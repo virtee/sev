@@ -204,7 +204,7 @@ impl<'a, 'b> SnpLaunchUpdate<'a> {
             uaddr: update.uaddr.as_ptr() as _,
             len: update.uaddr.len() as _,
             imi_page: if update.imi_page { 1 } else { 0 },
-            page_type: update.page_type.value(),
+            page_type: update.page_type as _,
             vmpl3_perms: update.vmpl3_perms.bits(),
             vmpl2_perms: update.vmpl2_perms.bits(),
             vmpl1_perms: update.vmpl1_perms.bits(),

@@ -348,39 +348,26 @@ bitflags! {
 /// Encoded page types for a launch update. See Table 58 of the SNP Firmware
 /// specification for further details.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[repr(C)]
+#[non_exhaustive]
 pub enum SnpPageType {
     /// A normal data page.
-    Normal,
+    Normal = 0x1,
 
     /// A VMSA page.
-    Vmsa,
+    Vmsa = 0x2,
 
     /// A page full of zeroes.
-    Zero,
+    Zero = 0x3,
 
     /// A page that is encrypted but not measured
-    Unmeasured,
+    Unmeasured = 0x4,
 
     /// A page for the firmware to store secrets for the guest.
-    Secrets,
+    Secrets = 0x5,
 
     /// A page for the hypervisor to provide CPUID function values.
-    Cpuid,
-}
-
-impl SnpPageType {
-    /// Get the encoded value for a page type. See Table 58 of the SNP
-    /// Firmware specification for further details.
-    pub fn value(self) -> u8 {
-        match self {
-            SnpPageType::Normal => 0x1,
-            SnpPageType::Vmsa => 0x2,
-            SnpPageType::Zero => 0x3,
-            SnpPageType::Unmeasured => 0x4,
-            SnpPageType::Secrets => 0x5,
-            SnpPageType::Cpuid => 0x6,
-        }
-    }
+    Cpuid = 0x6,
 }
 
 /// Encapsulates the data needed to complete a guest launch.
