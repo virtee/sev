@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-//! An implementation of the SEV launch process as a type-state machine.
+//! An implementation of the SEV (non-ES, non-SNP) launch process as a type-state machine.
 //! This ensures (at compile time) that the right steps are called in the
 //! right order.
 
@@ -8,7 +8,7 @@ use super::{Measurement, Secret, Start};
 
 use crate::kvm::types::*;
 use crate::launch::linux::ioctl::*;
-use crate::launch::*;
+pub use crate::launch::{HeaderFlags, Policy, PolicyFlags};
 
 use std::io::Result;
 use std::mem::MaybeUninit;
@@ -22,9 +22,6 @@ pub struct Started(Handle);
 
 /// Launcher type-state that indicates the availability of a measurement.
 pub struct Measured(Handle, Measurement);
-
-/// Launcher type-state that indicates a SNP in-progress.
-pub struct SnpStarted;
 
 /// Facilitates the correct execution of the SEV launch process.
 pub struct Launcher<'a, T, U: AsRawFd, V: AsRawFd> {
@@ -72,43 +69,6 @@ impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, New, U, V> {
 
         Ok(next)
     }
-
-    /// Begin the SEV-SNP launch process by creating a Launcher and issuing the
-    /// KVM_SNP_INIT ioctl.
-    pub fn snp_new(kvm: &'a mut U, sev: &'a mut V) -> Result<Self> {
-        let launcher = Launcher {
-            state: New,
-            vm_fd: kvm,
-            sev,
-        };
-
-        let init = SnpInit::default();
-
-        let mut cmd = Command::from(launcher.sev, &init);
-        SNP_INIT
-            .ioctl(launcher.vm_fd, &mut cmd)
-            .map_err(|e| cmd.encapsulate(e))?;
-
-        Ok(launcher)
-    }
-
-    /// Initialize the flow to launch a guest.
-    pub fn snp_start(self, start: SnpStart) -> Result<Launcher<'a, SnpStarted, U, V>> {
-        let mut launch_start = SnpLaunchStart::new(&start);
-        let mut cmd = Command::from_mut(self.sev, &mut launch_start);
-
-        SNP_LAUNCH_START
-            .ioctl(self.vm_fd, &mut cmd)
-            .map_err(|e| cmd.encapsulate(e))?;
-
-        let launcher = Launcher {
-            state: SnpStarted,
-            vm_fd: self.vm_fd,
-            sev: self.sev,
-        };
-
-        Ok(launcher)
-    }
 }
 
 impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, Started, U, V> {
@@ -142,34 +102,6 @@ impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, Started, U, V> {
         };
 
         Ok(next)
-    }
-}
-
-impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, SnpStarted, U, V> {
-    /// Encrypt guest SNP data.
-    pub fn snp_update_data(&mut self, update: SnpUpdate) -> Result<()> {
-        let launch_update_data = SnpLaunchUpdate::new(&update);
-        let mut cmd = Command::from(self.sev, &launch_update_data);
-
-        ENC_REG_REGION.ioctl(self.vm_fd, &KvmEncRegion::new(update.uaddr))?;
-
-        SNP_LAUNCH_UPDATE
-            .ioctl(self.vm_fd, &mut cmd)
-            .map_err(|e| cmd.encapsulate(e))?;
-
-        Ok(())
-    }
-
-    /// Complete the SNP launch process.
-    pub fn snp_finish(self, finish: SnpFinish) -> Result<()> {
-        let launch_finish = SnpLaunchFinish::new(&finish);
-        let mut cmd = Command::from(self.sev, &launch_finish);
-
-        SNP_LAUNCH_FINISH
-            .ioctl(self.vm_fd, &mut cmd)
-            .map_err(|e| cmd.encapsulate(e))?;
-
-        Ok(())
     }
 }
 

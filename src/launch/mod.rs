@@ -6,11 +6,11 @@
 //! AMD Secure Processor for purposes of attestation as well as abstractions
 //! for navigating the AMD SEV launch process for a virtual machine.
 
-mod launcher;
 #[cfg(target_os = "linux")]
 mod linux;
 
-pub use launcher::{Launcher, Measured, New, Started};
+pub mod sev;
+pub mod snp;
 
 use super::*;
 use bitflags::bitflags;

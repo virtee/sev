@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use sev::firmware::Firmware;
-use sev::launch::*;
-use sev::Version;
+use sev::launch::snp::*;
 
 use kvm_bindings::fam_wrappers::KVM_MAX_CPUID_ENTRIES;
 pub use kvm_bindings::kvm_segment as KvmSegment;
 use kvm_bindings::kvm_userspace_memory_region;
 use kvm_ioctls::{Kvm, VcpuFd};
 use mmarinus::{perms, Kind, Map};
+
 const CODE_SIZE: usize = 0x1000;
 
 /*
@@ -145,18 +145,17 @@ fn snp() {
     }
 
     let mut sev = Firmware::open().unwrap();
-    let launcher = Launcher::snp_new(&mut vm_fd, &mut sev).unwrap();
-    let x: [u8; 16] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    let launcher = Launcher::new(&mut vm_fd, &mut sev).unwrap();
 
-    let policy = SnpPolicy {
-        flags: SnpPolicyFlags::SMT,
-        // we don't care about the version
-        minfw: Version { major: 0, minor: 0 },
+    let start = SnpStart {
+        policy: SnpPolicy {
+            flags: SnpPolicyFlags::SMT,
+            ..Default::default()
+        },
+        ..Default::default()
     };
 
-    let start = SnpStart::new(None, policy, false, x);
-
-    let mut launcher = launcher.snp_start(start).unwrap();
+    let mut launcher = launcher.start(start).unwrap();
 
     // If VMPL is not enabled, perms must be zero
     let dp = VmplPerms::empty();
@@ -168,14 +167,14 @@ fn snp() {
         (dp, dp, dp),
     );
 
-    launcher.snp_update_data(update).unwrap();
+    launcher.update_data(update).unwrap();
 
     let finish = SnpFinish::new(None, None, [0u8; 32]);
 
-    let mut vcpu_fd = launcher.as_mut_vmfd().create_vcpu(0).unwrap();
+    let mut vcpu_fd = launcher.as_mut().create_vcpu(0).unwrap();
     set_cpu(&kvm_fd, &mut vcpu_fd);
 
-    launcher.snp_finish(finish).unwrap();
+    launcher.finish(finish).unwrap();
 
     let ret = vcpu_fd.run();
 
