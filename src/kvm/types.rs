@@ -114,16 +114,11 @@ impl<'a> LaunchMeasure<'a> {
 pub struct LaunchFinish;
 
 /// Initialize the SEV-SNP platform in KVM.
+#[derive(Default)]
 #[repr(C, packed)]
 pub struct SnpInit {
     /// Reserved space, must be always set to 0 when issuing the ioctl.
     flags: u64,
-}
-
-impl Default for SnpInit {
-    fn default() -> Self {
-        Self { flags: 0 }
-    }
 }
 
 /// Initialize the flow to launch a guest.

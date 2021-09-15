@@ -13,6 +13,7 @@ union Signatures {
     rsa: rsa::Signature,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for Signatures {
     fn default() -> Self {
         Signatures {

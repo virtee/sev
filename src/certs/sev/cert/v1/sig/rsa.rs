@@ -20,6 +20,7 @@ impl PartialEq for Signature {
     }
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for Signature {
     fn default() -> Self {
         Signature([0u8; 512])
