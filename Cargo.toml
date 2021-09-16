@@ -32,11 +32,11 @@ serde_bytes = "0.11"
 bitflags = "1.2"
 codicon = "3.0"
 bitfield = "0.13"
-dirs = "3.0"
+dirs = "4.0"
 iocuddle = "0.1"
 
 [dev-dependencies]
-dirs = "3.0"
+dirs = "4.0"
 kvm-bindings = "0.5"
 kvm-ioctls = "0.10"
 mmarinus = "0.2"
