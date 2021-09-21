@@ -23,7 +23,7 @@ impl_const_id! {
     PekCertImport<'_> = 6,
     GetId<'_> = 8, /* GET_ID2 is 8, the deprecated GET_ID ioctl is 7 */
 
-    SnpPlatformStatus = 256,
+    SnpPlatformStatus = 9,
 }
 
 const SEV: Group = Group::new(b'S');

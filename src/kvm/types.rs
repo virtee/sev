@@ -142,6 +142,8 @@ pub struct SnpLaunchStart<'a> {
     /// The format is hypervisor defined.
     gosvw: [u8; 16],
 
+    pad: [u8; 6],
+
     _phantom: PhantomData<&'a [u8]>,
 }
 
@@ -159,6 +161,7 @@ impl<'a> SnpLaunchStart<'a> {
             ma_en: start.ma_en as _,
             imi_en: start.imi_en as _,
             gosvw: start.gosvw,
+            pad: [0u8; 6],
             _phantom: PhantomData,
         }
     }
@@ -167,6 +170,9 @@ impl<'a> SnpLaunchStart<'a> {
 /// Insert pages into the guest physical address space.
 #[repr(C)]
 pub struct SnpLaunchUpdate<'a> {
+    /// guest start frame number.
+    start_gfn: u64,
+
     /// Userspace address of the page needed to be encrypted.
     uaddr: u64,
 
@@ -196,6 +202,7 @@ pub struct SnpLaunchUpdate<'a> {
 impl<'a, 'b> SnpLaunchUpdate<'a> {
     pub fn new(update: &'a SnpUpdate) -> Self {
         Self {
+            start_gfn: update.start_gfn,
             uaddr: update.uaddr.as_ptr() as _,
             len: update.uaddr.len() as _,
             imi_page: if update.imi_page { 1 } else { 0 },
@@ -229,6 +236,8 @@ pub struct SnpLaunchFinish<'a> {
     /// Opaque host-supplied data to describe the guest. The firmware does not interpret this value.
     host_data: [u8; KVM_SEV_SNP_FINISH_DATA_SIZE],
 
+    pad: [u8; 6],
+
     _phantom: PhantomData<&'a [u8]>,
 }
 
@@ -252,6 +261,7 @@ impl<'a> SnpLaunchFinish<'a> {
             id_block_en: if finish.id_block_en { 1 } else { 0 },
             auth_key_en: if finish.auth_key_en { 1 } else { 0 },
             host_data: finish.host_data,
+            pad: [0u8; 6],
             _phantom: PhantomData,
         }
     }

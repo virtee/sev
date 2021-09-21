@@ -161,6 +161,7 @@ fn snp() {
     let dp = VmplPerms::empty();
 
     let update = SnpUpdate::new(
+        mem_region.guest_phys_addr >> 12,
         address_space.as_ref(),
         false,
         SnpPageType::Normal,

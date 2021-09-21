@@ -289,6 +289,9 @@ impl<'a> SnpStart<'a> {
 /// Encapsulates the various data needed to begin the update process.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct SnpUpdate<'a> {
+    /// guest start frame number.
+    pub start_gfn: u64,
+
     /// The userspace of address of the encrypted region.
     pub uaddr: &'a [u8],
 
@@ -311,12 +314,14 @@ pub struct SnpUpdate<'a> {
 impl<'a> SnpUpdate<'a> {
     /// Encapsulate all data needed for the SNP_LAUNCH_UPDATE ioctl.
     pub fn new(
+        start_gfn: u64,
         uaddr: &'a [u8],
         imi_page: bool,
         page_type: SnpPageType,
         perms: (VmplPerms, VmplPerms, VmplPerms),
     ) -> Self {
         Self {
+            start_gfn,
             uaddr,
             imi_page,
             page_type,

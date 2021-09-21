@@ -20,10 +20,10 @@ impl_const_id! {
     LaunchMeasure<'_> = 6,
     LaunchFinish = 7,
 
-    SnpInit = 256,
-    SnpLaunchStart<'_> = 257,
-    SnpLaunchUpdate<'_> = 258,
-    SnpLaunchFinish<'_> = 259,
+    SnpInit = 22,
+    SnpLaunchStart<'_> = 23,
+    SnpLaunchUpdate<'_> = 24,
+    SnpLaunchFinish<'_> = 25,
 }
 
 const KVM: Group = Group::new(0xAE);
