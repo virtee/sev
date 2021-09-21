@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
+//! A collection of type-safe ioctl implementations for the AMD Secure Encrypted Virtualization
+//! (SEV) platform. These ioctls are exported by the Linux kernel.
+
 use crate::firmware::{Error, Indeterminate};
 use crate::impl_const_id;
 use crate::kvm::types::*;
@@ -12,6 +15,7 @@ use std::os::unix::io::AsRawFd;
 // These enum ordinal values are defined in the Linux kernel
 // source code: include/uapi/linux/kvm.h
 impl_const_id! {
+    /// The ioctl sub number
     pub Id => u32;
     Init = 0,
     LaunchStart<'_> = 2,
@@ -66,7 +70,6 @@ pub const ENC_REG_REGION: Ioctl<Write, &KvmEncRegion> =
     unsafe { KVM.read::<KvmEncRegion>(0xBB).lie() };
 
 /// Corresponds to the `KVM_MEMORY_ENCRYPT_UNREG_REGION` ioctl
-#[allow(dead_code)]
 pub const ENC_UNREG_REGION: Ioctl<Write, &KvmEncRegion> =
     unsafe { KVM.read::<KvmEncRegion>(0xBC).lie() };
 
@@ -100,8 +103,14 @@ impl<'a> KvmEncRegion<'a> {
             phantom: PhantomData,
         }
     }
+
+    /// Register the encrypted memory region to a virtual machine
+    pub fn register(&mut self, vm_fd: &mut impl AsRawFd) -> std::io::Result<std::os::raw::c_uint> {
+        ENC_REG_REGION.ioctl(vm_fd, self)
+    }
 }
 
+/// A generic SEV command
 #[repr(C)]
 pub struct Command<'a, T: Id> {
     code: u32,
@@ -112,6 +121,7 @@ pub struct Command<'a, T: Id> {
 }
 
 impl<'a, T: Id> Command<'a, T> {
+    /// create the command from a mutable subcommand
     pub fn from_mut(sev: &'a mut impl AsRawFd, subcmd: &'a mut T) -> Self {
         Self {
             code: T::ID,
@@ -122,6 +132,7 @@ impl<'a, T: Id> Command<'a, T> {
         }
     }
 
+    /// create the command from a subcommand reference
     pub fn from(sev: &'a mut impl AsRawFd, subcmd: &'a T) -> Self {
         Self {
             code: T::ID,
@@ -132,6 +143,7 @@ impl<'a, T: Id> Command<'a, T> {
         }
     }
 
+    /// encapsulate a `std::io::Error` in an `Indeterminate<Error>`
     pub fn encapsulate(&self, err: std::io::Error) -> Indeterminate<Error> {
         match self.error {
             0 => Indeterminate::<Error>::from(err),

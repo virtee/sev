@@ -77,7 +77,7 @@ impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, Started, U, V> {
         let launch_update_data = LaunchUpdateData::new(data);
         let mut cmd = Command::from(self.sev, &launch_update_data);
 
-        ENC_REG_REGION.ioctl(self.vm_fd, &KvmEncRegion::new(data))?;
+        KvmEncRegion::new(data).register(self.vm_fd)?;
 
         LAUNCH_UPDATE_DATA
             .ioctl(self.vm_fd, &mut cmd)

@@ -87,7 +87,7 @@ impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, Started, U, V> {
         let launch_update_data = SnpLaunchUpdate::new(&update);
         let mut cmd = Command::from(self.sev, &launch_update_data);
 
-        ENC_REG_REGION.ioctl(self.vm_fd, &KvmEncRegion::new(update.uaddr))?;
+        KvmEncRegion::new(update.uaddr).register(self.vm_fd)?;
 
         SNP_LAUNCH_UPDATE
             .ioctl(self.vm_fd, &mut cmd)

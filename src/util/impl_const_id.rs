@@ -6,12 +6,15 @@
 #[macro_export]
 macro_rules! impl_const_id {
     (
+        $(#[$outer:meta])*
         $visibility:vis $trait:ident => $id_ty:ty;
         $(
             $iocty:ty = $val:expr
         ),* $(,)*
     ) => {
+        $(#[$outer])*
         $visibility trait $trait {
+            $(#[$outer])*
             const ID: $id_ty;
         }
 
