@@ -102,7 +102,7 @@ fn snp() {
     }
 
     let kvm_fd = Kvm::new().unwrap();
-    let mut vm_fd = kvm_fd.create_vm().unwrap();
+    let vm_fd = kvm_fd.create_vm().unwrap();
     vm_fd.create_irq_chip().unwrap();
 
     let mut address_space = Map::map(CODE_SIZE)
@@ -144,8 +144,8 @@ fn snp() {
         vm_fd.set_user_memory_region(mem_region).unwrap();
     }
 
-    let mut sev = Firmware::open().unwrap();
-    let launcher = Launcher::new(&mut vm_fd, &mut sev).unwrap();
+    let sev = Firmware::open().unwrap();
+    let launcher = Launcher::new(vm_fd, sev).unwrap();
 
     let start = SnpStart {
         policy: SnpPolicy {
@@ -175,7 +175,7 @@ fn snp() {
     let mut vcpu_fd = launcher.as_mut().create_vcpu(0).unwrap();
     set_cpu(&kvm_fd, &mut vcpu_fd);
 
-    launcher.finish(finish).unwrap();
+    let (_vm_fd, _sev) = launcher.finish(finish).unwrap();
 
     let ret = vcpu_fd.run();
 
