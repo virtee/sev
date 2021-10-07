@@ -71,10 +71,6 @@ pub const LAUNCH_FINISH: Ioctl<WriteRead, &Command<sev::LaunchFinish>> = unsafe 
 pub const ENC_REG_REGION: Ioctl<Write, &KvmEncRegion> =
     unsafe { KVM.read::<KvmEncRegion>(0xBB).lie() };
 
-/// Corresponds to the `KVM_MEMORY_ENCRYPT_UNREG_REGION` ioctl
-pub const ENC_UNREG_REGION: Ioctl<Write, &KvmEncRegion> =
-    unsafe { KVM.read::<KvmEncRegion>(0xBC).lie() };
-
 /// Initialize the SEV-SNP platform in KVM.
 pub const SNP_INIT: Ioctl<WriteRead, &Command<snp::Init>> = unsafe { ENC_OP.lie() };
 
