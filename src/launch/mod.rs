@@ -7,7 +7,7 @@
 //! for navigating the AMD SEV launch process for a virtual machine.
 
 #[cfg(target_os = "linux")]
-pub mod linux;
+mod linux;
 
 pub mod sev;
 pub mod snp;
