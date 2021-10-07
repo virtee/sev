@@ -2,7 +2,7 @@
 
 //! AMD's Naples certificates.
 //!
-//! Certificate provenance: https://developer.amd.com/wp-content/resources/ask_ark_naples.cert
+//! Certificate provenance: <https://developer.amd.com/wp-content/resources/ask_ark_naples.cert>
 //!
 //! For convenience, the certificate chain has been split into individual
 //! certificates and are embedded here as byte slices.
