@@ -3,3 +3,4 @@
 //! Operations for launching on Linux
 
 pub mod ioctl;
+pub(crate) mod kvm;

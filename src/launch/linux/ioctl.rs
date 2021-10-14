@@ -5,7 +5,7 @@
 
 use crate::firmware::{Error, Indeterminate};
 use crate::impl_const_id;
-use crate::kvm::types::*;
+use crate::launch::linux::kvm::*;
 use iocuddle::*;
 
 use std::marker::PhantomData;

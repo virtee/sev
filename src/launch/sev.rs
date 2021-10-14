@@ -6,8 +6,8 @@
 
 use super::{Measurement, Secret, Start};
 
-use crate::kvm::types::*;
 use crate::launch::linux::ioctl::*;
+use crate::launch::linux::kvm::*;
 pub use crate::launch::{HeaderFlags, Policy, PolicyFlags};
 
 use std::io::Result;

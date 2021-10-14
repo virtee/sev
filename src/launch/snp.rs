@@ -8,8 +8,8 @@ pub use crate::launch::{
     SnpFinish, SnpPageType, SnpPolicy, SnpPolicyFlags, SnpStart, SnpUpdate, VmplPerms,
 };
 
-use crate::kvm::types::*;
 use crate::launch::linux::ioctl::*;
+use crate::launch::linux::kvm::*;
 
 use std::io::Result;
 use std::marker::PhantomData;

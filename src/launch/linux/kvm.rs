@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+//! Types for interacting with the KVM-SEV guest management API.
+
 use crate::certs::sev;
 use crate::launch::*;
 use crate::launch::{Header, Measurement, Policy, Session};
