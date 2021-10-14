@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-//! Operations for launching on Linux
+//! Operations and types for launching on Linux
 
 pub mod ioctl;
-pub(crate) mod kvm;
+pub(crate) mod sev;
+pub(crate) mod snp;

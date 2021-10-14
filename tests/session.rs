@@ -9,7 +9,7 @@ mod initialized {
 
     #[test]
     fn create() {
-        Session::try_from(launch::Policy::default()).unwrap();
+        Session::try_from(launch::sev::Policy::default()).unwrap();
     }
 
     #[test]
@@ -19,7 +19,7 @@ mod initialized {
         const PEK: &[u8] = include_bytes!("naples/pek.cert");
         const PDH: &[u8] = include_bytes!("naples/pdh.cert");
 
-        let session = Session::try_from(launch::Policy::default()).unwrap();
+        let session = Session::try_from(launch::sev::Policy::default()).unwrap();
         session
             .start(Chain {
                 ca: ca::Chain {

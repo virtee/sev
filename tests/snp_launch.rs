@@ -44,9 +44,9 @@ fn snp() {
     let sev = Firmware::open().unwrap();
     let launcher = Launcher::new(vm_fd, sev).unwrap();
 
-    let start = SnpStart {
-        policy: SnpPolicy {
-            flags: SnpPolicyFlags::SMT,
+    let start = Start {
+        policy: Policy {
+            flags: PolicyFlags::SMT,
             ..Default::default()
         },
         ..Default::default()
@@ -57,17 +57,17 @@ fn snp() {
     // If VMPL is not enabled, perms must be zero
     let dp = VmplPerms::empty();
 
-    let update = SnpUpdate::new(
+    let update = Update::new(
         mem_region.guest_phys_addr >> 12,
         address_space.as_ref(),
         false,
-        SnpPageType::Normal,
+        PageType::Normal,
         (dp, dp, dp),
     );
 
     launcher.update_data(update).unwrap();
 
-    let finish = SnpFinish::new(None, None, [0u8; 32]);
+    let finish = Finish::new(None, None, [0u8; 32]);
 
     let vcpu_fd = launcher.as_mut().create_vcpu(0).unwrap();
 
