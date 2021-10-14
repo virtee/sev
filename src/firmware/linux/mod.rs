@@ -133,12 +133,15 @@ impl Firmware {
             },
             guests: info.guest_count,
             tcb_version: info.tcb_version,
+            is_rmp_init: info.is_rmp_init == 1,
+            mask_chip_id: info.mask_chip_id == 1,
             state: match info.state {
                 0 => State::Uninitialized,
                 1 => State::Initialized,
                 // SNP platforms cannot be in the 'Working' State.
                 _ => return Err(Indeterminate::Unknown),
             },
+            reported_tcb_version: info.reported_tcb_version,
         })
     }
 }

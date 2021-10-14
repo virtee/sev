@@ -156,7 +156,7 @@ impl<'a> GetId<'a> {
 ///
 /// (Chapter 8.3; Table 38)
 #[derive(Default)]
-#[repr(C, packed)]
+#[repr(C)]
 pub struct SnpPlatformStatus {
     /// The firmware API version (major.minor)
     pub version: Version,
@@ -164,12 +164,21 @@ pub struct SnpPlatformStatus {
     /// The platform state.
     pub state: u8,
 
+    /// IsRmpInitiailzied
+    pub is_rmp_init: u8,
+
     /// The platform build ID.
     pub build_id: u32,
+
+    /// MaskChipId
+    pub mask_chip_id: u32,
 
     /// The number of valid guests maintained by the SEV-SNP firmware.
     pub guest_count: u32,
 
     /// The installed TCB version.
     pub tcb_version: u64,
+
+    /// reported TCB version
+    pub reported_tcb_version: u64,
 }

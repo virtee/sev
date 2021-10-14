@@ -313,9 +313,18 @@ pub struct SnpStatus {
     /// The platform's current state.
     pub state: State,
 
+    /// IsRmpInitiailzied
+    pub is_rmp_init: bool,
+
+    /// MaskChipId
+    pub mask_chip_id: bool,
+
     /// The number of valid guests supervised by this platform.
     pub guests: u32,
 
     /// The installed TCB version.
     pub tcb_version: u64,
+
+    /// reported TCB version
+    pub reported_tcb_version: u64,
 }
