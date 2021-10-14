@@ -8,7 +8,9 @@ pub use crate::launch::{
     SnpFinish, SnpPageType, SnpPolicy, SnpPolicyFlags, SnpStart, SnpUpdate, VmplPerms,
 };
 
+#[cfg(target_os = "linux")]
 use crate::launch::linux::ioctl::*;
+#[cfg(target_os = "linux")]
 use crate::launch::linux::kvm::*;
 
 use std::io::Result;

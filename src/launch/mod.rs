@@ -16,6 +16,7 @@ use super::*;
 use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
 
+#[cfg(target_os = "linux")]
 use crate::launch::linux::kvm::*;
 
 bitflags! {
