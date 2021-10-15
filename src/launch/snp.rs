@@ -66,7 +66,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
 
     /// Initialize the flow to launch a guest.
     pub fn start(mut self, start: Start) -> Result<Launcher<Started, U, V>> {
-        let mut launch_start = LaunchStart::new(&start);
+        let mut launch_start = LaunchStart::from(start);
         let mut cmd = Command::from_mut(&mut self.sev, &mut launch_start);
 
         SNP_LAUNCH_START
@@ -86,7 +86,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
 impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
     /// Encrypt guest SNP data.
     pub fn update_data(&mut self, update: Update) -> Result<()> {
-        let launch_update_data = LaunchUpdate::new(&update);
+        let launch_update_data = LaunchUpdate::from(update);
         let mut cmd = Command::from(&mut self.sev, &launch_update_data);
 
         KvmEncRegion::new(update.uaddr).register(&mut self.vm_fd)?;
@@ -100,7 +100,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
 
     /// Complete the SNP launch process.
     pub fn finish(mut self, finish: Finish) -> Result<(U, V)> {
-        let launch_finish = LaunchFinish::new(&finish);
+        let launch_finish = LaunchFinish::from(finish);
         let mut cmd = Command::from(&mut self.sev, &launch_finish);
 
         SNP_LAUNCH_FINISH
@@ -137,20 +137,19 @@ pub struct Policy {
     pub minfw: Version,
 }
 
-impl Policy {
-    /// Convert a Policy to it's u64 counterpart.
-    pub fn as_u64(&self) -> u64 {
+impl From<Policy> for u64 {
+    fn from(policy: Policy) -> u64 {
         let mut val: u64 = 0;
 
-        let minor_version = u64::from(self.minfw.minor);
-        let mut major_version = u64::from(self.minfw.major);
+        let minor_version = u64::from(policy.minfw.minor);
+        let mut major_version = u64::from(policy.minfw.major);
 
         /*
          * According to the SNP firmware spec, bit 1 of the policy flags is reserved and must
          * always be set to 1. Rather than passing this responsibility off to callers, set this bit
          * every time an ioctl is issued to the kernel.
          */
-        let flags = self.flags.bits | 0b10;
+        let flags = policy.flags.bits | 0b10;
         let mut flags_64 = u64::from(flags);
 
         major_version <<= 8;

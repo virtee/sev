@@ -40,8 +40,8 @@ pub struct LaunchStart<'a> {
     _phantom: PhantomData<&'a [u8]>,
 }
 
-impl<'a> LaunchStart<'a> {
-    pub fn new(start: &'a Start) -> Self {
+impl From<Start<'_>> for LaunchStart<'_> {
+    fn from(start: Start) -> Self {
         let uaddr = if let Some(addr) = start.ma_uaddr {
             addr.as_ptr() as u64
         } else {
@@ -49,7 +49,7 @@ impl<'a> LaunchStart<'a> {
         };
 
         Self {
-            policy: start.policy.as_u64(),
+            policy: start.policy.into(),
             ma_uaddr: uaddr,
             ma_en: start.ma_en as _,
             imi_en: start.imi_en as _,
@@ -92,8 +92,8 @@ pub struct LaunchUpdate<'a> {
     _phantom: PhantomData<&'a ()>,
 }
 
-impl<'a, 'b> LaunchUpdate<'a> {
-    pub fn new(update: &'a Update) -> Self {
+impl From<Update<'_>> for LaunchUpdate<'_> {
+    fn from(update: Update) -> Self {
         Self {
             start_gfn: update.start_gfn,
             uaddr: update.uaddr.as_ptr() as _,
@@ -134,8 +134,8 @@ pub struct LaunchFinish<'a> {
     _phantom: PhantomData<&'a [u8]>,
 }
 
-impl<'a> LaunchFinish<'a> {
-    pub fn new(finish: &'a Finish) -> Self {
+impl From<Finish<'_, '_>> for LaunchFinish<'_> {
+    fn from(finish: Finish) -> Self {
         let id_block = if let Some(addr) = finish.id_block {
             addr.as_ptr() as u64
         } else {
