@@ -42,16 +42,14 @@ pub struct LaunchStart<'a> {
 
 impl From<Start<'_>> for LaunchStart<'_> {
     fn from(start: Start) -> Self {
-        let uaddr = if let Some(addr) = start.ma_uaddr {
-            addr.as_ptr() as u64
-        } else {
-            0
-        };
-
         Self {
             policy: start.policy.into(),
-            ma_uaddr: uaddr,
-            ma_en: start.ma_en as _,
+            ma_uaddr: if let Some(addr) = start.ma_uaddr {
+                addr.as_ptr() as u64
+            } else {
+                0
+            },
+            ma_en: if start.ma_uaddr.is_some() { 1 } else { 0 },
             imi_en: start.imi_en as _,
             gosvw: start.gosvw,
             pad: [0u8; 6],
@@ -151,8 +149,8 @@ impl From<Finish<'_, '_>> for LaunchFinish<'_> {
         Self {
             id_block_uaddr: id_block,
             id_auth_uaddr: id_auth,
-            id_block_en: if finish.id_block_en { 1 } else { 0 },
-            auth_key_en: if finish.auth_key_en { 1 } else { 0 },
+            id_block_en: if finish.id_block.is_some() { 1 } else { 0 },
+            auth_key_en: if finish.id_auth.is_some() { 1 } else { 0 },
             host_data: finish.host_data,
             pad: [0u8; 6],
             _phantom: PhantomData,

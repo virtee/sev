@@ -173,9 +173,6 @@ pub struct Start<'a> {
     /// Describes a policy that the AMD Secure Processor will enforce.
     pub policy: Policy,
 
-    /// Indicates if this guest is associated with a migration agent. Otherwise 0.
-    pub ma_en: bool,
-
     /// Indicates that this launch flow is launching an IMI for the purpose of guest-assisted migration.
     pub imi_en: bool,
 
@@ -189,7 +186,6 @@ impl<'a> Start<'a> {
         Self {
             ma_uaddr,
             policy,
-            ma_en: ma_uaddr.is_some(),
             imi_en,
             gosvw,
         }
@@ -294,13 +290,6 @@ pub struct Finish<'a, 'b> {
     /// The userspace address of the authentication information of the ID block.
     pub id_auth: Option<&'b [u8]>,
 
-    /// Indicates that the ID block is present.
-    pub id_block_en: bool,
-
-    /// Indicates that the author key is present in the ID authentication information structure.
-    /// Ignored if id_block_en is 0.
-    pub auth_key_en: bool,
-
     /// Opaque host-supplied data to describe the guest. The firmware does not interpret this
     /// value.
     pub host_data: [u8; KVM_SEV_SNP_FINISH_DATA_SIZE],
@@ -316,8 +305,6 @@ impl<'a, 'b> Finish<'a, 'b> {
         Self {
             id_block,
             id_auth,
-            id_block_en: id_block.is_some(),
-            auth_key_en: id_auth.is_some(),
             host_data,
         }
     }
