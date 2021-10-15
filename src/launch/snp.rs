@@ -168,16 +168,16 @@ impl From<Policy> for u64 {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Start<'a> {
     /// The userspace address of the migration agent region to be encrypted.
-    pub ma_uaddr: Option<&'a [u8]>,
+    pub(crate) ma_uaddr: Option<&'a [u8]>,
 
     /// Describes a policy that the AMD Secure Processor will enforce.
-    pub policy: Policy,
+    pub(crate) policy: Policy,
 
     /// Indicates that this launch flow is launching an IMI for the purpose of guest-assisted migration.
-    pub imi_en: bool,
+    pub(crate) imi_en: bool,
 
     /// Hypervisor provided value to indicate guest OS visible workarounds.The format is hypervisor defined.
-    pub gosvw: [u8; 16],
+    pub(crate) gosvw: [u8; 16],
 }
 
 impl<'a> Start<'a> {
@@ -196,25 +196,25 @@ impl<'a> Start<'a> {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Update<'a> {
     /// guest start frame number.
-    pub start_gfn: u64,
+    pub(crate) start_gfn: u64,
 
     /// The userspace of address of the encrypted region.
-    pub uaddr: &'a [u8],
+    pub(crate) uaddr: &'a [u8],
 
     /// Indicates that this page is part of the IMI of the guest.
-    pub imi_page: bool,
+    pub(crate) imi_page: bool,
 
     /// Encoded page type.
-    pub page_type: PageType,
+    pub(crate) page_type: PageType,
 
     /// VMPL3 permission mask.
-    pub vmpl3_perms: VmplPerms,
+    pub(crate) vmpl3_perms: VmplPerms,
 
     /// VMPL2 permission mask.
-    pub vmpl2_perms: VmplPerms,
+    pub(crate) vmpl2_perms: VmplPerms,
 
     /// VMPL1 permission mask.
-    pub vmpl1_perms: VmplPerms,
+    pub(crate) vmpl1_perms: VmplPerms,
 }
 
 impl<'a> Update<'a> {
@@ -285,14 +285,14 @@ pub enum PageType {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Finish<'a, 'b> {
     /// The userspace address of the encrypted region.
-    pub id_block: Option<&'a [u8]>,
+    pub(crate) id_block: Option<&'a [u8]>,
 
     /// The userspace address of the authentication information of the ID block.
-    pub id_auth: Option<&'b [u8]>,
+    pub(crate) id_auth: Option<&'b [u8]>,
 
     /// Opaque host-supplied data to describe the guest. The firmware does not interpret this
     /// value.
-    pub host_data: [u8; KVM_SEV_SNP_FINISH_DATA_SIZE],
+    pub(crate) host_data: [u8; KVM_SEV_SNP_FINISH_DATA_SIZE],
 }
 
 impl<'a, 'b> Finish<'a, 'b> {

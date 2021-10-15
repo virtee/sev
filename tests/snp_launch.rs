@@ -44,13 +44,15 @@ fn snp() {
     let sev = Firmware::open().unwrap();
     let launcher = Launcher::new(vm_fd, sev).unwrap();
 
-    let start = Start {
-        policy: Policy {
+    let start = Start::new(
+        None,
+        Policy {
             flags: PolicyFlags::SMT,
             ..Default::default()
         },
-        ..Default::default()
-    };
+        false,
+        [0; 16],
+    );
 
     let mut launcher = launcher.start(start).unwrap();
 
