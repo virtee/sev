@@ -132,7 +132,10 @@ impl Firmware {
                 build: info.build_id,
             },
             guests: info.guest_count,
-            tcb_version: info.tcb_version,
+            tcb: SnpTcbStatus {
+                platform_version: info.platform_tcb_version,
+                reported_version: info.reported_tcb_version,
+            },
             is_rmp_init: info.is_rmp_init == 1,
             mask_chip_id: info.mask_chip_id == 1,
             state: match info.state {
@@ -141,7 +144,6 @@ impl Firmware {
                 // SNP platforms cannot be in the 'Working' State.
                 _ => return Err(Indeterminate::Unknown),
             },
-            reported_tcb_version: info.reported_tcb_version,
         })
     }
 }

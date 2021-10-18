@@ -131,13 +131,27 @@ fn snp_platform_status() {
               version (major, minor): {}.{}\n
               build id: {}\n
               guests: {}\n
-              tcb version: {}\n
+              platform tcb microcode version: {}\n
+              platform tcb snp version: {}\n
+              platform tcb tee version: {}\n
+              platform tcb bootloader version: {}\n
+              reported tcb microcode version: {}\n
+              reported tcb snp version: {}\n
+              reported tcb tee version: {}\n
+              reported tcb bootloader version: {}\n
               state: {}\n",
         status.build.version.major,
         status.build.version.minor,
         status.build.build,
         status.guests,
-        status.tcb_version,
+        status.tcb.platform_version.microcode,
+        status.tcb.platform_version.snp,
+        status.tcb.platform_version.tee,
+        status.tcb.platform_version.bootloader,
+        status.tcb.reported_version.microcode,
+        status.tcb.reported_version.snp,
+        status.tcb.reported_version.tee,
+        status.tcb.reported_version.bootloader,
         status.state
     );
 }

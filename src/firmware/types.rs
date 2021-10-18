@@ -152,6 +152,26 @@ impl<'a> GetId<'a> {
     }
 }
 
+/// TcbVersion represents the version of the firmware.
+///
+/// (Chapter 2.2; Table 3)
+#[derive(Clone, Debug, Default, PartialEq)]
+#[repr(C)]
+pub struct TcbVersion {
+    /// Current bootloader version.
+    /// SVN of PSP bootloader.
+    pub bootloader: u8,
+    /// Current PSP OS version.
+    /// SVN of PSP operating system.
+    pub tee: u8,
+    _reserved: [u8; 4],
+    /// Version of the SNP firmware.
+    /// Security Version Number (SVN) of SNP firmware.
+    pub snp: u8,
+    /// Lowest current patch level of all the cores.
+    pub microcode: u8,
+}
+
 /// Query the SEV-SNP platform status.
 ///
 /// (Chapter 8.3; Table 38)
@@ -176,9 +196,9 @@ pub struct SnpPlatformStatus {
     /// The number of valid guests maintained by the SEV-SNP firmware.
     pub guest_count: u32,
 
-    /// The installed TCB version.
-    pub tcb_version: u64,
+    /// Installed TCB version.
+    pub platform_tcb_version: TcbVersion,
 
-    /// reported TCB version
-    pub reported_tcb_version: u64,
+    /// Reported TCB version.
+    pub reported_tcb_version: TcbVersion,
 }

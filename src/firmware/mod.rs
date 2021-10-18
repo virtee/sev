@@ -15,7 +15,7 @@ use std::{error, io};
 #[cfg(target_os = "linux")]
 pub use linux::Firmware;
 
-pub use types::PlatformStatusFlags;
+pub use types::{PlatformStatusFlags, TcbVersion};
 
 /// There are a number of error conditions that can occur between this
 /// layer all the way down to the SEV platform. Most of these cases have
@@ -304,6 +304,16 @@ impl std::fmt::Display for Identifier {
     }
 }
 
+/// Information regarding the SEV-SNP platform's TCB version.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SnpTcbStatus {
+    /// Installed TCB version.
+    pub platform_version: TcbVersion,
+
+    /// Reported TCB version.
+    pub reported_version: TcbVersion,
+}
+
 /// Information regarding the SEV-SNP platform's current status.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SnpStatus {
@@ -322,9 +332,6 @@ pub struct SnpStatus {
     /// The number of valid guests supervised by this platform.
     pub guests: u32,
 
-    /// The installed TCB version.
-    pub tcb_version: u64,
-
-    /// reported TCB version
-    pub reported_tcb_version: u64,
+    /// TCB status.
+    pub tcb: SnpTcbStatus,
 }
