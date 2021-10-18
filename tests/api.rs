@@ -127,19 +127,19 @@ fn snp_platform_status() {
     let status = fw.snp_platform_status().unwrap();
 
     println!(
-        "Platform status ioctl results:\n
-              version (major, minor): {}.{}\n
-              build id: {}\n
-              guests: {}\n
-              platform tcb microcode version: {}\n
-              platform tcb snp version: {}\n
-              platform tcb tee version: {}\n
-              platform tcb bootloader version: {}\n
-              reported tcb microcode version: {}\n
-              reported tcb snp version: {}\n
-              reported tcb tee version: {}\n
-              reported tcb bootloader version: {}\n
-              state: {}\n",
+        "Platform status ioctl results:
+              version (major, minor): {}.{}
+              build id: {}
+              guests: {}
+              platform tcb microcode version: {}
+              platform tcb snp version: {}
+              platform tcb tee version: {}
+              platform tcb bootloader version: {}
+              reported tcb microcode version: {}
+              reported tcb snp version: {}
+              reported tcb tee version: {}
+              reported tcb bootloader version: {}
+              state: {}",
         status.build.version.major,
         status.build.version.minor,
         status.build.build,
