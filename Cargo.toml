@@ -38,6 +38,6 @@ iocuddle = "0.1"
 [dev-dependencies]
 dirs = "4.0"
 kvm-bindings = "0.5"
-kvm-ioctls = "0.10"
+kvm-ioctls = "0.11"
 mmarinus = "0.2"
 serial_test = "0.5"
