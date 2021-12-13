@@ -176,6 +176,18 @@ pub struct Policy {
     pub minfw: Version,
 }
 
+/// Convert a policy represented as a u32 to a Policy struct.
+impl From<u32> for Policy {
+    fn from(p: u32) -> Self {
+        let flags = PolicyFlags::from_bits_truncate(((p & 0xFF00) >> 8) as u16);
+
+        let minfw = (p & 0xFF) as u16;
+        let minfw: Version = minfw.into();
+
+        Self { flags, minfw }
+    }
+}
+
 /// A secure channel between the tenant and the AMD Secure
 /// Processor.
 #[repr(C)]

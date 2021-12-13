@@ -74,6 +74,15 @@ impl std::fmt::Display for Version {
     }
 }
 
+impl From<u16> for Version {
+    fn from(v: u16) -> Self {
+        Self {
+            major: ((v & 0xF0) >> 4) as u8,
+            minor: (v & 0x0F) as u8,
+        }
+    }
+}
+
 /// A description of the SEV platform's build information.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
