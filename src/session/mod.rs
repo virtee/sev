@@ -24,8 +24,13 @@ pub struct Verified(launch::sev::Measurement);
 /// This is required for facilitating an SEV launch and attestation.
 pub struct Session<T> {
     policy: launch::sev::Policy,
-    tek: key::Key,
-    tik: key::Key,
+
+    /// Transport Encryption Key.
+    pub tek: key::Key,
+
+    /// Transport Integrity Key.
+    pub tik: key::Key,
+
     data: T,
 }
 

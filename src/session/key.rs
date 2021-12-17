@@ -34,6 +34,15 @@ impl DerefMut for Key {
     }
 }
 
+impl codicon::Encoder<()> for Key {
+    type Error = Error;
+    fn encode(&self, mut writer: impl Write, _: ()) -> std::io::Result<()> {
+        writer.write_all(&self.0)?;
+
+        Ok(())
+    }
+}
+
 impl Key {
     pub fn new(key: Vec<u8>) -> Self {
         Self(key)
