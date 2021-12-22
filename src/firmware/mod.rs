@@ -6,8 +6,6 @@
 mod linux;
 mod types;
 
-use bitflags::bitflags;
-
 use super::*;
 use std::fmt::Debug;
 use std::{error, io};
@@ -250,18 +248,6 @@ impl std::fmt::Display for State {
             State::Working => "working",
         };
         write!(f, "{}", state)
-    }
-}
-
-bitflags! {
-    /// Describes the platform state.
-    #[derive(Default)]
-    pub struct Flags: u32 {
-        /// If set, this platform is owned. Otherwise, it is self-owned.
-        const OWNED           = 1 << 0;
-
-        /// If set, encrypted state functionality is present.
-        const ENCRYPTED_STATE = 1 << 8;
     }
 }
 
