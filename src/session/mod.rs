@@ -105,6 +105,24 @@ impl Session<Initialized> {
         })
     }
 
+    /// Like the above start function, yet takes PDH as input instead of deriving it from a
+    /// certificate chain.
+    pub fn start_pdh(&self, pdh: certs::sev::Certificate) -> Result<launch::sev::Start> {
+        let (crt, prv) = sev::Certificate::generate(sev::Usage::PDH)?;
+
+        let z = key::Key::new(prv.derive(&pdh)?);
+        let mut nonce = [0u8; 16];
+        let mut iv = [0u8; 16];
+        rand::rand_bytes(&mut nonce)?;
+        rand::rand_bytes(&mut iv)?;
+
+        Ok(launch::sev::Start {
+            policy: self.policy,
+            cert: crt,
+            session: self.session(nonce, iv, z)?,
+        })
+    }
+
     /// Transitions to a measuring state.
     ///
     /// Any measureable data submitted to the AMD SP should also be included
