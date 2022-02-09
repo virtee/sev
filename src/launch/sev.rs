@@ -179,10 +179,12 @@ pub struct Policy {
 /// Convert a policy represented as a u32 to a Policy struct.
 impl From<u32> for Policy {
     fn from(p: u32) -> Self {
-        let flags = PolicyFlags::from_bits_truncate(((p & 0xFF00) >> 8) as u16);
+        let flags = p as u16;
+        let flags = PolicyFlags::from_bits_truncate(flags);
 
-        let minfw = (p & 0xFF) as u16;
-        let minfw: Version = minfw.into();
+        let p = p >> 16;
+        let p = p as u16;
+        let minfw = Version::from(p);
 
         Self { flags, minfw }
     }
