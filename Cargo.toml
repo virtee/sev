@@ -4,8 +4,8 @@ version = "0.2.0"
 authors = ["Nathaniel McCallum <npmccallum@redhat.com>"]
 license = "Apache-2.0"
 edition = "2018"
-homepage = "https://github.com/enarx/sev"
-repository = "https://github.com/enarx/sev"
+homepage = "https://github.com/virtee/sev"
+repository = "https://github.com/virtee/sev"
 description = "Library for AMD SEV"
 readme = "README.md"
 keywords = ["amd", "sev"]
@@ -14,11 +14,11 @@ exclude = [ ".gitignore", ".github/*" ]
 
 [badges]
 # See https://doc.rust-lang.org/cargo/reference/manifest.html#the-badges-section
-github = { repository = "enarx/sev", workflow = "test" }
-#github = { repository = "enarx/sev", workflow = "lint" }
+github = { repository = "virtee/sev", workflow = "test" }
+#github = { repository = "virtee/sev", workflow = "lint" }
 maintenance = { status = "actively-developed" }
-is-it-maintained-issue-resolution = { repository = "enarx/sev" }
-is-it-maintained-open-issues = { repository = "enarx/sev" }
+is-it-maintained-issue-resolution = { repository = "virtee/sev" }
+is-it-maintained-open-issues = { repository = "virtee/sev" }
 
 [features]
 default = []

@@ -1,6 +1,6 @@
-[![Workflow Status](https://github.com/enarx/sev/workflows/test/badge.svg)](https://github.com/enarx/sev/actions?query=workflow%3A%22test%22)
-[![Average time to resolve an issue](https://isitmaintained.com/badge/resolution/enarx/sev.svg)](https://isitmaintained.com/project/enarx/sev "Average time to resolve an issue")
-[![Percentage of issues still open](https://isitmaintained.com/badge/open/enarx/sev.svg)](https://isitmaintained.com/project/enarx/sev "Percentage of issues still open")
+[![Workflow Status](https://github.com/virtee/sev/workflows/test/badge.svg)](https://github.com/virtee/sev/actions?query=workflow%3A%22test%22)
+[![Average time to resolve an issue](https://isitmaintained.com/badge/resolution/virtee/sev.svg)](https://isitmaintained.com/project/virtee/sev "Average time to resolve an issue")
+[![Percentage of issues still open](https://isitmaintained.com/badge/open/virtee/sev.svg)](https://isitmaintained.com/project/virtee/sev "Percentage of issues still open")
 ![Maintenance](https://img.shields.io/badge/maintenance-activly--developed-brightgreen.svg)
 
 # sev
