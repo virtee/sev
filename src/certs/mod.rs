@@ -13,7 +13,7 @@ mod util;
 mod crypto;
 
 use std::convert::*;
-use std::io::*;
+use std::io::{Error, ErrorKind, Read, Result, Write};
 
 pub use chain::Chain;
 
