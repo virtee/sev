@@ -43,6 +43,7 @@ pub mod launch;
 #[cfg(feature = "openssl")]
 pub mod session;
 mod util;
+pub mod vmsa;
 
 pub use util::cached_chain;
 use util::{TypeLoad, TypeSave};
