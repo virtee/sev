@@ -155,7 +155,7 @@ impl<'a> GetId<'a> {
 /// TcbVersion represents the version of the firmware.
 ///
 /// (Chapter 2.2; Table 3)
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[repr(C)]
 pub struct TcbVersion {
     /// Current bootloader version.
