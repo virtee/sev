@@ -225,7 +225,7 @@ impl From<u32> for Indeterminate<Error> {
 ///
 /// The underlying SEV platform behaves like a state machine and can
 /// only perform certain actions while it is in certain states.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum State {
     /// The platform is uninitialized.
@@ -252,7 +252,7 @@ impl std::fmt::Display for State {
 }
 
 /// Information regarding the SEV platform's current status.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Status {
     /// The build number.
     pub build: Build,
@@ -291,7 +291,7 @@ impl std::fmt::Display for Identifier {
 }
 
 /// Information regarding the SEV-SNP platform's TCB version.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SnpTcbStatus {
     /// Installed TCB version.
     pub platform_version: TcbVersion,
@@ -301,7 +301,7 @@ pub struct SnpTcbStatus {
 }
 
 /// Information regarding the SEV-SNP platform's current status.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SnpStatus {
     /// The build number.
     pub build: SnpBuild,

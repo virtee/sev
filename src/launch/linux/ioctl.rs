@@ -87,7 +87,7 @@ pub const SNP_LAUNCH_FINISH: Ioctl<WriteRead, &Command<snp::LaunchFinish>> =
 
 /// Corresponds to the kernel struct `kvm_enc_region`
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
 pub struct KvmEncRegion<'a> {
     addr: u64,
     size: u64,
