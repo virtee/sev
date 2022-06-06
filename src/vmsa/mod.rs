@@ -6,6 +6,7 @@
 
 use super::*;
 
+use core::mem::size_of;
 use serde_big_array::BigArray;
 use std::fs;
 use std::io;
@@ -475,10 +476,10 @@ impl Vmsa {
             Err(e) => return VmsaRWResult::serialization_err(e),
         };
 
-        const SIZE: usize = 4096;
+        const SIZE: usize = size_of::<Vmsa>();
 
         // Pad to 4096 bytes
-        let buf: &mut [u8] = &mut [0; SIZE];
+        let buf: &mut [u8] = &mut [0; 4096];
         buf[..SIZE].copy_from_slice(&vmsa_buf[..]);
 
         match fs::write(filename, buf) {
