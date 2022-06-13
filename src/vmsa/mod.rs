@@ -305,36 +305,6 @@ pub struct Vmsa {
     x87_state_gpa: u64,
 }
 
-/// An enum that encompasses all valid return types of VMSA reading/writing and
-/// serialization/deserialization.
-pub enum VmsaRWResult {
-    /// An error occurred in reading/writing a VMSA struct.
-    IoErr(io::Error),
-
-    /// An error occurred in serialization/deserialization of a VMSA struct.
-    SerializationErr(bincode::Error),
-
-    /// A VMSA struct was successfully read.
-    ReadSuccess(Box<Vmsa>),
-
-    /// A VMSA struct was successfully written.
-    WriteSuccess,
-}
-
-impl VmsaRWResult {
-    fn read_success(v: Vmsa) -> Self {
-        VmsaRWResult::ReadSuccess(Box::new(v))
-    }
-
-    fn io_err(e: io::Error) -> Self {
-        VmsaRWResult::IoErr(e)
-    }
-
-    fn serialization_err(e: bincode::Error) -> Self {
-        VmsaRWResult::SerializationErr(e)
-    }
-}
-
 impl Vmsa {
     /// Set VMSA values to follow initialization for an amd64 CPU.
     pub fn init_amd64(&mut self) {
@@ -455,25 +425,20 @@ impl Vmsa {
     }
 
     /// Read binary content from a passed filename and deserialize it into a VMSA struct.
-    pub fn from_file(filename: &str) -> VmsaRWResult {
-        let data = match std::fs::read(filename) {
-            Ok(d) => d,
-            Err(e) => return VmsaRWResult::io_err(e),
-        };
-
+    pub fn from_file(filename: &str) -> Result<Self, io::Error> {
+        let data = std::fs::read(filename)?;
         let vmsa = match bincode::deserialize(&data[..]) {
             Ok(v) => v,
-            Err(e) => return VmsaRWResult::serialization_err(e),
+            Err(e) => return Err(io::Error::new(io::ErrorKind::InvalidData, e)),
         };
-
-        VmsaRWResult::read_success(vmsa)
+        Ok(vmsa)
     }
 
     /// Serialize a VMSA struct and write it to a passed filename.
-    pub fn to_file(&self, filename: &str) -> VmsaRWResult {
+    pub fn to_file(&self, filename: &str) -> Result<(), io::Error> {
         let vmsa_buf = match bincode::serialize(self) {
             Ok(v) => v,
-            Err(e) => return VmsaRWResult::serialization_err(e),
+            Err(e) => return Err(io::Error::new(io::ErrorKind::InvalidData, e)),
         };
 
         const SIZE: usize = size_of::<Vmsa>();
@@ -482,10 +447,8 @@ impl Vmsa {
         let buf: &mut [u8] = &mut [0; 4096];
         buf[..SIZE].copy_from_slice(&vmsa_buf[..]);
 
-        match fs::write(filename, buf) {
-            Ok(_) => VmsaRWResult::WriteSuccess,
-            Err(e) => VmsaRWResult::io_err(e),
-        }
+        fs::write(filename, buf)?;
+        Ok(())
     }
 }
 
