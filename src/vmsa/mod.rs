@@ -444,6 +444,12 @@ impl Vmsa {
     /// Read binary content from a passed filename and deserialize it into a VMSA struct.
     pub fn from_file(filename: &str) -> Result<Self, io::Error> {
         let data = std::fs::read(filename)?;
+        if data.len() != 4096 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Expected VMSA length 4096, was {}", data.len()),
+            ));
+        }
         let vmsa = Vmsa::decode(&data[..], ())?;
         Ok(vmsa)
     }
