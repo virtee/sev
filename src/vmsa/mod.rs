@@ -6,6 +6,7 @@
 
 use super::*;
 
+use codicon::{Decoder, Encoder};
 use core::mem::size_of;
 use serde_big_array::BigArray;
 use std::fs;
@@ -66,7 +67,7 @@ pub struct VmcbSegment {
 /// The layout of a VMCB struct is documented in Table B-4 of the
 /// AMD64 Architecture Programmer’s Manual, Volume 2: System Programming
 #[repr(C, packed)]
-#[derive(Serialize, Deserialize)]
+#[derive(Copy, Clone, Serialize, Deserialize)]
 pub struct Vmsa {
     /// Extra segment.
     es: VmcbSegment,
@@ -305,6 +306,22 @@ pub struct Vmsa {
     x87_state_gpa: u64,
 }
 
+impl codicon::Decoder<()> for Vmsa {
+    type Error = std::io::Error;
+
+    fn decode(mut reader: impl Read, _: ()) -> std::io::Result<Self> {
+        reader.load()
+    }
+}
+
+impl codicon::Encoder<()> for Vmsa {
+    type Error = std::io::Error;
+
+    fn encode(&self, mut writer: impl Write, _: ()) -> std::io::Result<()> {
+        writer.save(self)
+    }
+}
+
 impl Vmsa {
     /// Set VMSA values to follow initialization for an amd64 CPU.
     pub fn init_amd64(&mut self) {
@@ -427,19 +444,14 @@ impl Vmsa {
     /// Read binary content from a passed filename and deserialize it into a VMSA struct.
     pub fn from_file(filename: &str) -> Result<Self, io::Error> {
         let data = std::fs::read(filename)?;
-        let vmsa = match bincode::deserialize(&data[..]) {
-            Ok(v) => v,
-            Err(e) => return Err(io::Error::new(io::ErrorKind::InvalidData, e)),
-        };
+        let vmsa = Vmsa::decode(&data[..], ())?;
         Ok(vmsa)
     }
 
     /// Serialize a VMSA struct and write it to a passed filename.
     pub fn to_file(&self, filename: &str) -> Result<(), io::Error> {
-        let vmsa_buf = match bincode::serialize(self) {
-            Ok(v) => v,
-            Err(e) => return Err(io::Error::new(io::ErrorKind::InvalidData, e)),
-        };
+        let mut vmsa_buf = Vec::new();
+        self.encode(&mut vmsa_buf, ())?;
 
         const SIZE: usize = size_of::<Vmsa>();
 
