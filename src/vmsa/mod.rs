@@ -441,7 +441,9 @@ impl Vmsa {
         self.cs.base = u64::from(reset_cs);
     }
 
-    /// Read binary content from a passed filename and deserialize it into a VMSA struct.
+    /// Read binary content from a passed filename and deserialize it into a
+    /// VMSA struct. Validate that the passed file is 4096 bytes long,
+    /// which is expected by SEV measurement validation.
     pub fn from_file(filename: &str) -> Result<Self, io::Error> {
         let data = std::fs::read(filename)?;
         if data.len() != 4096 {
@@ -454,7 +456,9 @@ impl Vmsa {
         Ok(vmsa)
     }
 
-    /// Serialize a VMSA struct and write it to a passed filename.
+    /// Serialize a VMSA struct and write it to a passed filename,
+    /// This ensures it is padded to 4096 bytes which is expected
+    /// by SEV measurement validation.
     pub fn to_file(&self, filename: &str) -> Result<(), io::Error> {
         let mut vmsa_buf = Vec::new();
         self.encode(&mut vmsa_buf, ())?;
