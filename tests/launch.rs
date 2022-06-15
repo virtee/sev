@@ -9,7 +9,7 @@ use sev::session::Session;
 
 use kvm_bindings::kvm_userspace_memory_region;
 use kvm_ioctls::{Kvm, VcpuExit};
-use mmarinus::{perms, Kind, Map};
+use mmarinus::{perms, Map};
 use serial_test::serial;
 
 use std::convert::TryFrom;
@@ -38,10 +38,10 @@ fn sev() {
     let mut vm = kvm.create_vm().unwrap();
 
     const MEM_SIZE: usize = 0x1000;
-    let address_space = Map::map(MEM_SIZE)
+    let address_space = Map::bytes(MEM_SIZE)
         .anywhere()
         .anonymously()
-        .known::<perms::ReadWrite>(Kind::Private)
+        .with(perms::ReadWrite)
         .unwrap();
 
     let mem_region = kvm_userspace_memory_region {
