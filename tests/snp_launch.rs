@@ -6,7 +6,7 @@ use sev::launch::snp::*;
 pub use kvm_bindings::kvm_segment as KvmSegment;
 use kvm_bindings::kvm_userspace_memory_region;
 use kvm_ioctls::{Kvm, VcpuExit};
-use mmarinus::{perms, Kind, Map};
+use mmarinus::{perms, Map};
 
 // one page of `hlt`
 const CODE: &[u8; 4096] = &[
@@ -21,10 +21,10 @@ fn snp() {
 
     const MEM_ADDR: u64 = 0x1000;
 
-    let mut address_space = Map::map(CODE.len())
+    let mut address_space = Map::bytes(CODE.len())
         .anywhere()
         .anonymously()
-        .known::<perms::ReadWrite>(Kind::Private)
+        .with(perms::ReadWrite)
         .unwrap();
 
     address_space[..CODE.len()].copy_from_slice(&CODE[..]);
