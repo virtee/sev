@@ -3,6 +3,7 @@
 use crate::certs::sev;
 use crate::Version;
 
+use std::ffi::c_void;
 use std::marker::PhantomData;
 
 /// Reset the platform's persistent state.
@@ -201,4 +202,43 @@ pub struct SnpPlatformStatus {
 
     /// Reported TCB version.
     pub reported_tcb_version: TcbVersion,
+}
+
+#[repr(C)]
+pub struct SnpConfig {
+    reserved: [u8; 52],
+}
+
+impl Default for SnpConfig {
+    fn default() -> Self {
+        Self { reserved: [0; 52] }
+    }
+}
+
+#[repr(C)]
+pub struct SnpSetExtConfig<'a> {
+    /// Address of the SnpConfig or 0 when reported_tcb does not need
+    /// to be updated.
+    pub config_address: Option<&'a SnpConfig>,
+
+    /// Address of extended guest request certificate chain or 0 when
+    /// previous certificate should be removed on SNP_SET_EXT_CONFIG.
+    pub certs_address: Option<*mut c_void>,
+
+    /// Length of the certificates.
+    pub certs_len: u32,
+}
+
+#[repr(C)]
+pub struct SnpGetExtConfig<'a> {
+    /// Address of the SnpConfig or 0 when reported_tcb does not need
+    /// to be updated.
+    pub config_address: Option<&'a SnpConfig>,
+
+    /// Address of extended guest request certificate chain or 0 when
+    /// previous certificate should be removed on SNP_SET_EXT_CONFIG.
+    pub certs_address: Option<*mut c_void>,
+
+    /// Length of the certificates.
+    pub certs_len: u32,
 }

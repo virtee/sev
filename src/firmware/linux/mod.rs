@@ -10,7 +10,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 
 use super::*;
 use crate::certs::sev::Certificate;
-use linux::ioctl::*;
+use linux::ioctl::host::*;
 use types::*;
 
 /// A handle to the SEV platform.
