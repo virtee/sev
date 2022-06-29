@@ -304,7 +304,7 @@ pub struct ReportReq {
 impl Default for ReportReq {
     fn default() -> Self {
         Self {
-            report_data: [0x0F; 64],
+            report_data: [0; 64],
             vmpl: Default::default(),
             reserved: Default::default(),
         }
