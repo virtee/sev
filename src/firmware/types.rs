@@ -8,9 +8,7 @@ use std::marker::PhantomData;
 
 #[cfg(feature = "openssl")]
 use openssl::{bn::BigNum, ecdsa::EcdsaSig};
-#[cfg(feature = "openssl")]
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "openssl")]
 use serde_big_array::BigArray;
 
 /// Reset the platform's persistent state.
@@ -211,14 +209,20 @@ pub struct SnpPlatformStatus {
     pub reported_tcb_version: TcbVersion,
 }
 
-#[repr(C)]
+#[repr(C, packed)]
 pub struct SnpConfig {
+    reported_tcb: u64,
+    mask_chip_id: u32,
     reserved: [u8; 52],
 }
 
 impl Default for SnpConfig {
     fn default() -> Self {
-        Self { reserved: [0; 52] }
+        Self {
+            reported_tcb: Default::default(),
+            mask_chip_id: Default::default(),
+            reserved: [0; 52],
+        }
     }
 }
 
@@ -246,7 +250,7 @@ pub struct SnpGetExtConfig<'a> {
     /// previous certificate should be removed on SNP_SET_EXT_CONFIG.
     pub certs_address: Option<*mut c_void>,
 
-    /// Length of the certificates.
+    /// Length of the buffer which will hold the fetched certificates.
     pub certs_len: u32,
 }
 
@@ -277,12 +281,9 @@ macro_rules! bit_val {
 }
 
 #[cfg(feature = "openssl")]
-fn swap_endian(bytes: &mut [u8]) -> Vec<u8> {
+fn swap_endian(bytes: &[u8]) -> Vec<u8> {
     let mut retval: Vec<u8> = Vec::new();
-
-    for byte in bytes.iter().rev() {
-        retval.push(*byte);
-    }
+    retval.reverse();
     retval
 }
 
@@ -297,7 +298,7 @@ pub struct ReportReq {
     /// equal to the current VMPL and at most three.
     pub vmpl: u32,
 
-    /// Reserved memory slot, but be zero.
+    /// Reserved memory slot, must be zero.
     reserved: [u8; 28],
 }
 
@@ -329,20 +330,19 @@ impl Default for ReportReq {
 /// | 19     | DEBUG         | 0: Debugging is disallowed.<br>1: Debuggin is allowed.                                                   |
 /// | 20     | SINGLE_SOCKET | 0: Guest can be activated on multiple sockets.<br>1: Guest can only be activated on one socket.           |
 ///
-#[derive(Default, Clone, Copy, Debug)]
-#[cfg_attr(feature = "openssl", derive(Serialize, Deserialize))]
+#[derive(Default, Clone, Copy, Debug, Serialize, Deserialize)]
 #[repr(C)]
-pub struct GuestPolicy {
+pub struct SnpGuestPolicy {
     info: u64,
 }
 
-impl GuestPolicy {
-    /// Bits 0-7 of Guest Policy's info
+impl SnpGuestPolicy {
+    /// The minimum ABI minor version required for this guest to run
     pub fn abi_minor(&self) -> u64 {
         let mask: u64 = (1 << 8) - 1;
         self.info & mask
     }
-    /// Bits 8-15 of Guest Policy's info
+    /// The minimum ABI major version required for this guest to run
     pub fn abi_major(&self) -> u64 {
         let mask: u64 = ((1 << 8) - 1) << 8;
         (self.info & mask) >> 8
@@ -354,7 +354,7 @@ impl GuestPolicy {
     }
 
     /// Bit 18 of Guest Policy's info
-    pub fn single_socket(&self) -> bool {
+    pub fn migrate_ma(&self) -> bool {
         bit_val!(self.info, 18, u64) != 0
     }
 
@@ -364,19 +364,18 @@ impl GuestPolicy {
     }
 
     /// Bit 20 of Guest Policy's info
-    pub fn migrate_ma(&self) -> bool {
+    pub fn single_socket(&self) -> bool {
         bit_val!(self.info, 20, u64) != 0
     }
 }
 
 /// The TCB_VERSION is a structure containing the security version numbers of each component in
-/// the trusted computing base (TCB) of the SNP firmware. associated A TCB_VERSION is
-/// associated with each image of firmware. T
+/// the trusted computing base (TCB) of the SNP firmware. A TCB_VERSION is associated with each
+/// image of firmware.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "openssl", derive(Serialize, Deserialize))]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 
-pub struct SNPTcbVersion {
+pub struct SnpTcbVersion {
     /// Current bootloader version. SVN of PSP Bootloader.
     pub boot_loader: u8,
     /// Current PSP OS version. SVN of PSP Operating System.
@@ -388,7 +387,7 @@ pub struct SNPTcbVersion {
     pub microcode: u8,
 }
 
-impl SNPTcbVersion {
+impl SnpTcbVersion {
     pub fn raw(&self) -> String {
         format!(
             "{:02}{:02}{:02}{:02}{:02}{:02}{:02}{:02}",
@@ -409,42 +408,40 @@ impl SNPTcbVersion {
 /// Bit 1 representing the status of SMT enablement.
 /// Bits 2-63 are reserved.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default)]
-#[cfg_attr(feature = "openssl", derive(Serialize, Deserialize))]
-pub struct PlatformInfo {
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
+pub struct SnpPlatformInfo {
     info: u64,
 }
 
-impl PlatformInfo {
+impl SnpPlatformInfo {
     /// Returns the state of TSME
-    pub fn tsme_en(&self) -> bool {
+    pub fn tsme_enabled(&self) -> bool {
         bit_val!(self.info, 1, u64) != 0
     }
 
     /// Returns the state of SMT
-    pub fn smt_en(&self) -> bool {
+    pub fn smt_enabled(&self) -> bool {
         bit_val!(self.info, 2, u64) != 0
     }
 }
 
 /// The format of an ECDSA P-384 with SHA-384 Signature.
 #[repr(C)]
-#[derive(Debug)]
-#[cfg_attr(feature = "openssl", derive(Serialize, Deserialize))]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Signature {
     /// R component of this signature. Value is zero-extended little-endian encoded.
-    #[cfg_attr(feature = "openssl", serde(with = "BigArray"))]
+    #[serde(with = "BigArray")]
     pub r: [u8; 72],
     /// S component of this signature. Value is zero-extended little-endian encoded.
-    #[cfg_attr(feature = "openssl", serde(with = "BigArray"))]
+    #[serde(with = "BigArray")]
     pub s: [u8; 72],
-    #[cfg_attr(feature = "openssl", serde(with = "BigArray"))]
+    #[serde(with = "BigArray")]
     _reserved_0: [u8; 512 - 144],
 }
 
 #[cfg(feature = "openssl")]
 impl Signature {
-    pub fn get_ecdsa_sig(&mut self) -> EcdsaSig {
+    pub fn get_ecdsa_sig(&mut self) -> Result<EcdsaSig> {
         // OpenSSL Expects BigNum values in Big Endian so use lebin2bn
 
         let r_rev: Vec<u8> = swap_endian(&mut self.r);
@@ -497,15 +494,14 @@ impl Default for Signature {
 /// The firmware guarantees that the ReportedTcb value is never greater than the installed TCB
 /// version
 #[repr(C)]
-#[derive(Debug)]
-#[cfg_attr(feature = "openssl", derive(Serialize, Deserialize))]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AttestationReport {
     /// Version number of this attestation report. Set to 2h for this specification.
     pub version: u32,
     /// The guest SVN.
     pub guest_svn: u32,
     /// The guest policy.
-    pub policy: GuestPolicy,
+    pub policy: SnpGuestPolicy,
     /// The family ID provided at launch.
     pub family_id: [u8; 16],
     /// The image ID provided at launch.
@@ -515,42 +511,42 @@ pub struct AttestationReport {
     /// The signature algorithm used to sign this report.
     pub sig_algo: u32,
     /// Current TCB. See [`SNPTcbVersion`]
-    pub current_tcb: SNPTcbVersion,
+    pub current_tcb: SnpTcbVersion,
     /// Information about the platform. See [`PlatformInfo`]
-    pub plat_info: PlatformInfo,
+    pub plat_info: SnpPlatformInfo,
     /// Private variable as only the first bit is important.
     /// See [`AttestationReport::author_key_en`].
     author_key_en: u32,
     _reserved_0: u32,
     /// Guest-provided 512 Bits of Data
-    #[cfg_attr(feature = "openssl", serde(with = "BigArray"))]
+    #[serde(with = "BigArray")]
     pub report_data: [u8; 64],
     /// The measurement calculated at launch.
-    #[cfg_attr(feature = "openssl", serde(with = "BigArray"))]
+    #[serde(with = "BigArray")]
     pub measurement: [u8; 48],
     /// Data provided by the hypervisor at launch.
     pub host_data: [u8; 32],
     /// SHA-384 digest of the ID public key that signed the ID block provided
     /// in SNP_LANUNCH_FINISH.
-    #[cfg_attr(feature = "openssl", serde(with = "BigArray"))]
+    #[serde(with = "BigArray")]
     pub id_key_digest: [u8; 48],
     /// SHA-384 digest of the Author public key that certified the ID key,
     /// if provided in SNP_LAUNCH_FINSIH. Zeroes if AUTHOR_KEY_EN is 1.
-    #[cfg_attr(feature = "openssl", serde(with = "BigArray"))]
+    #[serde(with = "BigArray")]
     pub author_key_digest: [u8; 48],
     /// Report ID of this guest.
     pub report_id: [u8; 32],
     /// Report ID of this guest's migration agent (if applicable).
     pub report_id_ma: [u8; 32],
     /// Reported TCB version used to derive the VCEK that signed this report.
-    pub reported_tcb: SNPTcbVersion,
+    pub reported_tcb: SnpTcbVersion,
     _reserved_1: [u8; 24],
     /// If MaskChipId is set to 0, Identifier unique to the chip.
     /// Otherwise set to 0h.
-    #[cfg_attr(feature = "openssl", serde(with = "BigArray"))]
+    #[serde(with = "BigArray")]
     pub chip_id: [u8; 64],
     /// CommittedTCB
-    pub committed_tcb: SNPTcbVersion,
+    pub committed_tcb: SnpTcbVersion,
     /// The build number of CurrentVersion
     pub current_build: u8,
     /// The minor number of CurrentVersion
@@ -566,8 +562,8 @@ pub struct AttestationReport {
     pub committed_major: u8,
     _reserved_3: u8,
     /// The CurrentTcb at the time the guest was launched or imported.
-    pub launch_tcb: SNPTcbVersion,
-    #[cfg_attr(feature = "openssl", serde(with = "BigArray"))]
+    pub launch_tcb: SnpTcbVersion,
+    #[serde(with = "BigArray")]
     _reserved_4: [u8; 168],
     /// Signature of bytes 0 to 0x29F inclusive of this report.
     /// The format of the signature is found within [`Signature`].
@@ -591,7 +587,7 @@ pub struct AttestationReport {
 /// <sup>*[Encrypted Message - sev-guest.h](<https://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git/tree/include/uapi/linux/sev-guest.h>)</sup>
 #[repr(C)]
 pub struct MsgReportRsp {
-    /// The status of key derivation operation.
+    /// The status of attestation report generation.
     ///     0h: Success.
     ///     16h: Invalid parameters.
     pub status: u32,
@@ -607,7 +603,7 @@ pub struct MsgReportRsp {
 /// The structure used to define the read/write data for the IOCTL
 /// SNP_GUEST_REPORT.
 #[repr(C)]
-pub struct GuestMsg<'a, 'b> {
+pub struct GetReport<'a, 'b> {
     /// Message version number (must be non-zero)
     pub msg_version: u8,
 
@@ -624,7 +620,7 @@ pub struct GuestMsg<'a, 'b> {
 /// Corresponds to MSG_KEY_REQ in the Spec. The message structure that the guest sends to the firmware to
 /// request a derived key.
 #[repr(C)]
-pub struct DerivedKey {
+pub struct GetDerivedKey {
     /// Selects the root key to derive the key from.
     /// 0: Indicates VCEK.
     /// 1: Indicates VMRK.
@@ -654,7 +650,7 @@ pub struct DerivedKey {
     pub tcb_version: u64,
 }
 
-impl DerivedKey {
+impl GetDerivedKey {
     /// Determines the root key selected.
     ///
     /// `false`: Indicates VCEK.
@@ -709,12 +705,14 @@ impl DerivedKey {
 /// A raw representation of the PSP Report Response after calling SNP_GET_DERIVED_KEY.
 #[repr(C)]
 pub struct DerivedKeyRsp {
+    pub status: u32,
+    reserved_0: [u8; 28],
     /// Response data, see SEV-SNP spec for the format
-    pub data: [u8; 64],
+    pub key: [u8; 32],
 }
 
 #[repr(C)]
-pub struct ExtReport {
+pub struct GetExtReport {
     data: ReportReq,
     certs_address: *mut c_void,
     certs_len: u32,

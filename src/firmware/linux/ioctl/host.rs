@@ -61,11 +61,11 @@ pub const GET_ID: Ioctl<WriteRead, &Command<GetId<'_>>> = unsafe { SEV.write_rea
 pub const SNP_PLATFORM_STATUS: Ioctl<WriteRead, &Command<SnpPlatformStatus>> =
     unsafe { SEV.write_read(0) };
 
-/// Set the SNP External Configuration Settings.
+/// Set the SNP Extended Configuration Settings.
 pub const SNP_SET_EXT_CONFIG: Ioctl<WriteRead, &Command<SnpSetExtConfig<'_>>> =
     unsafe { SEV.write_read(0) };
 
-/// Get the SNP External Configuration Settings.
+/// Get the SNP Extended Configuration Settings.
 pub const SNP_GET_EXT_CONFIG: Ioctl<WriteRead, &Command<SnpGetExtConfig<'_>>> =
     unsafe { SEV.write_read(0) };
 

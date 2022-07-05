@@ -6,19 +6,19 @@ use crate::impl_const_id;
 use iocuddle::*;
 
 // These enum ordinal values are defined in the Linux kernel
-// source code: include/uapi/linux/psp-sev.h
+// source code: include/uapi/linux/sev-guest.h
 impl_const_id! {
     pub Id => u32;
-    GuestMsg<'_, '_> = 0,
-    DerivedKey = 1,
-    ExtReport = 2,
+    GetReport<'_, '_> = 0,
+    GetDerivedKey = 1,
+    GetExtReport = 2,
 }
 
 const SEV: Group = Group::new(b'S');
 
-pub const GET_REPORT: Ioctl<WriteRead, &Command<GuestMsg>> = unsafe { SEV.write_read(0) };
-pub const GET_DERIVED_KEY: Ioctl<WriteRead, &Command<DerivedKey>> = unsafe { SEV.write_read(0) };
-pub const GET_EXT_REPORT: Ioctl<WriteRead, &Command<ExtReport>> = unsafe { SEV.write_read(0) };
+pub const GET_REPORT: Ioctl<WriteRead, &Command<GetReport>> = unsafe { SEV.write_read(0) };
+pub const GET_DERIVED_KEY: Ioctl<WriteRead, &Command<GetDerivedKey>> = unsafe { SEV.write_read(0) };
+pub const GET_EXT_REPORT: Ioctl<WriteRead, &Command<GetExtReport>> = unsafe { SEV.write_read(0) };
 
 /// The Rust-flavored, FFI-friendly version of `struct sev_issue_cmd` which is
 /// used to pass arguments to the SEV ioctl implementation.
