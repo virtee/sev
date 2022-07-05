@@ -3,13 +3,9 @@
 use crate::certs::sev;
 use crate::Version;
 
-use std::ffi::c_void;
 use std::marker::PhantomData;
 
-#[cfg(feature = "openssl")]
-use openssl::{bn::BigNum, ecdsa::EcdsaSig};
-use serde::{Deserialize, Serialize};
-use serde_big_array::BigArray;
+use bitfield::bitfield;
 
 /// Reset the platform's persistent state.
 ///
@@ -209,10 +205,17 @@ pub struct SnpPlatformStatus {
     pub reported_tcb_version: TcbVersion,
 }
 
+/// Sets the system wide ocnfiguration values for SNP.
 #[repr(C, packed)]
 pub struct SnpConfig {
+    /// The TCB_VERSION to report in guest attestation reports.
     reported_tcb: u64,
+
+    /// Indicates that the CHIP_ID field in the attestationr eport will always
+    /// be zero.
     mask_chip_id: u32,
+
+    /// Reserved. Must be zero.
     reserved: [u8; 52],
 }
 
@@ -226,63 +229,43 @@ impl Default for SnpConfig {
     }
 }
 
+pub struct SnpExtConfig<'a, 'b> {
+    pub config_address: Option<&'a SnpConfig>,
+    pub certs_address: Option<&'b [u8]>,
+    pub certs_len: u32,
+}
+
 #[repr(C)]
-pub struct SnpSetExtConfig<'a> {
+pub struct SnpSetExtConfig {
     /// Address of the SnpConfig or 0 when reported_tcb does not need
     /// to be updated.
-    pub config_address: Option<&'a SnpConfig>,
+    pub config_address: u64,
 
     /// Address of extended guest request certificate chain or 0 when
     /// previous certificate should be removed on SNP_SET_EXT_CONFIG.
-    pub certs_address: Option<*mut c_void>,
+    pub certs_address: u64,
 
     /// Length of the certificates.
     pub certs_len: u32,
 }
 
 #[repr(C)]
-pub struct SnpGetExtConfig<'a> {
-    /// Address of the SnpConfig or 0 when reported_tcb does not need
-    /// to be updated.
-    pub config_address: Option<&'a SnpConfig>,
+pub struct SnpGetExtConfig {
+    /// Address of the SnpConfig or 0 when reported_tcb should not be
+    /// fetched.
+    pub config_address: u64,
 
     /// Address of extended guest request certificate chain or 0 when
-    /// previous certificate should be removed on SNP_SET_EXT_CONFIG.
-    pub certs_address: Option<*mut c_void>,
+    /// certificate should not be fetched.
+    pub certs_address: u64,
 
     /// Length of the buffer which will hold the fetched certificates.
     pub certs_len: u32,
 }
 
-/// Locates the non-zero based index bit field of a specified number.
-///
-/// `$field`: expr - The number in question the bit should be taken from.
-/// `$bit`: expr - The one-based index bit being requested.
-/// `$dt`: ty - The data type of the field (for alignment reasons).
-///
-/// # Examples:
-///
-/// To find the 3rd bit field of Guest Field Select of a Derived Key Request:
-///
-/// ```
-/// let mut key_req: DerivedKeyReq = Default::default();
-/// key_req.guest_field_select = 4; /// 0b0..100 the third bit should be on.
-/// let res = bit_val\!(key_req.guest_field_select, 3, u64);
-/// assert_eq!(res, 1);
-/// ```
-///
-#[macro_export]
-macro_rules! bit_val {
-    ($field: expr, $bit: expr, $dt: ty) => {
-        {
-            ($field & (1 as $dt << ($bit as $dt - 1 as $dt))) >> ($bit - 1 as $dt)
-        }
-    }
-}
-
 #[cfg(feature = "openssl")]
 fn swap_endian(bytes: &[u8]) -> Vec<u8> {
-    let mut retval: Vec<u8> = Vec::new();
+    let mut retval: Vec<u8> = bytes.into();
     retval.reverse();
     retval
 }
@@ -312,68 +295,41 @@ impl Default for ReportReq {
     }
 }
 
-/// The firmware associates each guest with a guest policy that the guest owner provides. The
-/// firmware restricts what actions the hypervisor can take on this guest according to the guest policy.
-/// The policy also indicates the minimum firmware version to for the guest.
-///
-/// The guest owner provides the guest policy to the firmware during launch. The firmware then binds
-/// the policy to the guest. The policy cannot be changed throughout the lifetime of the guest. The
-/// policy is also migrated with the guest and enforced by the destination platform firmware.
-///
-/// | Bit(s) | Name          | Description                                                                                                    |
-/// |--------|---------------|----------------------------------------------------------------------------------------------------------------|
-/// | 7:0    | ABI_MINOR     | The minimum ABI minor version required for this guest to run.                                                  |
-/// | 15:8   | ABI_MAJOR     | The minimum ABI major version required for this guest to run.                                                  |
-/// | 16     | SMT           | 0: SMT is disallowed.<br>1: SMT is allowed.                                                               |
-/// | 17     | -             | Reserved. Must be one.                                                                                         |
-/// | 18     | MIGRATE_MA    | 0: Association with a migration agent is disallowed.<br>1: Association with a migration agent is allowed. |
-/// | 19     | DEBUG         | 0: Debugging is disallowed.<br>1: Debuggin is allowed.                                                   |
-/// | 20     | SINGLE_SOCKET | 0: Guest can be activated on multiple sockets.<br>1: Guest can only be activated on one socket.           |
-///
-#[derive(Default, Clone, Copy, Debug, Serialize, Deserialize)]
-#[repr(C)]
-pub struct SnpGuestPolicy {
-    info: u64,
-}
-
-impl SnpGuestPolicy {
-    /// The minimum ABI minor version required for this guest to run
-    pub fn abi_minor(&self) -> u64 {
-        let mask: u64 = (1 << 8) - 1;
-        self.info & mask
-    }
-    /// The minimum ABI major version required for this guest to run
-    pub fn abi_major(&self) -> u64 {
-        let mask: u64 = ((1 << 8) - 1) << 8;
-        (self.info & mask) >> 8
-    }
-
-    /// Bit 16 of Guest Policy's info
-    pub fn smt(&self) -> bool {
-        bit_val!(self.info, 16, u64) != 0
-    }
-
-    /// Bit 18 of Guest Policy's info
-    pub fn migrate_ma(&self) -> bool {
-        bit_val!(self.info, 18, u64) != 0
-    }
-
-    /// Bit 19 of Guest Policy's info
-    pub fn debug(&self) -> bool {
-        bit_val!(self.info, 19, u64) != 0
-    }
-
-    /// Bit 20 of Guest Policy's info
-    pub fn single_socket(&self) -> bool {
-        bit_val!(self.info, 20, u64) != 0
-    }
+bitfield! {
+    /// The firmware associates each guest with a guest policy that the guest owner provides. The
+    /// firmware restricts what actions the hypervisor can take on this guest according to the guest policy.
+    /// The policy also indicates the minimum firmware version to for the guest.
+    ///
+    /// The guest owner provides the guest policy to the firmware during launch. The firmware then binds
+    /// the policy to the guest. The policy cannot be changed throughout the lifetime of the guest. The
+    /// policy is also migrated with the guest and enforced by the destination platform firmware.
+    ///
+    /// | Bit(s) | Name          | Description                                                                                                    |
+    /// |--------|---------------|----------------------------------------------------------------------------------------------------------------|
+    /// | 7:0    | ABI_MINOR     | The minimum ABI minor version required for this guest to run.                                                  |
+    /// | 15:8   | ABI_MAJOR     | The minimum ABI major version required for this guest to run.                                                  |
+    /// | 16     | SMT           | 0: SMT is disallowed.<br>1: SMT is allowed.                                                               |
+    /// | 17     | -             | Reserved. Must be one.                                                                                         |
+    /// | 18     | MIGRATE_MA    | 0: Association with a migration agent is disallowed.<br>1: Association with a migration agent is allowed. |
+    /// | 19     | DEBUG         | 0: Debugging is disallowed.<br>1: Debuggin is allowed.                                                   |
+    /// | 20     | SINGLE_SOCKET | 0: Guest can be activated on multiple sockets.<br>1: Guest can only be activated on one socket.           |
+    ///
+    #[repr(C)]
+    pub struct SnpGuestPolicy(u64);
+    impl Debug;
+    get_api_minor, set_api_minor: 7, 0;
+    get_abi_major, set_abi_major: 15, 8;
+    get_smt, set_smt: 16, 16;
+    get_migrate_ma, set_migrate_ma: 18, 18;
+    get_debug, set_debug: 19, 19;
+    get_single_socket, set_single_socket: 20, 20;
 }
 
 /// The TCB_VERSION is a structure containing the security version numbers of each component in
 /// the trusted computing base (TCB) of the SNP firmware. A TCB_VERSION is associated with each
 /// image of firmware.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 
 pub struct SnpTcbVersion {
     /// Current bootloader version. SVN of PSP Bootloader.
@@ -403,75 +359,16 @@ impl SnpTcbVersion {
     }
 }
 
-/// A structure with a bit-field unsigned 64 bit integer:
-/// Bit 0 representing the status of TSME enablement.
-/// Bit 1 representing the status of SMT enablement.
-/// Bits 2-63 are reserved.
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
-pub struct SnpPlatformInfo {
-    info: u64,
-}
-
-impl SnpPlatformInfo {
-    /// Returns the state of TSME
-    pub fn tsme_enabled(&self) -> bool {
-        bit_val!(self.info, 1, u64) != 0
-    }
-
-    /// Returns the state of SMT
-    pub fn smt_enabled(&self) -> bool {
-        bit_val!(self.info, 2, u64) != 0
-    }
-}
-
-/// The format of an ECDSA P-384 with SHA-384 Signature.
-#[repr(C)]
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Signature {
-    /// R component of this signature. Value is zero-extended little-endian encoded.
-    #[serde(with = "BigArray")]
-    pub r: [u8; 72],
-    /// S component of this signature. Value is zero-extended little-endian encoded.
-    #[serde(with = "BigArray")]
-    pub s: [u8; 72],
-    #[serde(with = "BigArray")]
-    _reserved_0: [u8; 512 - 144],
-}
-
-#[cfg(feature = "openssl")]
-impl Signature {
-    pub fn get_ecdsa_sig(&mut self) -> Result<EcdsaSig> {
-        // OpenSSL Expects BigNum values in Big Endian so use lebin2bn
-
-        let r_rev: Vec<u8> = swap_endian(&mut self.r);
-        let s_rev: Vec<u8> = swap_endian(&mut self.s);
-
-        let bnr: BigNum = match BigNum::from_slice(&r_rev) {
-            Ok(num) => num,
-            Err(error) => panic!("Could not parse Signature 'r' as BigNum: {error}"),
-        };
-
-        let bns: BigNum = match BigNum::from_slice(&s_rev) {
-            Ok(num) => num,
-            Err(error) => panic!("Could not parse Signature 's' as BigNum: {error}"),
-        };
-
-        match EcdsaSig::from_private_components(bnr, bns) {
-            Ok(sig) => sig,
-            Err(error) => panic!("Unable to generate EcdsaSignature: {error}"),
-        }
-    }
-}
-
-impl Default for Signature {
-    fn default() -> Self {
-        Self {
-            r: [0; 72],
-            s: [0; 72],
-            _reserved_0: [0; 368],
-        }
-    }
+bitfield! {
+    /// A structure with a bit-field unsigned 64 bit integer:
+    /// Bit 0 representing the status of TSME enablement.
+    /// Bit 1 representing the status of SMT enablement.
+    /// Bits 2-63 are reserved.
+    #[repr(C)]
+    pub struct SnpPlatformInfo(u64);
+    impl Debug;
+    get_tsme_enabled, set_tsme_enabled: 0, 0;
+    get_smt_enabled, set_smt_enabled: 1, 1;
 }
 
 /// The guest can request that the firmware construct an attestation report. External entities can use an
@@ -494,7 +391,6 @@ impl Default for Signature {
 /// The firmware guarantees that the ReportedTcb value is never greater than the installed TCB
 /// version
 #[repr(C)]
-#[derive(Debug, Serialize, Deserialize)]
 pub struct AttestationReport {
     /// Version number of this attestation report. Set to 2h for this specification.
     pub version: u32,
@@ -519,20 +415,16 @@ pub struct AttestationReport {
     author_key_en: u32,
     _reserved_0: u32,
     /// Guest-provided 512 Bits of Data
-    #[serde(with = "BigArray")]
     pub report_data: [u8; 64],
     /// The measurement calculated at launch.
-    #[serde(with = "BigArray")]
     pub measurement: [u8; 48],
     /// Data provided by the hypervisor at launch.
     pub host_data: [u8; 32],
     /// SHA-384 digest of the ID public key that signed the ID block provided
     /// in SNP_LANUNCH_FINISH.
-    #[serde(with = "BigArray")]
     pub id_key_digest: [u8; 48],
     /// SHA-384 digest of the Author public key that certified the ID key,
     /// if provided in SNP_LAUNCH_FINSIH. Zeroes if AUTHOR_KEY_EN is 1.
-    #[serde(with = "BigArray")]
     pub author_key_digest: [u8; 48],
     /// Report ID of this guest.
     pub report_id: [u8; 32],
@@ -543,7 +435,6 @@ pub struct AttestationReport {
     _reserved_1: [u8; 24],
     /// If MaskChipId is set to 0, Identifier unique to the chip.
     /// Otherwise set to 0h.
-    #[serde(with = "BigArray")]
     pub chip_id: [u8; 64],
     /// CommittedTCB
     pub committed_tcb: SnpTcbVersion,
@@ -563,11 +454,10 @@ pub struct AttestationReport {
     _reserved_3: u8,
     /// The CurrentTcb at the time the guest was launched or imported.
     pub launch_tcb: SnpTcbVersion,
-    #[serde(with = "BigArray")]
     _reserved_4: [u8; 168],
     /// Signature of bytes 0 to 0x29F inclusive of this report.
     /// The format of the signature is found within [`Signature`].
-    pub signature: Signature,
+    pub signature: sev::cert::v1::sig::ecdsa::Signature,
 }
 
 /// The response from the PSP containing the generated attestation report.
@@ -603,7 +493,7 @@ pub struct MsgReportRsp {
 /// The structure used to define the read/write data for the IOCTL
 /// SNP_GUEST_REPORT.
 #[repr(C)]
-pub struct GetReport<'a, 'b> {
+pub struct SnpGetReport<'a, 'b> {
     /// Message version number (must be non-zero)
     pub msg_version: u8,
 
@@ -617,17 +507,8 @@ pub struct GetReport<'a, 'b> {
     pub fw_err: u64,
 }
 
-/// Corresponds to MSG_KEY_REQ in the Spec. The message structure that the guest sends to the firmware to
-/// request a derived key.
-#[repr(C)]
-pub struct GetDerivedKey {
-    /// Selects the root key to derive the key from.
-    /// 0: Indicates VCEK.
-    /// 1: Indicates VMRK.
-    root_key_select: u32,
-    /// Reserved, must be zero
-    reserved_0: u32,
-    /// Bitmask indicating which data will be mixed into the derived key.
+bitfield! {
+    /// Data which will be mixed into the derived key.
     ///
     /// | Bit(s) | Name | Description |
     /// |--------|------|-------------|
@@ -638,7 +519,29 @@ pub struct GetDerivedKey {
     /// |4|GUEST_SVN|Indicates that the guest-provided SVN will be mixed into the key.|
     /// |5|TCB_VERSION|Indicates that the guest-provided TCB_VERSION will be mixed into the key.|
     /// |63:6|\-|Reserved. Must be zero.|
-    guest_field_select: u64,
+    #[repr(C)]
+    pub struct GuestFieldSelect(u64);
+    impl Debug;
+    get_guest_policy, set_guest_policy: 0, 0;
+    get_image_id, set_image_id: 1, 1;
+    get_family_id, set_family_id: 2, 2;
+    get_measurement, set_measurement: 3, 3;
+    get_svn, set_svn: 4, 4;
+    get_tcb_version, set_tcb_version: 5, 5;
+}
+
+/// Corresponds to MSG_KEY_REQ in the Spec. The message structure that the guest sends to the firmware to
+/// request a derived key.
+#[repr(C)]
+pub struct SnpGetDerivedKey {
+    /// Selects the root key to derive the key from.
+    /// 0: Indicates VCEK.
+    /// 1: Indicates VMRK.
+    root_key_select: RootDerivationKey,
+    /// Reserved, must be zero
+    reserved_0: u32,
+    /// What data will be mixed into the derived key.
+    pub guest_field_select: GuestFieldSelect,
     /// The VMPL to mix into the derived key. Must be greater than or equal
     /// to the current VMPL.
     pub vmpl: u32,
@@ -650,56 +553,10 @@ pub struct GetDerivedKey {
     pub tcb_version: u64,
 }
 
-impl GetDerivedKey {
-    /// Determines the root key selected.
-    ///
-    /// `false`: Indicates VCEK.
-    ///
-    /// `true`:  Indicates VMRK.
-    pub fn root_key_select(&self) -> bool {
-        bit_val!(self.root_key_select, 1, u32) != 0
-    }
-
-    /// Retreive the raw guest_field_select value.
-    pub fn guest_field_select(&self) -> u64 {
-        self.guest_field_select
-    }
-
-    /// Checks if the Guest Field Select included the Guest Policy in the
-    /// derived key.
-    pub fn gfs_uses_guest_policy(&self) -> bool {
-        bit_val!(self.guest_field_select, 1, u64) != 0
-    }
-
-    /// Checks if the Guest Field Select included the Image ID in the
-    /// derived key.
-    pub fn gfs_uses_image_id(&self) -> bool {
-        bit_val!(self.guest_field_select, 2, u64) != 0
-    }
-
-    /// Checks if the Guest Field Select included the Family ID in the
-    /// derived key.
-    pub fn gfs_uses_family_id(&self) -> bool {
-        bit_val!(self.guest_field_select, 3, u64) != 0
-    }
-
-    /// Checks if the Guest Field Select included the Launch Measurement in the
-    /// derived key.
-    pub fn gfs_uses_measurement(&self) -> bool {
-        bit_val!(self.guest_field_select, 4, u64) != 0
-    }
-
-    /// Checks if the Guest Field Select included the Guest SVN in the
-    /// derived key.
-    pub fn gfs_uses_guest_svn(&self) -> bool {
-        bit_val!(self.guest_field_select, 5, u64) != 0
-    }
-
-    /// Checks if the Guest Field Select included the TCB Version in the
-    /// derived key.
-    pub fn gfs_uses_tcb_version(&self) -> bool {
-        bit_val!(self.guest_field_select, 6, u64) != 0
-    }
+bitfield! {
+    pub struct RootDerivationKey(u32);
+    impl Debug;
+    get_root_key_select, set_root_key_select: 0, 0;
 }
 
 /// A raw representation of the PSP Report Response after calling SNP_GET_DERIVED_KEY.
@@ -712,8 +569,8 @@ pub struct DerivedKeyRsp {
 }
 
 #[repr(C)]
-pub struct GetExtReport {
+pub struct SnpGetExtReport {
     data: ReportReq,
-    certs_address: *mut c_void,
+    certs_address: u64,
     certs_len: u32,
 }

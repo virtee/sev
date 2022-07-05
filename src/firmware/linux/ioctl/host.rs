@@ -24,8 +24,8 @@ impl_const_id! {
     GetId<'_> = 8, /* GET_ID2 is 8, the deprecated GET_ID ioctl is 7 */
 
     SnpPlatformStatus = 9,
-    SnpSetExtConfig<'_> = 0xA,
-    SnpGetExtConfig<'_> = 0xB
+    SnpSetExtConfig = 0xA,
+    SnpGetExtConfig = 0xB
 }
 
 const SEV: Group = Group::new(b'S');
@@ -62,11 +62,11 @@ pub const SNP_PLATFORM_STATUS: Ioctl<WriteRead, &Command<SnpPlatformStatus>> =
     unsafe { SEV.write_read(0) };
 
 /// Set the SNP Extended Configuration Settings.
-pub const SNP_SET_EXT_CONFIG: Ioctl<WriteRead, &Command<SnpSetExtConfig<'_>>> =
+pub const SNP_SET_EXT_CONFIG: Ioctl<WriteRead, &Command<SnpSetExtConfig>> =
     unsafe { SEV.write_read(0) };
 
 /// Get the SNP Extended Configuration Settings.
-pub const SNP_GET_EXT_CONFIG: Ioctl<WriteRead, &Command<SnpGetExtConfig<'_>>> =
+pub const SNP_GET_EXT_CONFIG: Ioctl<WriteRead, &Command<SnpGetExtConfig>> =
     unsafe { SEV.write_read(0) };
 
 /// The Rust-flavored, FFI-friendly version of `struct sev_issue_cmd` which is

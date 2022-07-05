@@ -9,16 +9,18 @@ use iocuddle::*;
 // source code: include/uapi/linux/sev-guest.h
 impl_const_id! {
     pub Id => u32;
-    GetReport<'_, '_> = 0,
-    GetDerivedKey = 1,
-    GetExtReport = 2,
+    SnpGetReport<'_, '_> = 0,
+    SnpGetDerivedKey = 1,
+    SnpGetExtReport = 2,
 }
 
 const SEV: Group = Group::new(b'S');
 
-pub const GET_REPORT: Ioctl<WriteRead, &Command<GetReport>> = unsafe { SEV.write_read(0) };
-pub const GET_DERIVED_KEY: Ioctl<WriteRead, &Command<GetDerivedKey>> = unsafe { SEV.write_read(0) };
-pub const GET_EXT_REPORT: Ioctl<WriteRead, &Command<GetExtReport>> = unsafe { SEV.write_read(0) };
+pub const SNP_GET_REPORT: Ioctl<WriteRead, &Command<SnpGetReport>> = unsafe { SEV.write_read(0) };
+pub const SNP_GET_DERIVED_KEY: Ioctl<WriteRead, &Command<SnpGetDerivedKey>> =
+    unsafe { SEV.write_read(0) };
+pub const SNP_GET_EXT_REPORT: Ioctl<WriteRead, &Command<SnpGetExtReport>> =
+    unsafe { SEV.write_read(0) };
 
 /// The Rust-flavored, FFI-friendly version of `struct sev_issue_cmd` which is
 /// used to pass arguments to the SEV ioctl implementation.
