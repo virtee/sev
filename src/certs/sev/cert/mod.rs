@@ -2,7 +2,7 @@
 
 //! Operations that can be done on an SEV certificate.
 
-mod v1;
+pub(crate) mod v1;
 
 use std::mem::size_of;
 
