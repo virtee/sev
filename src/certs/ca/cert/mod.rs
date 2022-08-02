@@ -12,10 +12,14 @@ use serde_bytes::{ByteBuf, Bytes};
 use super::*;
 
 /// An OCA certificate.
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub union Certificate {
-    version: u32,
-    v1: v1::Certificate,
+    /// The version of the CA certificate.
+    pub version: u32,
+
+    /// The contents of the CA certificate.
+    pub v1: v1::Certificate,
 }
 
 impl std::fmt::Debug for Certificate {

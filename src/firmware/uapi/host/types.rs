@@ -3,13 +3,14 @@
 //! Operations for managing the SEV platform.
 
 #[cfg(target_os = "linux")]
-
 use super::*;
 use std::fmt::Debug;
 use std::{error, io};
 
 #[cfg(target_os = "linux")]
 pub use super::Firmware;
+use crate::ca::Chain;
+pub use crate::firmware::linux::host::types::SnpConfig;
 
 use types::{PlatformStatusFlags, TcbVersion};
 
@@ -318,4 +319,82 @@ pub struct SnpStatus {
 
     /// TCB status.
     pub tcb: SnpTcbStatus,
+}
+
+/// Rust-friendly instance of the SNP Extended Configuration.
+/// It may be used either to fetch or set the configuration.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SnpExtConfig {
+    /// SET:
+    ///     Address of the SnpConfig or 0 when reported_tcb does not need
+    ///     to be updated.
+    ///
+    /// GET:
+    ///     Address of the SnpConfig or 0 when reported_tcb should not be
+    ///     fetched.
+    pub config_address: Option<*const SnpConfig>,
+
+    /// SET:
+    ///     Address of extended guest request certificate chain or None when
+    ///     previous certificate should be removed on SNP_SET_EXT_CONFIG.
+    ///
+    /// GET:
+    ///     Address of extended guest request certificate chain or None when
+    ///     certificate should not be fetched.
+    pub certs_address: Option<*const Chain>,
+
+    /// SET:
+    ///     Length of the certificates.
+    ///
+    /// GET:
+    ///     Length of the buffer which will hold the fetched certificates.
+    pub certs_len: u32,
+}
+
+impl SnpExtConfig {
+    /// Returns the underlying SnpConfig.
+    pub fn get_config(&self) -> Option<SnpConfig> {
+        self.config_address.map(|addr| unsafe { *addr })
+    }
+
+    /// Returns the underlying certificate Chain.
+    pub fn get_cert_chain(&self) -> Option<Chain> {
+        self.certs_address.map(|chain| unsafe { *chain })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{SnpConfig, SnpExtConfig};
+    use crate::certs::ca::{Certificate, Chain};
+
+    fn build_ext_config() -> SnpExtConfig {
+        let test_cfg: SnpConfig = SnpConfig::new(200000000000639u64, 31);
+        let chain: Chain = Chain {
+            ask: Certificate { version: 2 },
+            ark: Certificate { version: 3 },
+        };
+        SnpExtConfig {
+            config_address: Some(&test_cfg as *const SnpConfig),
+            certs_address: Some(&chain as *const Chain),
+            certs_len: 2,
+        }
+    }
+
+    #[test]
+    fn snp_ext_config_get_config() {
+        let expected_data: SnpConfig = SnpConfig::new(200000000000639u64, 31);
+        let cfg: SnpExtConfig = build_ext_config();
+        assert_eq!(cfg.get_config(), Some(expected_data));
+    }
+
+    #[test]
+    fn snp_ext_config_get_certs() {
+        let expected_data: Chain = Chain {
+            ask: Certificate { version: 2 },
+            ark: Certificate { version: 3 },
+        };
+        let cfg: SnpExtConfig = build_ext_config();
+        assert_eq!(cfg.get_cert_chain(), Some(expected_data));
+    }
 }
