@@ -202,3 +202,59 @@ pub struct SnpPlatformStatus {
     /// Reported TCB version.
     pub reported_tcb_version: TcbVersion,
 }
+
+/// Sets the system wide ocnfiguration values for SNP.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[repr(C, packed)]
+pub struct SnpConfig {
+    /// The TCB_VERSION to report in guest attestation reports.
+    pub reported_tcb: u64,
+
+    /// Indicates that the CHIP_ID field in the attestationr eport will always
+    /// be zero.
+    pub mask_chip_id: u32,
+
+    /// Reserved. Must be zero.
+    reserved: [u8; 52],
+}
+
+impl SnpConfig {
+    /// Used to create a new SnpConfig
+    pub fn new(reported_tcb: u64, mask_chip_id: u32) -> Self {
+        Self {
+            reported_tcb,
+            mask_chip_id,
+            reserved: [0; 52],
+        }
+    }
+}
+
+#[derive(Default)]
+#[repr(C)]
+pub struct SnpSetExtConfig {
+    /// Address of the SnpConfig or 0 when reported_tcb does not need
+    /// to be updated.
+    pub config_address: u64,
+
+    /// Address of extended guest request certificate chain or 0 when
+    /// previous certificate should be removed on SNP_SET_EXT_CONFIG.
+    pub certs_address: u64,
+
+    /// Length of the certificates.
+    pub certs_len: u32,
+}
+
+#[derive(Default)]
+#[repr(C)]
+pub struct SnpGetExtConfig {
+    /// Address of the SnpConfig or 0 when reported_tcb should not be
+    /// fetched.
+    pub config_address: u64,
+
+    /// Address of extended guest request certificate chain or 0 when
+    /// certificate should not be fetched.
+    pub certs_address: u64,
+
+    /// Length of the buffer which will hold the fetched certificates.
+    pub certs_len: u32,
+}

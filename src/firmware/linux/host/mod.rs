@@ -1,3 +1,3 @@
 //! Host FFI Wrappers for C Kernel APIs
 pub(crate) mod ioctl;
-pub mod types;
+pub(crate) mod types;
