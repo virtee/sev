@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-mod ecdsa;
+pub(crate) mod ecdsa;
 mod rsa;
 
 use super::*;

@@ -3,6 +3,7 @@
 #[cfg(feature = "openssl")]
 use {super::*, openssl::ecdsa};
 
+/// An ECDSA Signature.
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct Signature {
