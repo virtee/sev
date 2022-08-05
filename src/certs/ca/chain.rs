@@ -8,7 +8,7 @@ use super::*;
 
 /// A complete OCA certificate chain.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Chain {
     /// The AMD Signing Key certificate.
     pub ask: Certificate,

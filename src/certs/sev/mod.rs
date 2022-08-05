@@ -2,7 +2,7 @@
 
 //! For operating on SEV certificates.
 
-mod cert;
+pub(crate) mod cert;
 mod chain;
 
 pub use cert::Certificate;
