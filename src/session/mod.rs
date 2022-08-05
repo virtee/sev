@@ -204,6 +204,24 @@ impl Session<Measuring> {
 
         session.verify(&digest, build, msr)
     }
+
+    /// Verifies the session's measurement against the AMD SP's measurement
+    /// using an externally generated digest.
+    pub fn verify_with_digest(
+        self,
+        build: Build,
+        msr: launch::sev::Measurement,
+        digest: &[u8],
+    ) -> Result<Session<Verified>> {
+        let session = Session {
+            policy: self.policy,
+            tek: self.tek,
+            tik: self.tik,
+            data: Initialized,
+        };
+
+        session.verify(digest, build, msr)
+    }
 }
 
 impl Session<Verified> {
