@@ -31,7 +31,6 @@ serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11"
 bitflags = "1.2"
 codicon = "3.0"
-bitfield = "0.14"
 dirs = "4.0"
 iocuddle = "0.1"
 serde-big-array = "0.4.1"
