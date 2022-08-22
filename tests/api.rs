@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use sev::cached_chain;
-use sev::certs::ca::{Certificate, Chain};
-use sev::firmware::uapi::host::types::{Error, Indeterminate, SnpConfig, SnpExtConfig};
 use sev::{certs::sev::Usage, firmware::uapi::host::Firmware, Build, Version};
 
 use serial_test::serial;
@@ -156,76 +154,4 @@ fn snp_platform_status() {
         status.tcb.reported_version.bootloader,
         status.state
     );
-}
-
-fn build_ext_config(cert: bool, cfg: bool) -> SnpExtConfig {
-    let test_cfg: SnpConfig = SnpConfig::new(200000000000639u64, 31);
-    let chain: Chain = Chain {
-        ask: Certificate { version: 2 },
-        ark: Certificate { version: 3 },
-    };
-    SnpExtConfig {
-        config_address: match cfg {
-            true => Some(&test_cfg as *const SnpConfig),
-            false => None,
-        },
-        certs_address: match cert {
-            true => Some(&chain as *const Chain),
-            false => None,
-        },
-        certs_len: match cert {
-            true => 2,
-            false => 0,
-        },
-    }
-}
-
-#[cfg_attr(not(all(has_sev, feature = "dangerous_hw_tests")), ignore)]
-#[ignore]
-#[test]
-#[serial]
-fn snp_set_ext_config_std() -> Result<(), Indeterminate<Error>> {
-    let mut fw: Firmware = Firmware::open().unwrap();
-    let new_config: SnpExtConfig = build_ext_config(true, true);
-    fw.snp_set_ext_config(&new_config)?;
-    Ok(())
-}
-
-#[cfg_attr(not(all(has_sev, feature = "dangerous_hw_tests")), ignore)]
-#[ignore]
-#[test]
-#[serial]
-fn snp_get_ext_config_std() -> Result<(), Indeterminate<Error>> {
-    let mut fw: Firmware = Firmware::open().unwrap();
-    let new_config: SnpExtConfig = build_ext_config(true, true);
-    fw.snp_set_ext_config(&new_config)?;
-    let hw_config: SnpExtConfig = fw.snp_get_ext_config()?;
-    assert_eq!(new_config, hw_config);
-    Ok(())
-}
-
-#[cfg_attr(not(all(has_sev, feature = "dangerous_hw_tests")), ignore)]
-#[ignore]
-#[test]
-#[serial]
-fn snp_get_ext_config_cert_only() -> Result<(), Indeterminate<Error>> {
-    let mut fw: Firmware = Firmware::open().unwrap();
-    let new_config: SnpExtConfig = build_ext_config(true, false);
-    fw.snp_set_ext_config(&new_config)?;
-    let hw_config: SnpExtConfig = fw.snp_get_ext_config()?;
-    assert_eq!(new_config, hw_config);
-    Ok(())
-}
-
-#[cfg_attr(not(all(has_sev, feature = "dangerous_hw_tests")), ignore)]
-#[ignore]
-#[test]
-#[serial]
-fn snp_get_ext_config_cfg_only() -> Result<(), Indeterminate<Error>> {
-    let mut fw: Firmware = Firmware::open().unwrap();
-    let new_config: SnpExtConfig = build_ext_config(false, true);
-    fw.snp_set_ext_config(&new_config)?;
-    let hw_config: SnpExtConfig = fw.snp_get_ext_config()?;
-    assert_eq!(new_config, hw_config);
-    Ok(())
 }

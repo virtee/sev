@@ -1,6 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
+
+use std::marker::PhantomData;
+
 use crate::firmware::linux::guest::types::{
-    SnpDerivedKeyReq, SnpDerivedKeyRsp, SnpExtReportReq, SnpExtReportRsp, SnpGuestRequest,
-    SnpReportReq, SnpReportRsp,
+    SnpDerivedKeyReq, SnpDerivedKeyRsp, SnpExtReportReq, SnpReportReq, SnpReportRsp,
 };
 use iocuddle::{Group, Ioctl, WriteRead};
 
@@ -21,5 +24,40 @@ pub const SNP_GET_DERIVED_KEY: Ioctl<
     &SnpGuestRequest<SnpDerivedKeyReq, SnpDerivedKeyRsp>,
 > = unsafe { SEV.write_read(SnpGuestIoctl::SnpGetDerivedKey as u8) };
 
-pub const SNP_GET_EXT_REPORT: Ioctl<WriteRead, &SnpGuestRequest<SnpExtReportReq, SnpExtReportRsp>> =
+pub const SNP_GET_EXT_REPORT: Ioctl<WriteRead, &SnpGuestRequest<SnpExtReportReq, SnpReportRsp>> =
     unsafe { SEV.write_read(SnpGuestIoctl::SnpGetExtReport as u8) };
+
+/// The default structure used for making requests to the PSP as a guest owner.
+pub struct SnpGuestRequest<'a, 'b, Req, Rsp> {
+    /// Message version number (must be non-zero)
+    pub message_version: u8,
+    /// Request structure address.
+    pub request_data: u64,
+    /// Response structure address.
+    pub response_data: u64,
+    /// Firmware error address.
+    pub fw_err: u64,
+
+    _phantom_req: PhantomData<&'a Req>,
+    _phantom_rsp: PhantomData<&'b Rsp>,
+}
+
+impl<'a, 'b, Req, Rsp> SnpGuestRequest<'a, 'b, Req, Rsp> {
+    /// Creates a new request from the addresses provided.
+    ///
+    /// # Arguments:
+    ///
+    /// * `ver` - Option<u8> - Version of the message.
+    /// * `req` - &Req - The reference a Request object.
+    /// * `rsp` - &Rsp - The reference a Response object.
+    pub fn new(ver: Option<u8>, req: &'a Req, rsp: &'b Rsp) -> Self {
+        Self {
+            message_version: ver.unwrap_or(1),
+            request_data: req as *const Req as u64,
+            response_data: rsp as *const Rsp as u64,
+            fw_err: Default::default(),
+            _phantom_req: PhantomData,
+            _phantom_rsp: PhantomData,
+        }
+    }
+}

@@ -16,10 +16,10 @@ use super::*;
 #[repr(C)]
 pub union Certificate {
     /// The version of the CA certificate.
-    pub version: u32,
+    version: u32,
 
     /// The contents of the CA certificate.
-    pub v1: v1::Certificate,
+    v1: v1::Certificate,
 }
 
 impl Default for Certificate {

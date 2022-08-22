@@ -9,10 +9,8 @@ use std::{error, io};
 
 #[cfg(target_os = "linux")]
 pub use super::Firmware;
-use crate::ca::Chain;
-pub use crate::firmware::linux::host::types::SnpConfig;
-
-use types::{PlatformStatusFlags, TcbVersion};
+pub use crate::firmware::linux::host::types::{SnpConfig, TcbVersion};
+use types::PlatformStatusFlags;
 
 /// There are a number of error conditions that can occur between this
 /// layer all the way down to the SEV platform. Most of these cases have
@@ -220,6 +218,42 @@ impl From<u32> for Indeterminate<Error> {
     }
 }
 
+/// The signature certificate type.
+pub enum CertType {
+    /// The *A*MD *R*oot *K*ey
+    ///  - A self-signed certificate.
+    ARK,
+
+    /// The *A*MD *S*igning *K*ey
+    ///  - Signed by the ARK
+    ASK,
+
+    /// The *V*ersion *C*hip *E*ndorsement *K*ey
+    ///  - Signed by the ASK
+    VCEK,
+}
+
+impl CertType {
+    /// Provides the GUID for the specified certificate type.
+    pub fn guid(&self) -> String {
+        match self {
+            CertType::ARK => "c0b406a4-a803-4952-9743-3fb6014cd0ae".to_string(),
+            CertType::ASK => "4ab7b379-bbac-4fe4-a02f-05aef327c782".to_string(),
+            CertType::VCEK => "63da758d-e664-4564-adc5-f4b93be8accd".to_string(),
+        }
+    }
+
+    /// Attempts to provide a certificate type from the specified GUID.
+    pub fn from_guid(guid: &str) -> Option<Self> {
+        match guid {
+            "c0b406a4-a803-4952-9743-3fb6014cd0ae" => Some(CertType::ARK),
+            "4ab7b379-bbac-4fe4-a02f-05aef327c782" => Some(CertType::ASK),
+            "63da758d-e664-4564-adc5-f4b93be8accd" => Some(CertType::VCEK),
+            _ => None,
+        }
+    }
+}
+
 /// The platform state.
 ///
 /// The underlying SEV platform behaves like a state machine and can
@@ -319,82 +353,4 @@ pub struct SnpStatus {
 
     /// TCB status.
     pub tcb: SnpTcbStatus,
-}
-
-/// Rust-friendly instance of the SNP Extended Configuration.
-/// It may be used either to fetch or set the configuration.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct SnpExtConfig {
-    /// SET:
-    ///     Address of the SnpConfig or 0 when reported_tcb does not need
-    ///     to be updated.
-    ///
-    /// GET:
-    ///     Address of the SnpConfig or 0 when reported_tcb should not be
-    ///     fetched.
-    pub config_address: Option<*const SnpConfig>,
-
-    /// SET:
-    ///     Address of extended guest request certificate chain or None when
-    ///     previous certificate should be removed on SNP_SET_EXT_CONFIG.
-    ///
-    /// GET:
-    ///     Address of extended guest request certificate chain or None when
-    ///     certificate should not be fetched.
-    pub certs_address: Option<*const Chain>,
-
-    /// SET:
-    ///     Length of the certificates.
-    ///
-    /// GET:
-    ///     Length of the buffer which will hold the fetched certificates.
-    pub certs_len: u32,
-}
-
-impl SnpExtConfig {
-    /// Returns the underlying SnpConfig.
-    pub fn get_config(&self) -> Option<SnpConfig> {
-        self.config_address.map(|addr| unsafe { *addr })
-    }
-
-    /// Returns the underlying certificate Chain.
-    pub fn get_cert_chain(&self) -> Option<Chain> {
-        self.certs_address.map(|chain| unsafe { *chain })
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::{SnpConfig, SnpExtConfig};
-    use crate::certs::ca::{Certificate, Chain};
-
-    fn build_ext_config() -> SnpExtConfig {
-        let test_cfg: SnpConfig = SnpConfig::new(200000000000639u64, 31);
-        let chain: Chain = Chain {
-            ask: Certificate { version: 2 },
-            ark: Certificate { version: 3 },
-        };
-        SnpExtConfig {
-            config_address: Some(&test_cfg as *const SnpConfig),
-            certs_address: Some(&chain as *const Chain),
-            certs_len: 2,
-        }
-    }
-
-    #[test]
-    fn snp_ext_config_get_config() {
-        let expected_data: SnpConfig = SnpConfig::new(200000000000639u64, 31);
-        let cfg: SnpExtConfig = build_ext_config();
-        assert_eq!(cfg.get_config(), Some(expected_data));
-    }
-
-    #[test]
-    fn snp_ext_config_get_certs() {
-        let expected_data: Chain = Chain {
-            ask: Certificate { version: 2 },
-            ark: Certificate { version: 3 },
-        };
-        let cfg: SnpExtConfig = build_ext_config();
-        assert_eq!(cfg.get_cert_chain(), Some(expected_data));
-    }
 }

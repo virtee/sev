@@ -8,7 +8,7 @@ use std::mem::MaybeUninit;
 use std::os::unix::io::{AsRawFd, RawFd};
 
 use crate::{
-    certs::{self, ca::Chain, sev::Certificate},
+    certs::{self, sev::Certificate},
     Build, SnpBuild, Version,
 };
 use types::*;
@@ -149,45 +149,6 @@ impl Firmware {
         })
     }
 
-    /// Fetch the SNP Extended Configuration.
-    pub fn snp_get_ext_config(&mut self) -> Result<SnpExtConfig, Indeterminate<Error>> {
-        let mut config: SnpGetExtConfig = Default::default();
-        SNP_GET_EXT_CONFIG.ioctl(&mut self.0, &mut Command::from_mut(&mut config))?;
-
-        Ok(SnpExtConfig {
-            config_address: Some(config.config_address as *const SnpConfig),
-            certs_address: Some(config.certs_address as *const Chain),
-            certs_len: config.certs_len,
-        })
-    }
-
-    /// Set the SNP Extended Configuration.
-    pub fn snp_set_ext_config(
-        &mut self,
-        new_config: &SnpExtConfig,
-    ) -> Result<(), Indeterminate<Error>> {
-        let mut config: SnpSetExtConfig = Default::default();
-
-        match (new_config.certs_address, new_config.config_address) {
-            (Some(cert_addr), Some(conf_addr)) => {
-                config.certs_address = cert_addr as u64;
-                config.config_address = conf_addr as u64;
-            }
-            (Some(cert_addr), None) => {
-                config.certs_address = cert_addr as u64;
-            }
-            (None, Some(conf_addr)) => {
-                config.config_address = conf_addr as u64;
-            }
-            (None, None) => (),
-        }
-
-        config.certs_len = new_config.certs_len;
-
-        SNP_SET_EXT_CONFIG.ioctl(&mut self.0, &mut Command::from_mut(&mut config))?;
-
-        Ok(())
-    }
 }
 
 impl AsRawFd for Firmware {
