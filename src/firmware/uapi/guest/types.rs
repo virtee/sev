@@ -1,12 +1,14 @@
+// SPDX-License-Identifier: Apache-2.0
+
 use bitfield::bitfield;
 
 pub(crate) use crate::firmware::linux::guest::types::{
-    SnpDerivedKeyReq, SnpDerivedKeyRsp, SnpExtReportRsp, SnpReportRsp,
+    SnpDerivedKeyReq, SnpDerivedKeyRsp, SnpReportRsp,
 };
 
 pub use crate::firmware::linux::guest::types::{
-    AttestationReport, Signature, SnpExtReportReq, SnpGuestPolicy, SnpGuestRequest,
-    SnpPlatformInfo, SnpReportReq, SnpTcbVersion,
+    AttestationReport, Signature, SnpExtReportReq, SnpGuestPolicy, SnpPlatformInfo, SnpReportReq,
+    SnpTcbVersion,
 };
 
 /// Structure of required data for fetching the derived key.

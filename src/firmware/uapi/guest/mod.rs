@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //! Guest Owner Rust-friendly API interfaces.
 
 /// Rust-friendly types returned by FFI wrapping APIs.
@@ -40,7 +42,7 @@ impl Firmware {
 
         SNP_GET_REPORT.ioctl(
             &mut self.0,
-            &mut SnpGuestRequest::from(message_version, &report_request, &report_response),
+            &mut SnpGuestRequest::new(message_version, &report_request, &report_response),
         )?;
 
         Ok(report_response.report)
@@ -62,7 +64,7 @@ impl Firmware {
 
         SNP_GET_DERIVED_KEY.ioctl(
             &mut self.0,
-            &mut SnpGuestRequest::from(
+            &mut SnpGuestRequest::new(
                 message_version,
                 &SnpDerivedKeyReq::from_uapi(derived_key_request),
                 &derived_key_response,
@@ -83,15 +85,15 @@ impl Firmware {
         &mut self,
         message_version: Option<u8>,
         ext_report_request: SnpExtReportReq,
-    ) -> Result<SnpExtReportRsp, Indeterminate<Error>> {
-        let ext_report_response: SnpExtReportRsp = SnpExtReportRsp::default();
+    ) -> Result<SnpReportRsp, Indeterminate<Error>> {
+        let ext_report_response: SnpReportRsp = SnpReportRsp::default();
 
         SNP_GET_EXT_REPORT.ioctl(
             &mut self.0,
-            &mut SnpGuestRequest::from(
+            &mut SnpGuestRequest::new(
                 message_version,
                 &SnpExtReportReq {
-                    data: ext_report_request.data as u64,
+                    data: ext_report_request.data,
                     certs_address: ext_report_request.certs_address as u64,
                     certs_len: ext_report_request.certs_len,
                 },
