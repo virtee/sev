@@ -13,6 +13,7 @@ use mmarinus::{perms, Map};
 use serial_test::serial;
 
 use std::convert::TryFrom;
+use std::os::unix::io::AsRawFd;
 
 // has to be a multiple of 16
 const CODE: &[u8; 16] = &[
@@ -60,7 +61,7 @@ fn sev() {
     session.update_data(address_space.as_ref()).unwrap();
 
     let (mut launcher, measurement) = {
-        let launcher = Launcher::new(&mut vm, &mut sev).unwrap();
+        let launcher = Launcher::new(vm.as_raw_fd(), sev.as_raw_fd()).unwrap();
         let mut launcher = launcher.start(start).unwrap();
         launcher.update_data(address_space.as_ref()).unwrap();
         let launcher = launcher.measure().unwrap();
