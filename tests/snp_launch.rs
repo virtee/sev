@@ -44,7 +44,7 @@ fn snp() {
     }
 
     let sev = Firmware::open().unwrap();
-    let launcher = Launcher::new(vm_fd, sev.as_raw_fd()).unwrap();
+    let launcher = Launcher::new(vm_fd.as_raw_fd(), sev.as_raw_fd()).unwrap();
 
     let start = Start::new(
         None,
@@ -73,7 +73,7 @@ fn snp() {
 
     let finish = Finish::new(None, None, [0u8; 32]);
 
-    let vcpu_fd = launcher.as_mut().create_vcpu(0).unwrap();
+    let vcpu_fd = vm_fd.create_vcpu(0).unwrap();
 
     let mut regs = vcpu_fd.get_regs().unwrap();
     regs.rip = MEM_ADDR;
