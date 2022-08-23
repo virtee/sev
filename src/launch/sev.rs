@@ -33,13 +33,6 @@ pub struct Launcher<T> {
     sev: RawFd,
 }
 
-impl<T> Launcher<T> {
-    /// Give access to the vm fd to create vCPUs or such.
-    pub fn as_mut_vmfd(&mut self) -> &mut RawFd {
-        &mut self.vm_fd
-    }
-}
-
 impl Launcher<New> {
     /// Begin the SEV launch process.
     pub fn new(kvm: RawFd, sev: RawFd) -> Result<Self> {
