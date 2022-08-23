@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use std::os::unix::io::AsRawFd;
+
 use sev::firmware::Firmware;
 use sev::launch::snp::*;
 
@@ -42,7 +44,7 @@ fn snp() {
     }
 
     let sev = Firmware::open().unwrap();
-    let launcher = Launcher::new(vm_fd, sev).unwrap();
+    let launcher = Launcher::new(vm_fd, sev.as_raw_fd()).unwrap();
 
     let start = Start::new(
         None,

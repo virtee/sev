@@ -12,7 +12,7 @@ use crate::Version;
 
 use std::io::Result;
 use std::marker::PhantomData;
-use std::os::unix::io::AsRawFd;
+use std::os::unix::io::RawFd;
 
 use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
@@ -24,30 +24,16 @@ pub struct New;
 pub struct Started;
 
 /// Facilitates the correct execution of the SEV launch process.
-pub struct Launcher<T, U: AsRawFd, V: AsRawFd> {
-    vm_fd: U,
-    sev: V,
+pub struct Launcher<T> {
+    vm_fd: RawFd,
+    sev: RawFd,
     state: PhantomData<T>,
 }
 
-impl<T, U: AsRawFd, V: AsRawFd> AsRef<U> for Launcher<T, U, V> {
-    /// Give access to the vm fd to create vCPUs or such.
-    fn as_ref(&self) -> &U {
-        &self.vm_fd
-    }
-}
-
-impl<T, U: AsRawFd, V: AsRawFd> AsMut<U> for Launcher<T, U, V> {
-    /// Give access to the vm fd to create vCPUs or such.
-    fn as_mut(&mut self) -> &mut U {
-        &mut self.vm_fd
-    }
-}
-
-impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
+impl Launcher<New> {
     /// Begin the SEV-SNP launch process by creating a Launcher and issuing the
     /// KVM_SNP_INIT ioctl.
-    pub fn new(vm_fd: U, sev: V) -> Result<Self> {
+    pub fn new(vm_fd: RawFd, sev: RawFd) -> Result<Self> {
         let mut launcher = Launcher {
             vm_fd,
             sev,
@@ -65,7 +51,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
     }
 
     /// Initialize the flow to launch a guest.
-    pub fn start(mut self, start: Start) -> Result<Launcher<Started, U, V>> {
+    pub fn start(mut self, start: Start) -> Result<Launcher<Started>> {
         let mut launch_start = LaunchStart::from(start);
         let mut cmd = Command::from_mut(&mut self.sev, &mut launch_start);
 
@@ -83,7 +69,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
     }
 }
 
-impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
+impl Launcher<Started> {
     /// Encrypt guest SNP data.
     pub fn update_data(&mut self, update: Update) -> Result<()> {
         let launch_update_data = LaunchUpdate::from(update);
@@ -99,7 +85,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
     }
 
     /// Complete the SNP launch process.
-    pub fn finish(mut self, finish: Finish) -> Result<(U, V)> {
+    pub fn finish(mut self, finish: Finish) -> Result<(RawFd, RawFd)> {
         let launch_finish = LaunchFinish::from(finish);
         let mut cmd = Command::from(&mut self.sev, &launch_finish);
 
