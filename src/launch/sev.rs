@@ -105,6 +105,18 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
         Ok(())
     }
 
+    /// Encrypt the VMSA on SEV-ES.
+    pub fn update_vmsa(&mut self) -> Result<()> {
+        let launch_update_vmsa = LaunchUpdateVmsa::new();
+        let mut cmd = Command::from(&mut self.sev, &launch_update_vmsa);
+
+        LAUNCH_UPDATE_VMSA
+            .ioctl(&mut self.vm_fd, &mut cmd)
+            .map_err(|e| cmd.encapsulate(e))?;
+
+        Ok(())
+    }
+
     /// Request a measurement from the SEV firmware.
     pub fn measure(mut self) -> Result<Launcher<Measured, U, V>> {
         let mut measurement = MaybeUninit::uninit();

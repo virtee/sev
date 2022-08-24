@@ -22,6 +22,7 @@ impl_const_id! {
     sev::EsInit = 1,
     sev::LaunchStart<'_> = 2,
     sev::LaunchUpdateData<'_> = 3,
+    sev::LaunchUpdateVmsa = 4,
     sev::LaunchSecret<'_> = 5,
     sev::LaunchMeasure<'_> = 6,
     sev::LaunchFinish = 7,
@@ -58,6 +59,10 @@ pub const LAUNCH_START: Ioctl<WriteRead, &Command<sev::LaunchStart>> = unsafe { 
 
 /// Encrypt guest data with its VEK.
 pub const LAUNCH_UPDATE_DATA: Ioctl<WriteRead, &Command<sev::LaunchUpdateData>> =
+    unsafe { ENC_OP.lie() };
+
+/// Encrypt the VMSA contents for SEV-ES.
+pub const LAUNCH_UPDATE_VMSA: Ioctl<WriteRead, &Command<sev::LaunchUpdateVmsa>> =
     unsafe { ENC_OP.lie() };
 
 /// Inject a secret into the guest.
