@@ -36,7 +36,7 @@ fn sev() {
     let start = session.start(chain).unwrap();
 
     let kvm = Kvm::new().unwrap();
-    let mut vm = kvm.create_vm().unwrap();
+    let vm = kvm.create_vm().unwrap();
 
     const MEM_SIZE: usize = 0x1000;
     let address_space = Map::bytes(MEM_SIZE)
