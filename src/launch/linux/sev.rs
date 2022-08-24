@@ -69,6 +69,16 @@ impl<'a> LaunchUpdateData<'a> {
     }
 }
 
+/// Update VMSA for setting up vCPUs on SEV-ES.
+#[repr(C)]
+pub struct LaunchUpdateVmsa;
+
+impl LaunchUpdateVmsa {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
 /// Inject a secret into the guest.
 #[repr(C)]
 pub struct LaunchSecret<'a> {
