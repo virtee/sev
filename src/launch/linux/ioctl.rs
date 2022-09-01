@@ -19,6 +19,7 @@ impl_const_id! {
     pub Id => u32;
 
     sev::Init = 0,
+    sev::EsInit = 1,
     sev::LaunchStart<'_> = 2,
     sev::LaunchUpdateData<'_> = 3,
     sev::LaunchSecret<'_> = 5,
@@ -48,6 +49,9 @@ const ENC_OP: Ioctl<WriteRead, &c_ulong> = unsafe { KVM.write_read(0xBA) };
 
 /// Initialize the SEV platform context.
 pub const INIT: Ioctl<WriteRead, &Command<sev::Init>> = unsafe { ENC_OP.lie() };
+
+/// Initialize the SEV-ES platform context.
+pub const ES_INIT: Ioctl<WriteRead, &Command<sev::EsInit>> = unsafe { ENC_OP.lie() };
 
 /// Create encrypted guest context.
 pub const LAUNCH_START: Ioctl<WriteRead, &Command<sev::LaunchStart>> = unsafe { ENC_OP.lie() };
