@@ -12,6 +12,10 @@ use std::mem::{size_of_val, MaybeUninit};
 #[repr(C)]
 pub struct Init;
 
+/// Initialize the SEV-ES platform context.
+#[repr(C)]
+pub struct EsInit;
+
 #[repr(transparent)]
 pub struct Handle(u32);
 

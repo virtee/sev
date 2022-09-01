@@ -56,6 +56,22 @@ impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, New, U, V> {
         Ok(launcher)
     }
 
+    /// Begin the SEV-ES launch process.
+    pub fn new_es(kvm: &'a mut U, sev: &'a mut V) -> Result<Self> {
+        let launcher = Launcher {
+            vm_fd: kvm,
+            sev,
+            state: New,
+        };
+
+        let mut cmd = Command::from(launcher.sev, &EsInit);
+        ES_INIT
+            .ioctl(launcher.vm_fd, &mut cmd)
+            .map_err(|e| cmd.encapsulate(e))?;
+
+        Ok(launcher)
+    }
+
     /// Create an encrypted guest context.
     pub fn start(self, start: Start) -> Result<Launcher<'a, Started, U, V>> {
         let mut launch_start = LaunchStart::new(&start.policy, &start.cert, &start.session);
