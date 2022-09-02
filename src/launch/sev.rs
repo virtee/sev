@@ -27,57 +27,57 @@ pub struct Started(Handle);
 pub struct Measured(Handle, Measurement);
 
 /// Facilitates the correct execution of the SEV launch process.
-pub struct Launcher<'a, T, U: AsRawFd, V: AsRawFd> {
+pub struct Launcher<T, U: AsRawFd, V: AsRawFd> {
     state: T,
-    vm_fd: &'a mut U,
-    sev: &'a mut V,
+    vm_fd: U,
+    sev: V,
 }
 
-impl<'a, T, U: AsRawFd, V: AsRawFd> Launcher<'a, T, U, V> {
+impl<T, U: AsRawFd, V: AsRawFd> Launcher<T, U, V> {
     /// Give access to the vm fd to create vCPUs or such.
     pub fn as_mut_vmfd(&mut self) -> &mut U {
-        self.vm_fd
+        &mut self.vm_fd
     }
 }
 
-impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, New, U, V> {
+impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
     /// Begin the SEV launch process.
-    pub fn new(kvm: &'a mut U, sev: &'a mut V) -> Result<Self> {
-        let launcher = Launcher {
+    pub fn new(kvm: U, sev: V) -> Result<Self> {
+        let mut launcher = Launcher {
             vm_fd: kvm,
             sev,
             state: New,
         };
 
-        let mut cmd = Command::from(launcher.sev, &Init);
-        INIT.ioctl(launcher.vm_fd, &mut cmd)
+        let mut cmd = Command::from(&mut launcher.sev, &Init);
+        INIT.ioctl(&mut launcher.vm_fd, &mut cmd)
             .map_err(|e| cmd.encapsulate(e))?;
 
         Ok(launcher)
     }
 
     /// Begin the SEV-ES launch process.
-    pub fn new_es(kvm: &'a mut U, sev: &'a mut V) -> Result<Self> {
-        let launcher = Launcher {
+    pub fn new_es(kvm: U, sev: V) -> Result<Self> {
+        let mut launcher = Launcher {
             vm_fd: kvm,
             sev,
             state: New,
         };
 
-        let mut cmd = Command::from(launcher.sev, &EsInit);
+        let mut cmd = Command::from(&mut launcher.sev, &EsInit);
         ES_INIT
-            .ioctl(launcher.vm_fd, &mut cmd)
+            .ioctl(&mut launcher.vm_fd, &mut cmd)
             .map_err(|e| cmd.encapsulate(e))?;
 
         Ok(launcher)
     }
 
     /// Create an encrypted guest context.
-    pub fn start(self, start: Start) -> Result<Launcher<'a, Started, U, V>> {
+    pub fn start(mut self, start: Start) -> Result<Launcher<Started, U, V>> {
         let mut launch_start = LaunchStart::new(&start.policy, &start.cert, &start.session);
-        let mut cmd = Command::from_mut(self.sev, &mut launch_start);
+        let mut cmd = Command::from_mut(&mut self.sev, &mut launch_start);
         LAUNCH_START
-            .ioctl(self.vm_fd, &mut cmd)
+            .ioctl(&mut self.vm_fd, &mut cmd)
             .map_err(|e| cmd.encapsulate(e))?;
 
         let next = Launcher {
@@ -90,28 +90,28 @@ impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, New, U, V> {
     }
 }
 
-impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, Started, U, V> {
+impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
     /// Encrypt guest data with its VEK.
     pub fn update_data(&mut self, data: &[u8]) -> Result<()> {
         let launch_update_data = LaunchUpdateData::new(data);
-        let mut cmd = Command::from(self.sev, &launch_update_data);
+        let mut cmd = Command::from(&mut self.sev, &launch_update_data);
 
-        KvmEncRegion::new(data).register(self.vm_fd)?;
+        KvmEncRegion::new(data).register(&mut self.vm_fd)?;
 
         LAUNCH_UPDATE_DATA
-            .ioctl(self.vm_fd, &mut cmd)
+            .ioctl(&mut self.vm_fd, &mut cmd)
             .map_err(|e| cmd.encapsulate(e))?;
 
         Ok(())
     }
 
     /// Request a measurement from the SEV firmware.
-    pub fn measure(self) -> Result<Launcher<'a, Measured, U, V>> {
+    pub fn measure(mut self) -> Result<Launcher<Measured, U, V>> {
         let mut measurement = MaybeUninit::uninit();
         let mut launch_measure = LaunchMeasure::new(&mut measurement);
-        let mut cmd = Command::from_mut(self.sev, &mut launch_measure);
+        let mut cmd = Command::from_mut(&mut self.sev, &mut launch_measure);
         LAUNCH_MEASUREMENT
-            .ioctl(self.vm_fd, &mut cmd)
+            .ioctl(&mut self.vm_fd, &mut cmd)
             .map_err(|e| cmd.encapsulate(e))?;
 
         let next = Launcher {
@@ -124,7 +124,7 @@ impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, Started, U, V> {
     }
 }
 
-impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, Measured, U, V> {
+impl<U: AsRawFd, V: AsRawFd> Launcher<Measured, U, V> {
     /// Get the measurement that the SEV platform recorded.
     pub fn measurement(&self) -> Measurement {
         self.state.1
@@ -137,18 +137,18 @@ impl<'a, U: AsRawFd, V: AsRawFd> Launcher<'a, Measured, U, V> {
     /// This should only be called after a successful attestation flow.
     pub fn inject(&mut self, secret: &Secret, guest: usize) -> Result<()> {
         let launch_secret = LaunchSecret::new(&secret.header, guest, &secret.ciphertext[..]);
-        let mut cmd = Command::from(self.sev, &launch_secret);
+        let mut cmd = Command::from(&mut self.sev, &launch_secret);
         LAUNCH_SECRET
-            .ioctl(self.vm_fd, &mut cmd)
+            .ioctl(&mut self.vm_fd, &mut cmd)
             .map_err(|e| cmd.encapsulate(e))?;
         Ok(())
     }
 
     /// Complete the SEV launch process.
-    pub fn finish(self) -> Result<Handle> {
-        let mut cmd = Command::from(self.sev, &LaunchFinish);
+    pub fn finish(mut self) -> Result<Handle> {
+        let mut cmd = Command::from(&mut self.sev, &LaunchFinish);
         LAUNCH_FINISH
-            .ioctl(self.vm_fd, &mut cmd)
+            .ioctl(&mut self.vm_fd, &mut cmd)
             .map_err(|e| cmd.encapsulate(e))?;
         Ok(self.state.0)
     }
