@@ -2,6 +2,9 @@
 
 #![cfg(feature = "openssl")]
 
+use std::convert::TryFrom;
+use std::os::unix::io::AsRawFd;
+
 use sev::cached_chain;
 use sev::firmware::Firmware;
 use sev::launch::sev::*;
@@ -11,8 +14,6 @@ use kvm_bindings::kvm_userspace_memory_region;
 use kvm_ioctls::{Kvm, VcpuExit};
 use mmarinus::{perms, Map};
 use serial_test::serial;
-
-use std::convert::TryFrom;
 
 // has to be a multiple of 16
 const CODE: &[u8; 16] = &[
