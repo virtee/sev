@@ -49,7 +49,7 @@ impl From<Start<'_>> for LaunchStart<'_> {
             } else {
                 0
             },
-            ma_en: if start.ma_uaddr.is_some() { 1 } else { 0 },
+            ma_en: u8::from(start.ma_uaddr.is_some()),
             imi_en: start.imi_en as _,
             gosvw: start.gosvw,
             pad: [0u8; 6],
@@ -96,7 +96,7 @@ impl From<Update<'_>> for LaunchUpdate<'_> {
             start_gfn: update.start_gfn,
             uaddr: update.uaddr.as_ptr() as _,
             len: update.uaddr.len() as _,
-            imi_page: if update.imi_page { 1 } else { 0 },
+            imi_page: u8::from(update.imi_page),
             page_type: update.page_type as _,
             vmpl3_perms: update.vmpl3_perms.bits(),
             vmpl2_perms: update.vmpl2_perms.bits(),
@@ -149,8 +149,8 @@ impl From<Finish<'_, '_>> for LaunchFinish<'_> {
         Self {
             id_block_uaddr: id_block,
             id_auth_uaddr: id_auth,
-            id_block_en: if finish.id_block.is_some() { 1 } else { 0 },
-            auth_key_en: if finish.id_auth.is_some() { 1 } else { 0 },
+            id_block_en: u8::from(finish.id_block.is_some()),
+            auth_key_en: u8::from(finish.id_auth.is_some()),
             host_data: finish.host_data,
             pad: [0u8; 6],
             _phantom: PhantomData,

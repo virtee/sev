@@ -55,7 +55,7 @@ impl SnpDerivedKey {
         tcb_version: u64,
     ) -> Self {
         Self {
-            root_key_select: if root_key_select { 1u32 } else { 0u32 },
+            root_key_select: u32::from(root_key_select),
             _reserved_0: Default::default(),
             guest_field_select,
             vmpl,

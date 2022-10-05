@@ -137,7 +137,7 @@ impl codicon::Encoder<()> for Build {
 ///
 /// use std::convert::TryFrom;
 /// use sev::certs::Usage;
-/// use sev::firmware::Firmware;
+/// use sev::firmware::uapi::host::types::Firmware;
 /// use sev::Generation;
 ///
 /// let mut firmware = Firmware::open().expect("failed to open /dev/sev");
