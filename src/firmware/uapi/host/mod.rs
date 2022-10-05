@@ -148,7 +148,6 @@ impl Firmware {
             },
         })
     }
-
 }
 
 impl AsRawFd for Firmware {
