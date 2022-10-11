@@ -94,7 +94,7 @@ impl Firmware {
                 message_version,
                 &SnpExtReportReq {
                     data: ext_report_request.data,
-                    certs_address: ext_report_request.certs_address as u64,
+                    certs_address: ext_report_request.certs_address,
                     certs_len: ext_report_request.certs_len,
                 },
                 &ext_report_response,
