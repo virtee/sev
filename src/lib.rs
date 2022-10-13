@@ -28,8 +28,8 @@
 //! expected to run as a process with the necessary privileges to interact
 //! with the device nodes.
 //!
-//! [`firmware`]: ./firmware/index.html
-//! [`launch`]: ./launch/index.html
+//! [`firmware`]: ./src/firmware/
+//! [`launch`]: ./src/launch/
 
 #![deny(clippy::all)]
 #![deny(missing_docs)]

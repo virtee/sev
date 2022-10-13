@@ -33,7 +33,7 @@ of the `sev` crate. Binaries that result from consumers of this crate are
 expected to run as a process with the necessary privileges to interact
 with the device nodes.
 
-[`firmware`]: ./firmware/index.html
-[`launch`]: ./launch/index.html
+[`firmware`]: ./src/firmware/
+[`launch`]: ./src/launch/
 
 License: Apache-2.0
