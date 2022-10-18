@@ -354,3 +354,152 @@ pub struct SnpStatus {
     /// TCB status.
     pub tcb: SnpTcbStatus,
 }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+/// Certificates which are accepted for [`CertTableEntry`]
+pub enum SnpCertType {
+    /// AMD Root Signing Key (ARK) certificate
+    ARK,
+
+    /// AMD SEV Signing Key (ASK) certificate
+    ASK,
+
+    /// Versioned Chip Endorsement Key (VCEK) certificate
+    VCEK,
+
+    /// Other (Specify GUID)
+    OTHER(String),
+}
+
+impl SnpCertType {
+    /// Create a certificate from the specified GUID. Any unexpected matches
+    /// produce an [`SnpCertType::OTHER`] type from the guid provided.
+    fn from_guid(guid: &str) -> Self {
+        match guid {
+            "c0b406a4-a803-4952-9743-3fb6014cd0ae" => SnpCertType::ARK,
+            "4ab7b379-bbac-4fe4-a02f-05aef327c782" => SnpCertType::ASK,
+            "63da758d-e664-4564-adc5-f4b93be8accd" => SnpCertType::VCEK,
+            guid => SnpCertType::OTHER(guid.to_string()),
+        }
+    }
+
+    /// Retreive the GUID from the [`SnpCertType`].
+    fn guid(&self) -> String {
+        match self {
+            SnpCertType::ARK => "c0b406a4-a803-4952-9743-3fb6014cd0ae",
+            SnpCertType::ASK => "4ab7b379-bbac-4fe4-a02f-05aef327c782",
+            SnpCertType::VCEK => "63da758d-e664-4564-adc5-f4b93be8accd",
+            SnpCertType::OTHER(guid) => guid,
+        }
+        .to_string()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+/// An entry with information regarding a specific certificate.
+pub struct CertTableEntry {
+    /// A Specificy certificate type.
+    cert_type: SnpCertType,
+
+    /// The raw data of the certificate.
+    data: Vec<u8>,
+}
+
+impl CertTableEntry {
+    /// Façade for retreiving the GUID for the Entry.
+    pub fn guid(&self) -> String {
+        self.cert_type.guid()
+    }
+
+    /// Get a copy of the data stored in the entry.
+    pub fn data(&self) -> Vec<u8> {
+        self.data.clone()
+    }
+
+    /// Generates a certificate from the str GUID and data provided.
+    pub fn from_guid(guid: &str, data: Vec<u8>) -> Self {
+        Self {
+            cert_type: SnpCertType::from_guid(guid),
+            data,
+        }
+    }
+
+    /// Generates a certificate from the SnpCertType and data provided.
+    pub fn new(cert_type: SnpCertType, data: Vec<u8>) -> Self {
+        Self { cert_type, data }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+/// Certificates to send to the PSP.
+pub struct CertTable {
+    /// A vector of [`CertTableEntry`].
+    pub entries: Vec<CertTableEntry>,
+}
+
+/// Rust-friendly instance of the SNP Extended Configuration.
+/// It may be used either to fetch or set the configuration.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SnpExtConfig {
+    /// SET:
+    ///     Address of the SnpConfig or 0 when reported_tcb does not need
+    ///     to be updated.
+    ///
+    /// GET:
+    ///     Address of the SnpConfig or 0 when reported_tcb should not be
+    ///     fetched.
+    pub config: Option<SnpConfig>,
+
+    /// SET:
+    ///     Address of extended guest request certificate chain or None when
+    ///     previous certificate should be removed on SNP_SET_EXT_CONFIG.
+    ///
+    /// GET:
+    ///     Address of extended guest request certificate chain or None when
+    ///     certificate should not be fetched.
+    pub certs: Option<CertTable>,
+
+    /// SET:
+    ///     Length of the certificates.
+    ///
+    /// GET:
+    ///     Length of the buffer which will hold the fetched certificates.
+    pub certs_len: u32,
+}
+
+#[cfg(test)]
+mod test {
+    use super::{CertTable, CertTableEntry, SnpCertType, SnpConfig, SnpExtConfig};
+    use crate::firmware::linux::host::types::TcbVersion;
+
+    fn build_ext_config() -> SnpExtConfig {
+        let test_cfg: SnpConfig = SnpConfig::new(TcbVersion::new(2, 0, 6, 39), 31);
+
+        let cert_table: CertTable = CertTable {
+            entries: vec![CertTableEntry::new(SnpCertType::ARK, vec![1; 28])],
+        };
+
+        SnpExtConfig {
+            config: Some(test_cfg),
+            certs: Some(cert_table),
+            certs_len: 2,
+        }
+    }
+
+    #[test]
+    fn snp_ext_config_get_config() {
+        let expected_data: SnpConfig = SnpConfig::new(TcbVersion::new(2, 0, 6, 39), 31);
+        let cfg: SnpExtConfig = build_ext_config();
+        assert_eq!(cfg.config, Some(expected_data));
+    }
+
+    #[test]
+    fn snp_ext_config_get_certs() {
+        let cert_table: CertTable = CertTable {
+            entries: vec![CertTableEntry::new(SnpCertType::ARK, vec![1; 28])],
+        };
+
+        let cfg: SnpExtConfig = build_ext_config();
+        assert_eq!(cfg.certs, Some(cert_table));
+    }
+}

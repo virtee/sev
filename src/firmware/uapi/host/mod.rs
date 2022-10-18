@@ -148,6 +148,23 @@ impl Firmware {
             },
         })
     }
+
+    /// Fetch the SNP Extended Configuration.
+    pub fn snp_get_ext_config(&mut self) -> Result<SnpExtConfig, Indeterminate<Error>> {
+        let mut config: SnpGetExtConfig = Default::default();
+        SNP_GET_EXT_CONFIG.ioctl(&mut self.0, &mut Command::from_mut(&mut config))?;
+        Ok(config.as_uapi())
+    }
+
+    /// Set the SNP Extended Configuration.
+    pub fn snp_set_ext_config(
+        &mut self,
+        new_config: &SnpExtConfig,
+    ) -> Result<(), Indeterminate<Error>> {
+        let mut config: SnpSetExtConfig = SnpSetExtConfig::from_uapi(new_config);
+        SNP_SET_EXT_CONFIG.ioctl(&mut self.0, &mut Command::from_mut(&mut config))?;
+        Ok(())
+    }
 }
 
 impl AsRawFd for Firmware {
