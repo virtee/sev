@@ -157,11 +157,10 @@ impl Firmware {
     }
 
     /// Set the SNP Extended Configuration.
-    pub fn snp_set_ext_config(
-        &mut self,
-        new_config: &SnpExtConfig,
-    ) -> Result<(), Indeterminate<Error>> {
-        let mut config: SnpSetExtConfig = SnpSetExtConfig::from_uapi(new_config);
+    pub fn snp_set_ext_config(&mut self, new_config: &SnpExtConfig) -> Result<(), UserApiError> {
+        let mut config: SnpSetExtConfig = SnpSetExtConfig::from_uapi(new_config)?;
+
+        // Need to translate this from IOError to UserApiError
         SNP_SET_EXT_CONFIG.ioctl(&mut self.0, &mut Command::from_mut(&mut config))?;
         Ok(())
     }

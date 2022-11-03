@@ -14,16 +14,16 @@ use std::marker::PhantomData;
 // source code: include/uapi/linux/psp-sev.h
 impl_const_id! {
     pub Id => u32;
-    PlatformReset = 0,
-    PlatformStatus = 1,
-    PekGen = 2,
-    PekCsr<'_> = 3,
-    PdhGen = 4,
-    PdhCertExport<'_> = 5,
-    PekCertImport<'_> = 6,
-    GetId<'_> = 8, /* GET_ID2 is 8, the deprecated GET_ID ioctl is 7 */
+    PlatformReset = 0x0,
+    PlatformStatus = 0x1,
+    PekGen = 0x2,
+    PekCsr<'_> = 0x3,
+    PdhGen = 0x4,
+    PdhCertExport<'_> = 0x5,
+    PekCertImport<'_> = 0x6,
+    GetId<'_> = 0x8, /* GET_ID2 is 0x8, the deprecated GET_ID ioctl is 0x7 */
 
-    SnpPlatformStatus = 9,
+    SnpPlatformStatus = 0x9,
     SnpSetExtConfig = 0xA,
     SnpGetExtConfig = 0xB,
 }

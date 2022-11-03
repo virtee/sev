@@ -4,7 +4,8 @@ use codicon::Read;
 
 use crate::certs::sev;
 use crate::firmware::uapi::host::types::{
-    CertTable as UapiCertTable, CertTableEntry as UapiCertTableEntry, SnpExtConfig,
+    CertTable as UapiCertTable, CertTableEntry as UapiCertTableEntry, SnpCertError, SnpExtConfig,
+    UserApiError,
 };
 use crate::Version;
 
@@ -298,13 +299,15 @@ impl Default for CertTable {
 }
 
 impl CertTable {
-    pub fn from_uapi(table: UapiCertTable) -> Self {
+    pub fn from_uapi(table: UapiCertTable) -> Result<Self, SnpCertError> {
         let mut entries: Vec<CertTableEntry> = vec![];
         let mut tmp_guid: [u8; 16] = [0u8; 16];
 
         for entry in table.entries {
             // We have a problem if the GUID is anything other than 16 bytes.
-            assert_eq!(entry.guid().len(), 16);
+            if entry.guid().len() != 16 {
+                return Err(SnpCertError::InvalidGUID);
+            }
 
             // Copy the GUID into a byte array. Note: Unwrapping should be safe
             // here, as the value should be present.
@@ -326,9 +329,9 @@ impl CertTable {
             tmp_guid = [0; 16];
         }
 
-        CertTable {
+        Ok(CertTable {
             entries: entries.as_ptr(),
-        }
+        })
     }
 
     /// Parses the raw array of bytes into more human understandable information.
@@ -411,12 +414,15 @@ pub struct SnpSetExtConfig {
 }
 
 impl SnpSetExtConfig {
-    pub(crate) fn from_uapi(data: &SnpExtConfig) -> Self {
-        Self {
+    pub(crate) fn from_uapi(data: &SnpExtConfig) -> Result<Self, UserApiError> {
+        Ok(Self {
             certs_address: if data.certs.is_none() {
                 0
             } else {
-                &CertTable::from_uapi(data.certs.clone().unwrap()) as *const CertTable as u64
+                match CertTable::from_uapi(data.certs.clone().unwrap()) {
+                    Ok(table) => &table as *const CertTable as u64,
+                    Err(e) => return Err(UserApiError::ApiError(e)),
+                }
             },
             config_address: if data.config.is_none() {
                 0
@@ -428,7 +434,7 @@ impl SnpSetExtConfig {
             } else {
                 data.certs_len
             },
-        }
+        })
     }
 }
 
