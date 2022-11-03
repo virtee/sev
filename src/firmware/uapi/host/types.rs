@@ -25,6 +25,76 @@ pub enum Indeterminate<T: Debug> {
     Unknown,
 }
 
+#[derive(Debug)]
+/// Wrapper Error for Firmware or User API Errors
+pub enum UserApiError {
+    /// Firmware related errors.
+    FirmwareError(Error),
+
+    /// User API related errors.
+    ApiError(SnpCertError),
+}
+
+impl error::Error for UserApiError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        match self {
+            UserApiError::ApiError(uapi_error) => Some(uapi_error),
+            UserApiError::FirmwareError(firmware_error) => Some(firmware_error),
+        }
+    }
+}
+
+impl std::fmt::Display for UserApiError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let err_msg: String = match self {
+            UserApiError::FirmwareError(error) => format!("Firmware Error Encountered: {}", error),
+            UserApiError::ApiError(error) => format!("Certificate Error Encountered: {}", error),
+        };
+        write!(f, "{err_msg}")
+    }
+}
+
+impl std::convert::From<Error> for UserApiError {
+    fn from(firmware_error: Error) -> Self {
+        UserApiError::FirmwareError(firmware_error)
+    }
+}
+
+impl std::convert::From<std::io::Error> for UserApiError {
+    fn from(io_error: std::io::Error) -> Self {
+        UserApiError::FirmwareError(Error::IoError(io_error))
+    }
+}
+
+impl std::convert::From<SnpCertError> for UserApiError {
+    fn from(cert_error: SnpCertError) -> Self {
+        UserApiError::ApiError(cert_error)
+    }
+}
+
+#[derive(Debug)]
+/// Errors which may be encountered through misuse of the User API.
+pub enum SnpCertError {
+    /// Malformed GUID.
+    InvalidGUID,
+
+    /// Unknown Error.
+    UnknownError,
+}
+
+impl std::fmt::Display for SnpCertError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            SnpCertError::InvalidGUID => write!(f, "Invalid GUID provided in certificate chain."),
+            SnpCertError::UnknownError => {
+                write!(f, "Unknown Error encountered within the certificate chain.")
+            }
+        }
+    }
+}
+
+impl error::Error for SnpCertError {}
+
 /// Error conditions returned by the SEV platform or by layers above it
 /// (i.e., the Linux kernel).
 ///
@@ -215,42 +285,6 @@ impl From<u32> for Indeterminate<Error> {
             24 => Error::SecureDataInvalid,
             _ => return Indeterminate::Unknown,
         })
-    }
-}
-
-/// The signature certificate type.
-pub enum CertType {
-    /// The *A*MD *R*oot *K*ey
-    ///  - A self-signed certificate.
-    ARK,
-
-    /// The *A*MD *S*igning *K*ey
-    ///  - Signed by the ARK
-    ASK,
-
-    /// The *V*ersion *C*hip *E*ndorsement *K*ey
-    ///  - Signed by the ASK
-    VCEK,
-}
-
-impl CertType {
-    /// Provides the GUID for the specified certificate type.
-    pub fn guid(&self) -> String {
-        match self {
-            CertType::ARK => "c0b406a4-a803-4952-9743-3fb6014cd0ae".to_string(),
-            CertType::ASK => "4ab7b379-bbac-4fe4-a02f-05aef327c782".to_string(),
-            CertType::VCEK => "63da758d-e664-4564-adc5-f4b93be8accd".to_string(),
-        }
-    }
-
-    /// Attempts to provide a certificate type from the specified GUID.
-    pub fn from_guid(guid: &str) -> Option<Self> {
-        match guid {
-            "c0b406a4-a803-4952-9743-3fb6014cd0ae" => Some(CertType::ARK),
-            "4ab7b379-bbac-4fe4-a02f-05aef327c782" => Some(CertType::ASK),
-            "63da758d-e664-4564-adc5-f4b93be8accd" => Some(CertType::VCEK),
-            _ => None,
-        }
     }
 }
 
