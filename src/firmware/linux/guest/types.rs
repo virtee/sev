@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub use crate::certs::sev::cert::v1::sig::ecdsa::Signature;
-use crate::firmware::uapi::guest::types::SnpDerivedKey;
+use crate::firmware::guest::types::SnpDerivedKey;
 use bitfield::bitfield;
 use static_assert_macro::static_assert;
 #[repr(C)]
