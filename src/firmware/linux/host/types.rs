@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use codicon::Read;
-
 use crate::certs::sev;
-use crate::firmware::uapi::host::types::{
+use crate::firmware::host::types::{
     CertTable as UapiCertTable, CertTableEntry as UapiCertTableEntry, SnpCertError, SnpExtConfig,
     UserApiError,
 };
 use crate::Version;
 
 use std::marker::PhantomData;
+
+use codicon::Read;
+
 /// Reset the platform's persistent state.
 ///
 /// (Chapter 5.5)

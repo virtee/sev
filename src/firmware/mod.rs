@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-//! Modules for interfacing with the SEV firmware.
-/// Modules containing FFI wrappers to C APIs
+//! Modules for interfacing with SEV firmware.
+//! Rust-friendly API wrappers to communicate with the FFI functions.
+pub mod guest;
+pub mod host;
+
 pub(crate) mod linux;
-/// Rust-friendly APIs which use those FFI wrappers.
-pub mod uapi;

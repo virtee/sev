@@ -13,7 +13,7 @@ use crate::{
 };
 use types::*;
 
-use super::super::linux::host::{ioctl::*, types::*};
+use super::linux::host::{ioctl::*, types::*};
 
 /// A handle to the SEV platform.
 pub struct Firmware(File);
