@@ -1,6 +1,6 @@
 [package]
 name = "sev"
-version = "0.3.0"
+version = "1.0.0"
 authors = ["Nathaniel McCallum <npmccallum@redhat.com>", "The VirTee Project Developers"]
 license = "Apache-2.0"
 edition = "2018"
