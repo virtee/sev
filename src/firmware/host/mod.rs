@@ -15,6 +15,8 @@ use types::*;
 
 use super::linux::host::{ioctl::*, types::*};
 
+pub use super::linux::host::types::PlatformStatusFlags;
+
 /// A handle to the SEV platform.
 pub struct Firmware(File);
 
