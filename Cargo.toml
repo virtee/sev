@@ -39,6 +39,6 @@ static_assert_macro = "^1.1"
 bitfield = "^0.14"
 
 [dev-dependencies]
-kvm-bindings = "0.5"
+kvm-bindings = "0.6"
 mmarinus = "0.4"
 serial_test = "0.8"
