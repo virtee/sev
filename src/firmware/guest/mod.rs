@@ -9,7 +9,8 @@ use std::fs::{File, OpenOptions};
 
 use self::types::*;
 
-use super::host::types::{Error, Indeterminate};
+use super::host::types::{CertTable, Error, Indeterminate};
+use super::linux::host::types::CertTable as FFICertTable;
 use crate::firmware::linux::guest::ioctl::*;
 
 /// A handle to the SEV, SEV-ES, or SEV-SNP platform.
@@ -85,14 +86,21 @@ impl Firmware {
         &mut self,
         message_version: Option<u8>,
         ext_report_request: SnpExtReportReq,
-    ) -> Result<SnpReportRsp, Indeterminate<Error>> {
+    ) -> Result<(AttestationReport, CertTable), Indeterminate<Error>> {
         let ext_report_response: SnpReportRsp = SnpReportRsp::default();
+        let mut cert_table: CertTable = Default::default();
 
         SNP_GET_EXT_REPORT.ioctl(
             &mut self.0,
             &mut SnpGuestRequest::new(message_version, &ext_report_request, &ext_report_response),
         )?;
 
-        Ok(ext_report_response)
+        if let Some(linux_cert_table) =
+            unsafe { (ext_report_request.certs_address as *const FFICertTable).as_ref() }
+        {
+            cert_table = linux_cert_table.to_uapi();
+        }
+
+        Ok((ext_report_response.report, cert_table))
     }
 }
