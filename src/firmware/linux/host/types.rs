@@ -330,6 +330,13 @@ impl CertTable {
             tmp_guid = [0; 16];
         }
 
+        // Make sure we push the empty entry to signfiy the table is finished.
+        entries.push(CertTableEntry {
+            guid: tmp_guid,
+            offset: 0u32,
+            length: 0u32,
+        });
+
         Ok(CertTable {
             entries: entries.as_ptr(),
         })
