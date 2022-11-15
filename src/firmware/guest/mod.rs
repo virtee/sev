@@ -80,13 +80,15 @@ impl Firmware {
     /// # Arguments
     ///
     /// * `message_version` - (Optional) Used for the SnpGuestRequest, specifies the message version number defaults to 1.
-    /// * `ext_report_request` - an SnpExtReportReq object with its associated data for requesting the extended attestation report.
+    /// * `report_request` - an SnpReportReq object with its associated data.
     ///
     pub fn snp_get_ext_report(
         &mut self,
         message_version: Option<u8>,
-        ext_report_request: SnpExtReportReq,
+        report_request: SnpReportReq,
     ) -> Result<(AttestationReport, CertTable), Indeterminate<Error>> {
+        let ext_report_request: SnpExtReportReq = SnpExtReportReq::new(report_request);
+
         let ext_report_response: SnpReportRsp = SnpReportRsp::default();
         let mut cert_table: CertTable = Default::default();
 

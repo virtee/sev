@@ -12,6 +12,8 @@ pub use super::Firmware;
 pub use crate::firmware::linux::host::types::{SnpConfig, TcbVersion};
 use types::PlatformStatusFlags;
 
+use serde::{Deserialize, Serialize};
+
 /// There are a number of error conditions that can occur between this
 /// layer all the way down to the SEV platform. Most of these cases have
 /// been enumerated; however, there is a possibility that some error
@@ -389,7 +391,7 @@ pub struct SnpStatus {
     pub tcb: SnpTcbStatus,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 /// Certificates which are accepted for [`CertTableEntry`]
 pub enum SnpCertType {
     /// AMD Root Signing Key (ARK) certificate
@@ -429,7 +431,7 @@ impl SnpCertType {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 /// An entry with information regarding a specific certificate.
 pub struct CertTableEntry {
     /// A Specificy certificate type.
@@ -464,7 +466,7 @@ impl CertTableEntry {
     }
 }
 
-#[derive(Default, Clone, Debug, PartialEq, Eq)]
+#[derive(Default, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 /// Certificates to send to the PSP.
 pub struct CertTable {
     /// A vector of [`CertTableEntry`].

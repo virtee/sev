@@ -3,6 +3,8 @@
 pub use crate::certs::sev::cert::v1::sig::ecdsa::Signature;
 use crate::firmware::guest::types::SnpDerivedKey;
 use bitfield::bitfield;
+use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
 use static_assert_macro::static_assert;
 #[repr(C)]
 pub struct SnpDerivedKeyReq {
@@ -75,6 +77,18 @@ pub struct SnpExtReportReq {
 
     /// Length of the buffer which will hold the certificates.
     pub certs_len: u32,
+}
+
+impl SnpExtReportReq {
+    /// Creates a new exteded report with default values
+    /// for the certs_address field and the certs_len field.
+    pub fn new(data: SnpReportReq) -> Self {
+        Self {
+            data,
+            certs_address: Default::default(),
+            certs_len: 0,
+        }
+    }
 }
 
 /// Information provided by the guest owner for requesting an attestation
@@ -177,6 +191,7 @@ impl Default for SnpReportRsp {
 /// The firmware guarantees that the ReportedTcb value is never greater than the installed TCB
 /// version
 #[repr(C)]
+#[derive(Deserialize, Serialize)]
 pub struct AttestationReport {
     /// Version number of this attestation report. Set to 2h for this specification.
     pub version: u32,
@@ -200,15 +215,19 @@ pub struct AttestationReport {
     /// See [`AttestationReport::_author_key_en`].
     _author_key_en: u32,
     _reserved_0: u32,
+    #[serde(with = "BigArray")]
     /// Guest-provided 512 Bits of Data
     pub report_data: [u8; 64],
+    #[serde(with = "BigArray")]
     /// The measurement calculated at launch.
     pub measurement: [u8; 48],
     /// Data provided by the hypervisor at launch.
     pub host_data: [u8; 32],
+    #[serde(with = "BigArray")]
     /// SHA-384 digest of the ID public key that signed the ID block provided
     /// in SNP_LANUNCH_FINISH.
     pub id_key_digest: [u8; 48],
+    #[serde(with = "BigArray")]
     /// SHA-384 digest of the Author public key that certified the ID key,
     /// if provided in SNP_LAUNCH_FINSIH. Zeroes if AUTHOR_KEY_EN is 1.
     pub author_key_digest: [u8; 48],
@@ -219,6 +238,7 @@ pub struct AttestationReport {
     /// Reported TCB version used to derive the VCEK that signed this report.
     pub reported_tcb: SnpTcbVersion,
     _reserved_1: [u8; 24],
+    #[serde(with = "BigArray")]
     /// If MaskChipId is set to 0, Identifier unique to the chip.
     /// Otherwise set to 0h.
     pub chip_id: [u8; 64],
@@ -240,6 +260,7 @@ pub struct AttestationReport {
     _reserved_3: u8,
     /// The CurrentTcb at the time the guest was launched or imported.
     pub launch_tcb: SnpTcbVersion,
+    #[serde(with = "BigArray")]
     _reserved_4: [u8; 168],
     /// Signature of bytes 0 to 0x29F inclusive of this report.
     /// The format of the signature is found within Signature.
@@ -305,7 +326,7 @@ bitfield! {
     /// | 19     | DEBUG         | 0: Debugging is disallowed.<br>1: Debuggin is allowed.                                                   |
     /// | 20     | SINGLE_SOCKET | 0: Guest can be activated on multiple sockets.<br>1: Guest can only be activated on one socket.           |
     ///
-    #[derive(Default)]
+    #[derive(Default, Deserialize, Serialize)]
     #[repr(C)]
     pub struct SnpGuestPolicy(u64);
     impl Debug;
@@ -321,7 +342,7 @@ bitfield! {
 /// the trusted computing base (TCB) of the SNP firmware. A TCB_VERSION is associated with each
 /// image of firmware.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 
 pub struct SnpTcbVersion {
     /// Current bootloader version. SVN of PSP Bootloader.
@@ -340,7 +361,7 @@ bitfield! {
     /// Bit 0 representing the status of TSME enablement.
     /// Bit 1 representing the status of SMT enablement.
     /// Bits 2-63 are reserved.
-    #[derive(Default)]
+    #[derive(Default, Deserialize, Serialize)]
     #[repr(C)]
     pub struct SnpPlatformInfo(u64);
     impl Debug;

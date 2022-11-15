@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
 #[cfg(feature = "openssl")]
 use {super::*, openssl::ecdsa};
 
 /// An ECDSA Signature.
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Deserialize, Serialize)]
 pub struct Signature {
+    #[serde(with = "BigArray")]
     r: [u8; 72],
+    #[serde(with = "BigArray")]
     s: [u8; 72],
 }
 
