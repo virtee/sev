@@ -464,7 +464,7 @@ impl CertTableEntry {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Default, Clone, Debug, PartialEq, Eq)]
 /// Certificates to send to the PSP.
 pub struct CertTable {
     /// A vector of [`CertTableEntry`].
