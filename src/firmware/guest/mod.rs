@@ -90,15 +90,7 @@ impl Firmware {
 
         SNP_GET_EXT_REPORT.ioctl(
             &mut self.0,
-            &mut SnpGuestRequest::new(
-                message_version,
-                &SnpExtReportReq {
-                    data: ext_report_request.data,
-                    certs_address: ext_report_request.certs_address,
-                    certs_len: ext_report_request.certs_len,
-                },
-                &ext_report_response,
-            ),
+            &mut SnpGuestRequest::new(message_version, &ext_report_request, &ext_report_response),
         )?;
 
         Ok(ext_report_response)
