@@ -166,6 +166,9 @@ pub enum Generation {
 
     /// Third generation EPYC (SEV, SEV-ES, SEV-SNP).
     Milan,
+
+    /// Fourth generation EPYC (SEV, SEV-ES, SEV-SNP).
+    Genoa,
 }
 
 impl From<Generation> for ca::Chain {
@@ -176,6 +179,7 @@ impl From<Generation> for ca::Chain {
             Generation::Naples => (builtin::naples::ARK, builtin::naples::ASK),
             Generation::Rome => (builtin::rome::ARK, builtin::rome::ASK),
             Generation::Milan => (builtin::milan::ARK, builtin::milan::ASK),
+            Generation::Genoa => (builtin::genoa::ARK, builtin::genoa::ASK),
         };
 
         ca::Chain {
@@ -195,6 +199,7 @@ impl TryFrom<&sev::Chain> for Generation {
         let naples: ca::Chain = Generation::Naples.into();
         let rome: ca::Chain = Generation::Rome.into();
         let milan: ca::Chain = Generation::Milan.into();
+        let genoa: ca::Chain = Generation::Genoa.into();
 
         Ok(if (&naples.ask, &schain.cek).verify().is_ok() {
             Generation::Naples
@@ -202,6 +207,8 @@ impl TryFrom<&sev::Chain> for Generation {
             Generation::Rome
         } else if (&milan.ask, &schain.cek).verify().is_ok() {
             Generation::Milan
+        } else if (&genoa.ask, &schain.cek).verify().is_ok() {
+            Generation::Genoa
         } else {
             return Err(());
         })

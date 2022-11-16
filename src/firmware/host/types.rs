@@ -9,8 +9,7 @@ use std::{error, io};
 
 #[cfg(target_os = "linux")]
 pub use super::Firmware;
-pub use crate::firmware::linux::host::types::{SnpConfig, TcbVersion};
-use types::PlatformStatusFlags;
+pub use crate::firmware::linux::host::types::{PlatformStatusFlags, SnpConfig, TcbVersion};
 
 use serde::{Deserialize, Serialize};
 
