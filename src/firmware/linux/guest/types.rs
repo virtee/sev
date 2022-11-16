@@ -5,7 +5,8 @@ use crate::firmware::guest::types::SnpDerivedKey;
 use bitfield::bitfield;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
-use static_assert_macro::static_assert;
+use static_assertions::const_assert;
+
 #[repr(C)]
 pub struct SnpDerivedKeyReq {
     /// Selects the root key to derive the key from.
@@ -158,7 +159,7 @@ pub struct SnpReportRsp {
 //      evaluation of constant value failed attempt to compute
 //      `0_usize - 1_usize`, which would overflow
 //
-static_assert!(std::mem::size_of::<SnpReportRsp>() == 4000);
+const_assert!(std::mem::size_of::<SnpReportRsp>() == 4000);
 
 impl Default for SnpReportRsp {
     fn default() -> Self {
