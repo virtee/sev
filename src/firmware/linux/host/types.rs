@@ -288,7 +288,7 @@ pub struct CertTableEntry {
 #[repr(C)]
 pub struct CertTable {
     /// Pointer to the Certificates in question.
-    entries: *const CertTableEntry,
+    pub entries: *const CertTableEntry,
 }
 
 impl Default for CertTable {

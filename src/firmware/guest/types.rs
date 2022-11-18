@@ -2,6 +2,15 @@
 
 use bitfield::bitfield;
 
+/// When the PSP attempt to retreive an SEV-SNP extended report,
+/// but the buffer is of an incorrect size, this is the exact value
+/// which will be returned in the [`SnpGuestRequest::fw_err`] field.
+///
+/// If this value is found, it is important that
+/// [`SnpExtReportReq::extend_buffer()`] be called to adjust for the
+/// buffer size provided by the PSP.
+pub const INVALID_CERT_BUFFER: u64 = 0x0000000100000000;
+
 pub(crate) use crate::firmware::linux::guest::types::{
     SnpDerivedKeyReq, SnpDerivedKeyRsp, SnpReportRsp,
 };
