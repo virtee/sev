@@ -68,33 +68,45 @@ pub struct SnpDerivedKeyRsp {
 
 /// Information provided by the guest owner for requesting an attestation
 /// report and associated certificate chain from the AMD Secure Processor.
+///
+/// The certificate buffer *should* be page aligned for the kernel.
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct SnpExtReportReq {
     /// Address of the [`SnpReportReq`].
     pub data: SnpReportReq,
 
-    /// Address of extended guest request certificate chain.
+    /// Starting address of the certificate data buffer.
     pub certs_address: u64,
 
-    /// Length of the buffer which will hold the certificates.
+    /// The page aligned length of the buffer the hypervisor should store the certificates in.
     pub certs_len: u32,
 }
 
 impl SnpExtReportReq {
-    /// Creates a new exteded report with default values
+    /// Creates a new exteded report with a one, 4K-page
     /// for the certs_address field and the certs_len field.
     pub fn new(data: SnpReportReq) -> Self {
+        const _4K_PAGE: usize = 4096;
         Self {
             data,
-            certs_address: Default::default(),
-            certs_len: 0,
+            certs_address: vec![0u8; _4K_PAGE].as_mut_ptr() as u64,
+            certs_len: _4K_PAGE as u32,
         }
+    }
+
+    /// This is used to update the certs_address offset when the buffer
+    /// needs to be extended.This happens when more than one page is required
+    /// for the storage.
+    pub fn extend_buffer(&mut self) {
+        self.certs_address = vec![0u8; self.certs_len as usize].as_mut_ptr() as u64;
     }
 }
 
 /// Information provided by the guest owner for requesting an attestation
 /// report from the AMD Secure Processor.
 #[repr(C, packed)]
+#[derive(Clone, Copy)]
 pub struct SnpReportReq {
     /// Guest-provided data to be included int the attestation report
     pub report_data: [u8; 64],
