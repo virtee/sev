@@ -321,22 +321,30 @@ bitfield! {
     /// |--------|---------------|----------------------------------------------------------------------------------------------------------------|
     /// | 7:0    | ABI_MINOR     | The minimum ABI minor version required for this guest to run.                                                  |
     /// | 15:8   | ABI_MAJOR     | The minimum ABI major version required for this guest to run.                                                  |
-    /// | 16     | SMT           | 0: SMT is disallowed.<br>1: SMT is allowed.                                                               |
+    /// | 16     | SMT           | 0: Host SMT usage is disallowed.<br>1: Host SMT usage is allowed.                                                               |
     /// | 17     | -             | Reserved. Must be one.                                                                                         |
     /// | 18     | MIGRATE_MA    | 0: Association with a migration agent is disallowed.<br>1: Association with a migration agent is allowed. |
-    /// | 19     | DEBUG         | 0: Debugging is disallowed.<br>1: Debuggin is allowed.                                                   |
+    /// | 19     | DEBUG         | 0: Debugging is disallowed.<br>1: Debugging is allowed.                                                   |
     /// | 20     | SINGLE_SOCKET | 0: Guest can be activated on multiple sockets.<br>1: Guest can only be activated on one socket.           |
     ///
     #[derive(Default, Deserialize, Serialize)]
     #[repr(C)]
     pub struct SnpGuestPolicy(u64);
     impl Debug;
-    get_api_minor, set_api_minor: 7, 0;
-    get_abi_major, set_abi_major: 15, 8;
-    get_smt, set_smt: 16, 16;
-    get_migrate_ma, set_migrate_ma: 18, 18;
-    get_debug, set_debug: 19, 19;
-    get_single_socket, set_single_socket: 20, 20;
+
+    /// API_MINOR field: Indicates the minor API version.
+    pub api_minor, _: 7, 0;
+    /// API_MAJOR field: Indicates the minor API version.
+    pub abi_major, _: 15, 8;
+    /// SMT_ALLOWED field: Indicates the if SMT should be permitted.
+    pub smt_allowed, _: 16, 16;
+    /// MIGRATE_MA_ALLOWED field: Indicates the if migration is permitted with
+    /// the migration agent.
+    pub migrate_ma_allowed, _: 18, 18;
+    /// DEBUG_ALLOWED field: Indicates the if debugging should is permitted.
+    pub debug_allowed, _: 19, 19;
+    /// SINGLE_SOCKET_REQUIRED field: Indicates the if a single socket is required.
+    pub single_socket_required, _: 20, 20;
 }
 
 /// The TCB_VERSION is a structure containing the security version numbers of each component in
@@ -366,6 +374,8 @@ bitfield! {
     #[repr(C)]
     pub struct SnpPlatformInfo(u64);
     impl Debug;
-    get_tsme_enabled, set_tsme_enabled: 0, 0;
-    get_smt_enabled, set_smt_enabled: 1, 1;
+    /// Returns the bit state of TSME.
+    pub tsme_enabled, _: 0, 0;
+    /// Returns the bit state of SMT
+    pub smt_enabled, _: 1, 1;
 }
