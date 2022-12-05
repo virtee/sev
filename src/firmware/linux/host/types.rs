@@ -10,6 +10,7 @@ use crate::Version;
 use std::marker::PhantomData;
 
 use codicon::Read;
+use uuid::Uuid;
 
 /// Reset the platform's persistent state.
 ///
@@ -305,16 +306,17 @@ impl CertTable {
         let mut tmp_guid: [u8; 16] = [0u8; 16];
 
         for entry in table.entries {
-            // We have a problem if the GUID is anything other than 16 bytes.
-            if entry.guid().len() != 16 {
-                return Err(SnpCertError::InvalidGUID);
-            }
+
+            // We have a problem if the GUID is invalid.
+            let guid: Uuid = match Uuid::parse_str(&entry.guid()) {
+                Ok(guid) => guid,
+                Err(_) => return Err(SnpCertError::InvalidGUID)
+            };
 
             // Copy the GUID into a byte array. Note: Unwrapping should be safe
             // here, as the value should be present.
-            entry
-                .guid()
-                .as_bytes()
+            guid
+                .into_bytes()
                 .bytes()
                 .zip(tmp_guid.iter_mut())
                 .for_each(|(byte, ptr)| *ptr = byte.unwrap());
