@@ -48,8 +48,8 @@ impl error::Error for UserApiError {
 impl std::fmt::Display for UserApiError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let err_msg: String = match self {
-            UserApiError::FirmwareError(error) => format!("Firmware Error Encountered: {}", error),
-            UserApiError::ApiError(error) => format!("Certificate Error Encountered: {}", error),
+            UserApiError::FirmwareError(error) => format!("Firmware Error Encountered: {error}"),
+            UserApiError::ApiError(error) => format!("Certificate Error Encountered: {error}"),
         };
         write!(f, "{err_msg}")
     }
@@ -218,7 +218,7 @@ impl std::fmt::Display for Error {
             }
             Error::SecureDataInvalid => "SEV platform observed a failed integrity check",
         };
-        write!(f, "{}", err_description)
+        write!(f, "{err_description}")
     }
 }
 
@@ -315,7 +315,7 @@ impl std::fmt::Display for State {
             State::Initialized => "initialized",
             State::Working => "working",
         };
-        write!(f, "{}", state)
+        write!(f, "{state}")
     }
 }
 
@@ -351,7 +351,7 @@ impl From<Identifier> for Vec<u8> {
 impl std::fmt::Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for b in self.0.iter() {
-            write!(f, "{:02X}", b)?;
+            write!(f, "{b:02X}")?;
         }
 
         Ok(())

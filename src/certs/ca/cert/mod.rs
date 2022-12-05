@@ -32,7 +32,7 @@ impl std::fmt::Debug for Certificate {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.version() {
             1 => write!(f, "{:?}", unsafe { self.v1 }),
-            v => write!(f, "Certificate {{ version: {} }}", v),
+            v => write!(f, "Certificate {{ version: {v} }}"),
         }
     }
 }
