@@ -391,6 +391,7 @@ pub struct SnpStatus {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[repr(C)]
 /// Certificates which are accepted for [`CertTableEntry`]
 pub enum SnpCertType {
     /// AMD Root Signing Key (ARK) certificate
@@ -404,6 +405,9 @@ pub enum SnpCertType {
 
     /// Other (Specify GUID)
     OTHER(String),
+
+    /// Empty or closing entry for the CertTable
+    Empty
 }
 
 impl SnpCertType {
@@ -414,6 +418,7 @@ impl SnpCertType {
             "c0b406a4-a803-4952-9743-3fb6014cd0ae" => SnpCertType::ARK,
             "4ab7b379-bbac-4fe4-a02f-05aef327c782" => SnpCertType::ASK,
             "63da758d-e664-4564-adc5-f4b93be8accd" => SnpCertType::VCEK,
+            "00000000-0000-0000-0000-000000000000" => SnpCertType::Empty,
             guid => SnpCertType::OTHER(guid.to_string()),
         }
     }
@@ -424,6 +429,7 @@ impl SnpCertType {
             SnpCertType::ARK => "c0b406a4-a803-4952-9743-3fb6014cd0ae",
             SnpCertType::ASK => "4ab7b379-bbac-4fe4-a02f-05aef327c782",
             SnpCertType::VCEK => "63da758d-e664-4564-adc5-f4b93be8accd",
+            SnpCertType::Empty => "00000000-0000-0000-0000-000000000000",
             SnpCertType::OTHER(guid) => guid,
         }
         .to_string()
@@ -431,6 +437,7 @@ impl SnpCertType {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[repr(C)]
 /// An entry with information regarding a specific certificate.
 pub struct CertTableEntry {
     /// A Specificy certificate type.
@@ -465,11 +472,37 @@ impl CertTableEntry {
     }
 }
 
+impl Default for CertTableEntry {
+    fn default() -> Self {
+        Self {
+            cert_type: SnpCertType::Empty,
+            data: Default::default()
+        }
+    }
+}
+
 #[derive(Default, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[repr(C)]
 /// Certificates to send to the PSP.
 pub struct CertTable {
     /// A vector of [`CertTableEntry`].
     pub entries: Vec<CertTableEntry>,
+}
+
+impl CertTable {
+    /// Default Constructor for the Certificate Table.
+    pub fn new(mut entries: Vec<CertTableEntry>) -> Self {
+        let last_entry: Option<&CertTableEntry> = entries.last();
+        
+        // Make sure the last entry is an empty one, or it will not work as expected.
+        if last_entry.is_some() && last_entry.unwrap().cert_type != SnpCertType::Empty {
+            entries.push(CertTableEntry::default());
+        }
+
+        Self {
+            entries
+        }
+    }
 }
 
 /// Rust-friendly instance of the SNP Extended Configuration.
