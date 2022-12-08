@@ -424,7 +424,7 @@ pub struct SnpSetExtConfig {
 
 impl SnpSetExtConfig {
     pub(crate) fn from_uapi(data: &SnpExtConfig) -> Result<Self, UserApiError> {
-        if data.certs_buf as usize % _4K_PAGE != 0 {
+        if data.certs_buf > 0 && data.certs_buf as usize % _4K_PAGE != 0 {
             return Err(UserApiError::ApiError(SnpCertError::PageMisallignment));
         }
 
