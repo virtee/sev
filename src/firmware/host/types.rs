@@ -9,6 +9,7 @@ use std::{error, io};
 
 #[cfg(target_os = "linux")]
 pub use super::Firmware;
+use crate::firmware::linux::guest::types::_4K_PAGE;
 pub use crate::firmware::linux::host::types::{PlatformStatusFlags, SnpConfig, TcbVersion};
 
 use serde::{Deserialize, Serialize};
@@ -79,6 +80,9 @@ pub enum SnpCertError {
     /// Malformed GUID.
     InvalidGUID,
 
+    /// Malformed Page Allignment
+    PageMisallignment,
+
     /// Unknown Error.
     UnknownError,
 }
@@ -87,6 +91,9 @@ impl std::fmt::Display for SnpCertError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             SnpCertError::InvalidGUID => write!(f, "Invalid GUID provided in certificate chain."),
+            SnpCertError::PageMisallignment => {
+                write!(f, "Certificate Buffer not alligned with 4K Pages.")
+            }
             SnpCertError::UnknownError => {
                 write!(f, "Unknown Error encountered within the certificate chain.")
             }
@@ -441,10 +448,10 @@ impl SnpCertType {
 /// An entry with information regarding a specific certificate.
 pub struct CertTableEntry {
     /// A Specificy certificate type.
-    cert_type: SnpCertType,
+    pub cert_type: SnpCertType,
 
     /// The raw data of the certificate.
-    data: Vec<u8>,
+    pub data: Vec<u8>,
 }
 
 impl CertTableEntry {
@@ -476,7 +483,7 @@ impl Default for CertTableEntry {
     fn default() -> Self {
         Self {
             cert_type: SnpCertType::Empty,
-            data: Default::default()
+            data: Default::default(),
         }
     }
 }
@@ -530,7 +537,29 @@ pub struct SnpExtConfig {
     ///
     /// GET:
     ///     Length of the buffer which will hold the fetched certificates.
-    pub certs_len: u32,
+    pub certs_buf: u32,
+}
+
+impl SnpExtConfig {
+    /// Used to update the PSP with the cerificates provided.
+    pub fn update_certs_only(certificates: CertTable) -> Result<Self, SnpCertError> {
+        let mut certs_buffer: usize = 4096;
+        let certs_length: usize = certificates
+            .entries
+            .iter()
+            .map(|entry| entry.data().len())
+            .sum();
+
+        while certs_length > certs_buffer {
+            certs_buffer += _4K_PAGE;
+        }
+
+        Ok(Self {
+            config: None,
+            certs: Some(certificates),
+            certs_buf: certs_buffer as u32,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -548,7 +577,7 @@ mod test {
         SnpExtConfig {
             config: Some(test_cfg),
             certs: Some(cert_table),
-            certs_len: 2,
+            certs_buf: 4096,
         }
     }
 

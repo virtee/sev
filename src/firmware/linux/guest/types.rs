@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 use static_assertions::const_assert;
 
+pub(crate) const _4K_PAGE: usize = 4096;
+
 #[repr(C)]
 pub struct SnpDerivedKeyReq {
     /// Selects the root key to derive the key from.
@@ -87,7 +89,6 @@ impl SnpExtReportReq {
     /// Creates a new exteded report with a one, 4K-page
     /// for the certs_address field and the certs_len field.
     pub fn new(data: SnpReportReq) -> Self {
-        const _4K_PAGE: usize = 4096;
         Self {
             data,
             certs_address: vec![0u8; _4K_PAGE].as_mut_ptr() as u64,
