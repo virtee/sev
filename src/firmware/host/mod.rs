@@ -13,6 +13,7 @@ use crate::{
 };
 use types::*;
 
+use super::linux::guest::types::_4K_PAGE;
 use super::linux::host::{ioctl::*, types::*};
 
 /// A handle to the SEV platform.
@@ -151,7 +152,12 @@ impl Firmware {
 
     /// Fetch the SNP Extended Configuration.
     pub fn snp_get_ext_config(&mut self) -> Result<SnpExtConfig, Indeterminate<Error>> {
-        let mut config: SnpGetExtConfig = Default::default();
+        let mut raw_buf: Vec<u8> = vec![0; _4K_PAGE * 2];
+        let mut config: SnpGetExtConfig = SnpGetExtConfig {
+            config_address: 0u64,
+            certs_address: raw_buf.as_mut_ptr() as u64,
+            certs_buf: raw_buf.len() as u32,
+        };
         SNP_GET_EXT_CONFIG.ioctl(&mut self.0, &mut Command::from_mut(&mut config))?;
         Ok(config.as_uapi())
     }
