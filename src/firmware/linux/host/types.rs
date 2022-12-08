@@ -5,6 +5,7 @@ use crate::firmware::host::types::{
     CertTable as UapiCertTable, CertTableEntry as UapiCertTableEntry, SnpCertError, SnpExtConfig,
     UserApiError,
 };
+use crate::firmware::linux::guest::types::_4K_PAGE;
 use crate::Version;
 
 use std::marker::PhantomData;
@@ -118,7 +119,7 @@ pub struct PdhCertExport<'a> {
     pdh_addr: u64,
     pdh_len: u32,
     certs_addr: u64,
-    certs_len: u32,
+    certs_buf: u32,
     _phantom: PhantomData<&'a ()>,
 }
 
@@ -128,7 +129,7 @@ impl<'a> PdhCertExport<'a> {
             pdh_addr: pdh as *mut _ as _,
             pdh_len: std::mem::size_of_val(pdh) as _,
             certs_addr: certs.as_mut_ptr() as _,
-            certs_len: std::mem::size_of_val(certs) as _,
+            certs_buf: std::mem::size_of_val(certs) as _,
             _phantom: PhantomData,
         }
     }
@@ -306,17 +307,15 @@ impl CertTable {
         let mut tmp_guid: [u8; 16] = [0u8; 16];
 
         for entry in table.entries {
-
             // We have a problem if the GUID is invalid.
             let guid: Uuid = match Uuid::parse_str(&entry.guid()) {
                 Ok(guid) => guid,
-                Err(_) => return Err(SnpCertError::InvalidGUID)
+                Err(_) => return Err(SnpCertError::InvalidGUID),
             };
 
             // Copy the GUID into a byte array. Note: Unwrapping should be safe
             // here, as the value should be present.
-            guid
-                .into_bytes()
+            guid.into_bytes()
                 .bytes()
                 .zip(tmp_guid.iter_mut())
                 .for_each(|(byte, ptr)| *ptr = byte.unwrap());
@@ -419,13 +418,22 @@ pub struct SnpSetExtConfig {
     /// previous certificate should be removed on SNP_SET_EXT_CONFIG.
     pub certs_address: u64,
 
-    /// Length of the certificates.
-    pub certs_len: u32,
+    /// 4K Page aligned buffer size.
+    pub certs_buf: u32,
 }
 
 impl SnpSetExtConfig {
     pub(crate) fn from_uapi(data: &SnpExtConfig) -> Result<Self, UserApiError> {
+        if data.certs_buf as usize % _4K_PAGE != 0 {
+            return Err(UserApiError::ApiError(SnpCertError::PageMisallignment));
+        }
+
         Ok(Self {
+            config_address: if data.config.is_none() {
+                0
+            } else {
+                &data.config.unwrap() as *const SnpConfig as u64
+            },
             certs_address: if data.certs.is_none() {
                 0
             } else {
@@ -434,15 +442,10 @@ impl SnpSetExtConfig {
                     Err(e) => return Err(UserApiError::ApiError(e)),
                 }
             },
-            config_address: if data.config.is_none() {
+            certs_buf: if data.certs.is_none() {
                 0
             } else {
-                &data.config.unwrap() as *const SnpConfig as u64
-            },
-            certs_len: if data.certs.is_none() {
-                0
-            } else {
-                data.certs_len
+                data.certs_buf
             },
         })
     }
@@ -459,8 +462,8 @@ pub struct SnpGetExtConfig {
     /// certificate should not be fetched.
     pub certs_address: u64,
 
-    /// Length of the buffer which will hold the fetched certificates.
-    pub certs_len: u32,
+    /// Length of the 4K page aligned buffer which will hold the fetched certificates.
+    pub certs_buf: u32,
 }
 
 impl SnpGetExtConfig {
@@ -486,7 +489,7 @@ impl SnpGetExtConfig {
                     Some((*ptr).to_uapi())
                 }
             },
-            certs_len: self.certs_len,
+            certs_buf: self.certs_buf,
         }
     }
 }
