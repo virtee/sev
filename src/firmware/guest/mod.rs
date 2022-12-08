@@ -87,7 +87,6 @@ impl Firmware {
         message_version: Option<u8>,
         report_request: SnpReportReq,
     ) -> Result<(AttestationReport, CertTable), Indeterminate<Error>> {
-
         // Due to the complex buffer allocation, we will take the SnpReportReq
         // provided by the caller, and create an extended report request object
         // for them.
@@ -107,7 +106,6 @@ impl Firmware {
         let mut cert_table: CertTable = Default::default();
 
         if let Err(ioctl_error) = SNP_GET_EXT_REPORT.ioctl(&mut self.0, &mut guest_request) {
-
             // Any errors other than INVALID_CERT_BUFFER are unexpected
             // IoErrors, and should be returned.
             if guest_request.fw_err != INVALID_CERT_BUFFER {

@@ -407,7 +407,7 @@ pub enum SnpCertType {
     OTHER(String),
 
     /// Empty or closing entry for the CertTable
-    Empty
+    Empty,
 }
 
 impl SnpCertType {
@@ -493,15 +493,13 @@ impl CertTable {
     /// Default Constructor for the Certificate Table.
     pub fn new(mut entries: Vec<CertTableEntry>) -> Self {
         let last_entry: Option<&CertTableEntry> = entries.last();
-        
+
         // Make sure the last entry is an empty one, or it will not work as expected.
         if last_entry.is_some() && last_entry.unwrap().cert_type != SnpCertType::Empty {
             entries.push(CertTableEntry::default());
         }
 
-        Self {
-            entries
-        }
+        Self { entries }
     }
 }
 
