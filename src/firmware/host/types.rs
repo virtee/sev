@@ -479,35 +479,12 @@ impl CertTableEntry {
     }
 }
 
-impl Default for CertTableEntry {
-    fn default() -> Self {
-        Self {
-            cert_type: SnpCertType::Empty,
-            data: Default::default(),
-        }
-    }
-}
-
 #[derive(Default, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[repr(C)]
 /// Certificates to send to the PSP.
 pub struct CertTable {
     /// A vector of [`CertTableEntry`].
     pub entries: Vec<CertTableEntry>,
-}
-
-impl CertTable {
-    /// Default Constructor for the Certificate Table.
-    pub fn new(mut entries: Vec<CertTableEntry>) -> Self {
-        let last_entry: Option<&CertTableEntry> = entries.last();
-
-        // Make sure the last entry is an empty one, or it will not work as expected.
-        if last_entry.is_some() && last_entry.unwrap().cert_type != SnpCertType::Empty {
-            entries.push(CertTableEntry::default());
-        }
-
-        Self { entries }
-    }
 }
 
 /// Rust-friendly instance of the SNP Extended Configuration.
