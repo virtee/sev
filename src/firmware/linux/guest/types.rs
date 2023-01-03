@@ -73,7 +73,7 @@ pub struct SnpDerivedKeyRsp {
 ///
 /// The certificate buffer *should* be page aligned for the kernel.
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct SnpExtReportReq {
     /// Address of the [`SnpReportReq`].
     pub data: SnpReportReq,
@@ -118,6 +118,16 @@ pub struct SnpReportReq {
 
     /// Reserved memory slot, must be zero.
     reserved: [u8; 28],
+}
+
+impl Default for SnpReportReq {
+    fn default() -> Self {
+        Self {
+            report_data: [0; 64],
+            vmpl: Default::default(),
+            reserved: Default::default(),
+        }
+    }
 }
 
 impl SnpReportReq {

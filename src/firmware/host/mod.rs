@@ -14,7 +14,7 @@ use crate::{
 use types::*;
 
 use super::linux::guest::types::_4K_PAGE;
-use super::linux::host::{ioctl::*, types::*};
+use super::linux::host::{ioctl::*, types::CertTableEntry as FFICertTableEntry, types::*};
 
 /// A handle to the SEV platform.
 pub struct Firmware(File);
@@ -152,21 +152,35 @@ impl Firmware {
 
     /// Fetch the SNP Extended Configuration.
     pub fn snp_get_ext_config(&mut self) -> Result<SnpExtConfig, Indeterminate<Error>> {
-        let mut raw_buf: Vec<u8> = vec![0; _4K_PAGE * 2];
+        let mut raw_buf: Vec<u8> = vec![0; _4K_PAGE];
         let mut config: SnpGetExtConfig = SnpGetExtConfig {
-            config_address: 0u64,
-            certs_address: raw_buf.as_mut_ptr() as u64,
-            certs_buf: raw_buf.len() as u32,
+            config_address: 0,
+            certs_address: raw_buf.as_mut_ptr() as *mut FFICertTableEntry as u64,
+            certs_buf: _4K_PAGE as u32,
         };
-        SNP_GET_EXT_CONFIG.ioctl(&mut self.0, &mut Command::from_mut(&mut config))?;
+        if let Err(error) =
+            SNP_GET_EXT_CONFIG.ioctl(&mut self.0, &mut Command::from_mut(&mut config))
+        {
+            // If the error occurred because the buffer was to small, it will have changed the
+            // buffer. If it has, we will attempt to resize it.
+            if config.certs_buf > _4K_PAGE as u32 {
+                raw_buf = vec![0; config.certs_buf as usize];
+                config.certs_address = raw_buf.as_mut_ptr() as *mut FFICertTableEntry as u64;
+
+                SNP_GET_EXT_CONFIG.ioctl(&mut self.0, &mut Command::from_mut(&mut config))?;
+            } else {
+                return Err(error.into());
+            }
+        }
+
         Ok(config.as_uapi())
     }
 
     /// Set the SNP Extended Configuration.
     pub fn snp_set_ext_config(&mut self, new_config: &SnpExtConfig) -> Result<(), UserApiError> {
-        let mut config: SnpSetExtConfig = SnpSetExtConfig::from_uapi(new_config)?;
+        let mut bytes: Vec<u8> = vec![];
+        let mut config: SnpSetExtConfig = SnpSetExtConfig::from_uapi(new_config, &mut bytes)?;
 
-        // Need to translate this from IOError to UserApiError
         SNP_SET_EXT_CONFIG.ioctl(&mut self.0, &mut Command::from_mut(&mut config))?;
         Ok(())
     }

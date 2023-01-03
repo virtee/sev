@@ -9,8 +9,8 @@ use std::fs::{File, OpenOptions};
 
 use self::types::*;
 
-use super::host::types::{CertTable, Error, Indeterminate};
-use super::linux::host::types::CertTable as FFICertTable;
+use super::host::types::{CertTableEntry, Error, Indeterminate};
+use super::linux::host::types::CertTableEntry as FFICertTableEntry;
 use crate::firmware::linux::guest::ioctl::*;
 
 /// A handle to the SEV, SEV-ES, or SEV-SNP platform.
@@ -86,7 +86,7 @@ impl Firmware {
         &mut self,
         message_version: Option<u8>,
         report_request: SnpReportReq,
-    ) -> Result<(AttestationReport, CertTable), Indeterminate<Error>> {
+    ) -> Result<(AttestationReport, Vec<CertTableEntry>), Indeterminate<Error>> {
         // Due to the complex buffer allocation, we will take the SnpReportReq
         // provided by the caller, and create an extended report request object
         // for them.
@@ -95,6 +95,8 @@ impl Firmware {
         // Create an object for the PSP to store the response content in.
         let ext_report_response: SnpReportRsp = Default::default();
 
+        let mut certificates: Vec<CertTableEntry> = vec![];
+
         // Construct the needed object needed to perform the IOCTL request.
         // *NOTE:* This is __important__ because a fw_err value which matches
         // [`INVALID_CERT_BUFFER`] will indicate the buffer was not large
@@ -102,10 +104,9 @@ impl Firmware {
         let mut guest_request: SnpGuestRequest<SnpExtReportReq, SnpReportRsp> =
             SnpGuestRequest::new(message_version, &ext_report_request, &ext_report_response);
 
-        // Create a Rust-friendly CertTable to return to the consumer.
-        let mut cert_table: CertTable = Default::default();
+        let ioctl_return = SNP_GET_EXT_REPORT.ioctl(&mut self.0, &mut guest_request);
 
-        if let Err(ioctl_error) = SNP_GET_EXT_REPORT.ioctl(&mut self.0, &mut guest_request) {
+        if let Err(ioctl_error) = ioctl_return {
             // Any errors other than INVALID_CERT_BUFFER are unexpected
             // IoErrors, and should be returned.
             if guest_request.fw_err != INVALID_CERT_BUFFER {
@@ -117,9 +118,10 @@ impl Firmware {
             //
             // Create a copy of the original (IOCTL modified) request,
             // and modify the certificate buffer to the size provided
-            // from the PSP (extend_buffer()).
+            // from the PSP (extend_buffer()), and update the guest_request.
             let mut new_request: SnpExtReportReq = ext_report_request;
             new_request.extend_buffer();
+            guest_request.request_data = &mut new_request as *mut SnpExtReportReq as u64;
 
             // Now that the buffer has been extended to the correct size, we
             // should be able to expect a successfull ioctl call the second
@@ -130,13 +132,16 @@ impl Firmware {
         // If an FFI Certificate Table is returned, we want to parse that table
         // into a Rust-friendly structure to be returned. Calling `to_uapi()` will
         // do that for us.
-        if let Some(linux_cert_table) =
-            unsafe { (ext_report_request.certs_address as *const FFICertTable).as_ref() }
-        {
-            cert_table = linux_cert_table.to_uapi();
+        unsafe {
+            if let Some(linux_cert_table) =
+                (ext_report_request.certs_address as *mut FFICertTableEntry).as_mut()
+            {
+                certificates =
+                    FFICertTableEntry::parse_table(linux_cert_table as *mut FFICertTableEntry);
+            }
         }
 
         // Return both the Attestation Report, as well as the Cert Table.
-        Ok((ext_report_response.report, cert_table))
+        Ok((ext_report_response.report, certificates))
     }
 }

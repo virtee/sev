@@ -83,6 +83,9 @@ pub enum SnpCertError {
     /// Malformed Page Allignment
     PageMisallignment,
 
+    /// Invalid Buffer Size
+    BufferOverflow,
+
     /// Unknown Error.
     UnknownError,
 }
@@ -93,6 +96,9 @@ impl std::fmt::Display for SnpCertError {
             SnpCertError::InvalidGUID => write!(f, "Invalid GUID provided in certificate chain."),
             SnpCertError::PageMisallignment => {
                 write!(f, "Certificate Buffer not alligned with 4K Pages.")
+            }
+            SnpCertError::BufferOverflow => {
+                write!(f, "Buffer overflow prevented: Bytes provided exceed space allocated for the buffer provided.")
             }
             SnpCertError::UnknownError => {
                 write!(f, "Unknown Error encountered within the certificate chain.")
@@ -460,9 +466,9 @@ impl CertTableEntry {
         self.cert_type.guid()
     }
 
-    /// Get a copy of the data stored in the entry.
-    pub fn data(&self) -> Vec<u8> {
-        self.data.clone()
+    /// Get an immutable reference to the data stored in the entry.
+    pub fn data(&self) -> &[u8] {
+        self.data.as_slice()
     }
 
     /// Generates a certificate from the str GUID and data provided.
@@ -477,14 +483,6 @@ impl CertTableEntry {
     pub fn new(cert_type: SnpCertType, data: Vec<u8>) -> Self {
         Self { cert_type, data }
     }
-}
-
-#[derive(Default, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
-#[repr(C)]
-/// Certificates to send to the PSP.
-pub struct CertTable {
-    /// A vector of [`CertTableEntry`].
-    pub entries: Vec<CertTableEntry>,
 }
 
 /// Rust-friendly instance of the SNP Extended Configuration.
@@ -507,7 +505,7 @@ pub struct SnpExtConfig {
     /// GET:
     ///     Address of extended guest request certificate chain or None when
     ///     certificate should not be fetched.
-    pub certs: Option<CertTable>,
+    pub certs: Option<Vec<CertTableEntry>>,
 
     /// SET:
     ///     Length of the certificates.
@@ -519,13 +517,9 @@ pub struct SnpExtConfig {
 
 impl SnpExtConfig {
     /// Used to update the PSP with the cerificates provided.
-    pub fn update_certs_only(certificates: CertTable) -> Result<Self, SnpCertError> {
-        let mut certs_buffer: usize = 4096;
-        let certs_length: usize = certificates
-            .entries
-            .iter()
-            .map(|entry| entry.data().len())
-            .sum();
+    pub fn update_certs_only(certificates: Vec<CertTableEntry>) -> Result<Self, SnpCertError> {
+        let mut certs_buffer: usize = _4K_PAGE;
+        let certs_length: usize = certificates.iter().map(|entry| entry.data().len()).sum();
 
         while certs_length > certs_buffer {
             certs_buffer += _4K_PAGE;
@@ -541,15 +535,15 @@ impl SnpExtConfig {
 
 #[cfg(test)]
 mod test {
-    use super::{CertTable, CertTableEntry, SnpCertType, SnpConfig, SnpExtConfig};
+
+    use super::{CertTableEntry, SnpCertType, SnpConfig, SnpExtConfig};
     use crate::firmware::linux::host::types::TcbVersion;
 
     fn build_ext_config() -> SnpExtConfig {
         let test_cfg: SnpConfig = SnpConfig::new(TcbVersion::new(2, 0, 6, 39), 31);
 
-        let cert_table: CertTable = CertTable {
-            entries: vec![CertTableEntry::new(SnpCertType::ARK, vec![1; 28])],
-        };
+        let cert_table: Vec<CertTableEntry> =
+            vec![CertTableEntry::new(SnpCertType::ARK, vec![1; 28])];
 
         SnpExtConfig {
             config: Some(test_cfg),
@@ -567,9 +561,8 @@ mod test {
 
     #[test]
     fn snp_ext_config_get_certs() {
-        let cert_table: CertTable = CertTable {
-            entries: vec![CertTableEntry::new(SnpCertType::ARK, vec![1; 28])],
-        };
+        let cert_table: Vec<CertTableEntry> =
+            vec![CertTableEntry::new(SnpCertType::ARK, vec![1; 28])];
 
         let cfg: SnpExtConfig = build_ext_config();
         assert_eq!(cfg.certs, Some(cert_table));

@@ -2,15 +2,12 @@
 
 use crate::certs::sev;
 use crate::firmware::host::types::{
-    CertTable as UapiCertTable, CertTableEntry as UapiCertTableEntry, SnpCertError, SnpExtConfig,
-    UserApiError,
+    CertTableEntry as UapiCertTableEntry, SnpCertError, SnpExtConfig, UserApiError,
 };
 use crate::firmware::linux::guest::types::_4K_PAGE;
 use crate::Version;
 
 use std::marker::PhantomData;
-
-use codicon::Read;
 use uuid::Uuid;
 
 /// Reset the platform's persistent state.
@@ -274,7 +271,7 @@ impl SnpConfig {
 /// };
 /// ```
 ///
-#[derive(Clone, Default)]
+#[derive(Clone, Copy, Default, Debug)]
 #[repr(C)]
 pub struct CertTableEntry {
     /// Sixteen character GUID.
@@ -287,60 +284,83 @@ pub struct CertTableEntry {
     length: u32,
 }
 
-#[repr(C)]
-pub struct CertTable {
-    /// Pointer to the Certificates in question.
-    pub entries: *const CertTableEntry,
-}
+impl CertTableEntry {
+    /// Builds a Kernel formatted CertTable for sending the certificate content to the PSP.
+    ///
+    /// Users should pass the rust-friendly vector of [`UapiCertTableEntry`], and this function
+    /// will handle adding the last entry and the structuring of the buffer sent to the hypervisor.
+    ///
+    /// The contiguous memory layout should look similar to this:
+    ///
+    /// ```
+    ///             |-> |------------------|    |-  CertTableEntry -|
+    ///             |   | CertTableEntry_1 <<<--| - guid            |
+    ///             |   | CertTableEntry_2 |    | - offset          |
+    /// CertTable --|   | ...              |    | - length          |
+    ///             |   | ...              |    |-------------------|
+    ///             |   | ...              |
+    ///             |-> | CertTableEntry_z | <-- last entry all zeroes
+    /// offset (1)  --> | RawCertificate_1 |
+    ///                 | ...              |
+    ///                 | ...              |
+    /// offset (2)  --> | RawCertificate_2 |
+    ///                 | ...              |
+    ///                 | ...              |
+    /// offset (n)  --> | RawCertificate_n |
+    ///                 |------------------|
+    ///          
+    /// ```
+    ///
+    pub fn uapi_to_vec_bytes(table: &mut Vec<UapiCertTableEntry>) -> Result<Vec<u8>, SnpCertError> {
+        // Create the vector to return for later.
+        let mut bytes: Vec<u8> = vec![];
 
-impl Default for CertTable {
-    fn default() -> Self {
-        Self {
-            entries: &CertTableEntry::default() as *const CertTableEntry,
-        }
-    }
-}
+        // Find the location where the first certificate should begin.
+        let mut offset: u32 = (std::mem::size_of::<CertTableEntry>() * (table.len() + 1)) as u32;
 
-impl CertTable {
-    pub fn from_uapi(table: UapiCertTable) -> Result<Self, SnpCertError> {
-        let mut entries: Vec<CertTableEntry> = vec![];
-        let mut tmp_guid: [u8; 16] = [0u8; 16];
+        // Create the buffer to store the table and certificates.
+        let mut raw_certificates: Vec<u8> = vec![];
 
-        for entry in table.entries {
-            // We have a problem if the GUID is invalid.
+        for entry in table.iter() {
             let guid: Uuid = match Uuid::parse_str(&entry.guid()) {
-                Ok(guid) => guid,
+                Ok(uuid) => uuid,
                 Err(_) => return Err(SnpCertError::InvalidGUID),
             };
 
-            // Copy the GUID into a byte array. Note: Unwrapping should be safe
-            // here, as the value should be present.
-            guid.into_bytes()
-                .bytes()
-                .zip(tmp_guid.iter_mut())
-                .for_each(|(byte, ptr)| *ptr = byte.unwrap());
-
-            // Push the entry onto the vector.
-            entries.push(CertTableEntry {
-                guid: tmp_guid,
-                offset: entry.data().as_ptr() as *const u8 as u32,
-                length: entry.data().len() as u32,
+            // Append the guid to the byte array.
+            guid.as_bytes().iter().for_each(|byte: &u8| {
+                bytes.push(*byte);
             });
 
-            // Zero the tmp array.
-            tmp_guid = [0; 16];
+            // Append the offset location to the byte array.
+            offset.to_ne_bytes().iter().for_each(|byte: &u8| {
+                bytes.push(*byte);
+            });
+
+            // Append the length to the byte array.
+            (entry.data.len() as u32)
+                .to_ne_bytes()
+                .iter()
+                .for_each(|byte: &u8| {
+                    bytes.push(*byte);
+                });
+
+            // Copy the certificate data out until concatenating it later.
+            entry.data.as_slice().iter().for_each(|byte: &u8| {
+                raw_certificates.push(*byte);
+            });
+
+            // Increment the offset
+            offset += entry.data.len() as u32;
         }
 
-        // Make sure we push the empty entry to signfiy the table is finished.
-        entries.push(CertTableEntry {
-            guid: tmp_guid,
-            offset: 0u32,
-            length: 0u32,
-        });
+        // Append the the empty entry to signify the end of the table.
+        bytes.append(&mut vec![0u8; 24]);
 
-        Ok(CertTable {
-            entries: entries.as_ptr(),
-        })
+        // Append the certificate bytes to the end of the table.
+        bytes.append(&mut raw_certificates);
+
+        Ok(bytes)
     }
 
     /// Parses the raw array of bytes into more human understandable information.
@@ -357,53 +377,58 @@ impl CertTable {
     /// };
     /// ```
     ///
-    unsafe fn parse_table(&self) -> Vec<UapiCertTableEntry> {
-        const OFFSET_START: isize = (std::mem::size_of::<u8>() * 16) as isize;
-        const LENGTH_START: isize = (std::mem::size_of::<u8>() * 20) as isize;
-        const ENTRY_SIZE: isize = (std::mem::size_of::<u8>() * 24) as isize;
-        const GUID_SIZE: usize = 16_usize;
+    pub unsafe fn parse_table(mut data: *mut CertTableEntry) -> Vec<UapiCertTableEntry> {
+        // Helpful Constance for parsing the data
+        const ZERO_GUID: Uuid = Uuid::from_bytes([0x0; 16]);
 
-        let mut retval: Vec<UapiCertTableEntry> = vec![];
-        let mut guid_ptr: *const CertTableEntry = self.entries;
-        let mut guid: String;
-        let mut cert_address: *mut u8;
-        let mut cert_len: usize;
+        // Pre-defined re-usable variables.
+        let mut guid: Uuid;
+        let table_ptr: *mut u8 = data as *mut u8;
+        let mut cert_addr: *mut u8;
         let mut cert_end: *mut u8;
+        let mut cert_bytes: Vec<u8> = vec![];
+
+        // Create a location to store the final data.
+        let mut retval: Vec<UapiCertTableEntry> = vec![];
+
+        // Start parsing the PSP data from the pointers.
+        let mut entry: CertTableEntry;
 
         loop {
-            let mut cert_bytes: Vec<u8> = vec![];
+            // Dereference the pointer to parse the table data.
+            entry = *data;
+            guid = Uuid::from_slice(entry.guid.as_slice()).unwrap();
 
-            // Calculate values for each CertTableEntry.
-            cert_address = guid_ptr.offset(OFFSET_START) as *mut u8;
-            cert_len = *(guid_ptr.offset(LENGTH_START) as *const usize);
-            cert_end = cert_address.add(cert_len);
-            guid = String::from_raw_parts(guid_ptr as *mut u8, GUID_SIZE, GUID_SIZE);
-
-            // Gather the certificate bytes.
-            while cert_address.ne(&cert_end) {
-                cert_bytes.push(*cert_address);
-                cert_address = cert_address.add(1);
-            }
-
-            // Append the entry to the vector.
-            retval.push(UapiCertTableEntry::from_guid(&guid, cert_bytes));
-
-            // Move the pointer ahead to the next value.
-            guid_ptr = guid_ptr.offset(ENTRY_SIZE);
-
-            // Check for the end of the table.
-            if guid_ptr.eq(&std::ptr::null()) {
+            // Once we find a zeroed GUID, we are done.
+            if guid == ZERO_GUID {
                 break;
             }
+
+            // Calculate the beginning and ending pointers of the raw certificate data.
+            cert_addr = table_ptr.offset(entry.offset as isize) as *mut u8;
+            cert_end = cert_addr.add(entry.length as usize) as *mut u8;
+
+            // Gather the certificate bytes.
+            while cert_addr.ne(&cert_end) {
+                cert_bytes.push(*cert_addr);
+                cert_addr = cert_addr.add(1usize);
+            }
+
+            // Build the Rust-friendly structure and append vector to be returned when
+            // we are finished.
+            retval.push(UapiCertTableEntry::from_guid(
+                &guid.hyphenated().to_string(),
+                cert_bytes.clone(),
+            ));
+
+            // Cleanup the certificate vector for the next iteration.
+            cert_bytes.clear();
+
+            // Move the pointer ahead to the next value.
+            data = data.offset(1isize);
         }
 
         retval
-    }
-
-    pub fn to_uapi(&self) -> UapiCertTable {
-        UapiCertTable {
-            entries: unsafe { self.parse_table() },
-        }
     }
 }
 
@@ -414,40 +439,48 @@ pub struct SnpSetExtConfig {
     /// to be updated.
     pub config_address: u64,
 
-    /// Address of extended guest request [`CertTable`] or 0 when
-    /// previous certificate should be removed on SNP_SET_EXT_CONFIG.
+    /// Address of extended guest request [`CertTableEntry`] buffer or 0 when
+    /// previous certificate(s) should be removed via SNP_SET_EXT_CONFIG.
     pub certs_address: u64,
 
-    /// 4K Page aligned buffer size.
+    /// 4K-page aligned length of the buffer holding certificates to be cached.
     pub certs_buf: u32,
 }
 
 impl SnpSetExtConfig {
-    pub(crate) fn from_uapi(data: &SnpExtConfig) -> Result<Self, UserApiError> {
+    pub(crate) fn from_uapi(
+        data: &SnpExtConfig,
+        bytes: &mut Vec<u8>,
+    ) -> Result<Self, UserApiError> {
+        // Make sure the buffer is is of sufficient size.
+        if data.certs_buf < bytes.len() as u32 {
+            return Err(UserApiError::ApiError(SnpCertError::BufferOverflow));
+        }
+
+        // Make sure the buffer length is 4K-page aligned.
         if data.certs_buf > 0 && data.certs_buf as usize % _4K_PAGE != 0 {
             return Err(UserApiError::ApiError(SnpCertError::PageMisallignment));
         }
 
-        Ok(Self {
-            config_address: if data.config.is_none() {
-                0
-            } else {
-                &data.config.unwrap() as *const SnpConfig as u64
-            },
-            certs_address: if data.certs.is_none() {
-                0
-            } else {
-                match CertTable::from_uapi(data.certs.clone().unwrap()) {
-                    Ok(table) => &table as *const CertTable as u64,
-                    Err(e) => return Err(UserApiError::ApiError(e)),
-                }
-            },
-            certs_buf: if data.certs.is_none() {
-                0
-            } else {
-                data.certs_buf
-            },
-        })
+        // Build a default instance, and then set the values as they have been provided.
+        let mut retval: Self = Self::default();
+
+        // When a configuration is present, make sure to copy the pointer.
+        if data.config.is_some() {
+            retval.config_address = &mut data.config.unwrap() as *mut SnpConfig as u64;
+        }
+
+        // When certificates are present, create a pointer to the location, and update the length appropriately.
+        if data.certs.is_some() {
+            // Update the bytes vector with correct bytes.
+            *bytes = CertTableEntry::uapi_to_vec_bytes(&mut data.certs.clone().unwrap())?;
+
+            // Set the pointers to the updated buffer.
+            retval.certs_address = bytes.as_mut_ptr() as u64;
+            retval.certs_buf = data.certs_buf;
+        }
+
+        Ok(retval)
     }
 }
 
@@ -458,11 +491,11 @@ pub struct SnpGetExtConfig {
     /// fetched.
     pub config_address: u64,
 
-    /// Address of extended guest request [`CertTable`] or 0 when
-    /// certificate should not be fetched.
+    /// Address of extended guest request [`CertTableEntry`] buffer or 0 when
+    /// certificate(s) should not be fetched.
     pub certs_address: u64,
 
-    /// Length of the 4K page aligned buffer which will hold the fetched certificates.
+    /// 4K-page aligned length of the buffer which will hold the fetched certificates.
     pub certs_buf: u32,
 }
 
@@ -472,21 +505,15 @@ impl SnpGetExtConfig {
             config: if self.config_address == 0 {
                 None
             } else {
-                let mut config: SnpConfig = Default::default();
-                let ptr: *mut SnpConfig = &mut config;
-                unsafe {
-                    std::ptr::copy(self.config_address as *const SnpConfig, ptr, 1);
-                    Some(*ptr)
-                }
+                unsafe { Some(*(self.config_address as *mut SnpConfig)) }
             },
             certs: if self.certs_address == 0 {
                 None
             } else {
-                let mut chain: CertTable = Default::default();
-                let ptr: *mut CertTable = &mut chain;
                 unsafe {
-                    std::ptr::copy(self.certs_address as *const CertTable, ptr, 1);
-                    Some((*ptr).to_uapi())
+                    Some(CertTableEntry::parse_table(
+                        self.certs_address as *mut CertTableEntry,
+                    ))
                 }
             },
             certs_buf: self.certs_buf,
