@@ -62,6 +62,7 @@ pub const SNP_PLATFORM_STATUS: Ioctl<WriteRead, &Command<SnpPlatformStatus>> =
     unsafe { SEV.write_read(0) };
 
 /// Set the SNP Extended Configuration Settings.
+/// C IOCTL calls -> sev_ioctl_snp_set_config
 pub const SNP_SET_EXT_CONFIG: Ioctl<WriteRead, &Command<SnpSetExtConfig>> =
     unsafe { SEV.write_read(0) };
 
@@ -75,9 +76,9 @@ pub const SNP_GET_EXT_CONFIG: Ioctl<WriteRead, &Command<SnpGetExtConfig>> =
 /// This struct is defined in the Linux kernel: include/uapi/linux/psp-sev.h
 #[repr(C, packed)]
 pub struct Command<'a, T: Id> {
-    code: u32,
-    data: u64,
-    error: u32,
+    pub code: u32,
+    pub data: u64,
+    pub error: u32,
     _phantom: PhantomData<&'a T>,
 }
 

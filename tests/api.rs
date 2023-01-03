@@ -2,7 +2,7 @@
 
 use sev::cached_chain;
 use sev::firmware::host::types::{
-    CertTable, CertTableEntry, SnpCertType, SnpConfig, SnpExtConfig, TcbVersion,
+    CertTableEntry, SnpCertType, SnpConfig, SnpExtConfig, TcbVersion,
 };
 use sev::{certs::sev::Usage, firmware::host::Firmware, Build, Version};
 
@@ -161,12 +161,12 @@ fn snp_platform_status() {
 
 fn build_ext_config(cert: bool, cfg: bool) -> SnpExtConfig {
     let test_cfg: SnpConfig = SnpConfig::new(TcbVersion::new(2, 0, 6, 39), 31);
-    let cert_table: CertTable = CertTable {
-        entries: vec![
-            CertTableEntry::new(SnpCertType::ARK, vec![1; 28]),
-            CertTableEntry::new(SnpCertType::ASK, vec![1; 28]),
-        ],
-    };
+
+    let cert_table: Vec<CertTableEntry> = vec![
+        CertTableEntry::new(SnpCertType::ARK, vec![1; 28]),
+        CertTableEntry::new(SnpCertType::ASK, vec![1; 28]),
+    ];
+
     SnpExtConfig {
         config: match cfg {
             true => Some(test_cfg),
@@ -176,7 +176,7 @@ fn build_ext_config(cert: bool, cfg: bool) -> SnpExtConfig {
             true => Some(cert_table),
             false => None,
         },
-        certs_len: match cert {
+        certs_buf: match cert {
             true => 2,
             false => 0,
         },
