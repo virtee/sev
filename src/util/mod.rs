@@ -9,6 +9,18 @@ use std::io::{Read, Result, Write};
 use std::mem::{size_of, MaybeUninit};
 use std::slice::{from_raw_parts, from_raw_parts_mut};
 
+pub fn hexdump(bytes: &[u8]) -> String {
+    let mut retval: String = String::new();
+    for (i, byte) in bytes.iter().enumerate() {
+        if (i % 16) == 0 {
+            retval.push('\n');
+        }
+        retval.push_str(&format!("{:02x} ", byte));
+    }
+    retval.push('\n');
+    retval
+}
+
 pub trait TypeLoad: Read {
     fn load<T: Sized + Copy>(&mut self) -> Result<T> {
         #[allow(clippy::uninit_assumed_init)]

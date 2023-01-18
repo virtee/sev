@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use std::fmt::Display;
+
 pub use crate::certs::sev::cert::v1::sig::ecdsa::Signature;
 use crate::firmware::guest::types::SnpDerivedKey;
 use bitfield::bitfield;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 use static_assertions::const_assert;
+use crate::util::hexdump;
 
 pub(crate) const _4K_PAGE: usize = 4096;
 
@@ -216,7 +219,7 @@ impl Default for SnpReportRsp {
 /// The firmware guarantees that the ReportedTcb value is never greater than the installed TCB
 /// version
 #[repr(C)]
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct AttestationReport {
     /// Version number of this attestation report. Set to 2h for this specification.
     pub version: u32,
@@ -292,6 +295,12 @@ pub struct AttestationReport {
     pub signature: Signature,
 }
 
+impl AttestationReport {
+    fn author_key_en(&self) -> bool {
+        self._author_key_en == 1
+    }
+}
+
 impl Default for AttestationReport {
     fn default() -> Self {
         Self {
@@ -332,6 +341,77 @@ impl Default for AttestationReport {
     }
 }
 
+impl Display for AttestationReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            r#"
+Attestation Report ({} bytes):
+Version:                      {}
+Guest SVN:                    {}
+{}
+Family ID:                    {}
+Image ID:                     {}
+VMPL:                         {}
+Signature Algorithm:          {}
+Current TCB:
+{}
+{}
+Author Key Encryption:        {}
+Report Data:                  {}
+Measurement:                  {}
+Host Data:                    {}
+ID Key Digest:                {}
+Author Key Digest:            {}
+Report ID:                    {}
+Report ID Migration Agent:    {}
+Reported TCB:                 {}
+Chip ID:                      {}
+Committed TCB:
+{}
+Current Build:                {}
+Current Minor:                {}
+Current Major:                {}
+Committed Build:              {}
+Committed Minor:              {}
+Committed Major:              {}
+Launch TCB:
+{}
+{}
+"#,
+            std::mem::size_of_val(self),
+            self.version,
+            self.guest_svn,
+            self.policy,
+            hexdump(&self.family_id),
+            hexdump(&self.image_id),
+            self.vmpl,
+            self.sig_algo,
+            self.current_tcb,
+            self.plat_info,
+            self.author_key_en(),
+            hexdump(&self.report_data),
+            hexdump(&self.measurement),
+            hexdump(&self.host_data),
+            hexdump(&self.id_key_digest),
+            hexdump(&self.author_key_digest),
+            hexdump(&self.report_id),
+            hexdump(&self.report_id_ma),
+            self.reported_tcb,
+            hexdump(&self.chip_id),
+            self.committed_tcb,
+            self.current_build,
+            self.current_minor,
+            self.current_major,
+            self.committed_build,
+            self.committed_minor,
+            self.committed_major,
+            self.launch_tcb,
+            self.signature
+        )
+    }
+}
+
 bitfield! {
     /// The firmware associates each guest with a guest policy that the guest owner provides. The
     /// firmware restricts what actions the hypervisor can take on this guest according to the guest policy.
@@ -356,9 +436,9 @@ bitfield! {
     pub struct SnpGuestPolicy(u64);
     impl Debug;
 
-    /// API_MINOR field: Indicates the minor API version.
-    pub api_minor, _: 7, 0;
-    /// API_MAJOR field: Indicates the minor API version.
+    /// ABI_MINOR field: Indicates the minor API version.
+    pub abi_minor, _: 7, 0;
+    /// ABI_MAJOR field: Indicates the minor API version.
     pub abi_major, _: 15, 8;
     /// SMT_ALLOWED field: Indicates the if SMT should be permitted.
     pub smt_allowed, _: 16, 16;
@@ -369,6 +449,29 @@ bitfield! {
     pub debug_allowed, _: 19, 19;
     /// SINGLE_SOCKET_REQUIRED field: Indicates the if a single socket is required.
     pub single_socket_required, _: 20, 20;
+}
+
+impl Display for SnpGuestPolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            r#"
+  Guest Policy ({}):
+    ABI Major:     {}
+    ABI Minor:     {}
+    SMT Allowed:   {}
+    Migrate MA:    {}
+    Debug Allowed: {}
+    Single Socket: {}"#,
+            self,
+            self.abi_major(),
+            self.abi_minor(),
+            self.smt_allowed(),
+            self.migrate_ma_allowed(),
+            self.debug_allowed(),
+            self.single_socket_required()
+        )
+    }
 }
 
 /// The TCB_VERSION is a structure containing the security version numbers of each component in
@@ -389,6 +492,27 @@ pub struct SnpTcbVersion {
     pub microcode: u8,
 }
 
+impl Display for SnpTcbVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            r#"
+TCB Version:
+  Raw:         {}
+  Microcode:   {}
+  SNP:         {}
+  TEE:         {}
+  Boot Loader: {}
+  "#,
+            *self,
+            self.microcode,
+            self.snp,
+            self.tee,
+            self.boot_loader
+        )
+    }
+}
+
 bitfield! {
     /// A structure with a bit-field unsigned 64 bit integer:
     /// Bit 0 representing the status of TSME enablement.
@@ -402,4 +526,21 @@ bitfield! {
     pub tsme_enabled, _: 0, 0;
     /// Returns the bit state of SMT
     pub smt_enabled, _: 1, 1;
+}
+
+
+impl Display for SnpPlatformInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            r#"
+Platform Info ({}):
+  TSME Enabled: {}
+  SMT Enabled:  {}
+"#,
+            *self,
+            self.tsme_enabled(),
+            self.smt_enabled()
+        )
+    }
 }

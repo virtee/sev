@@ -2,8 +2,11 @@
 
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
+
 #[cfg(feature = "openssl")]
 use {super::*, openssl::ecdsa};
+
+use crate::util::hexdump;
 
 /// An ECDSA Signature.
 #[repr(C)]
@@ -40,6 +43,21 @@ impl Default for Signature {
             r: [0u8; 72],
             s: [0u8; 72],
         }
+    }
+}
+
+impl std::fmt::Display for Signature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            r#"
+Signature:
+  R: {}
+  S: {}
+            "#,
+            hexdump(&self.r),
+            hexdump(&self.s)
+        )
     }
 }
 
