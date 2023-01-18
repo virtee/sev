@@ -292,7 +292,7 @@ impl CertTableEntry {
     ///
     /// The contiguous memory layout should look similar to this:
     ///
-    /// ```
+    /// ```text
     ///             |-> |------------------|    |-  CertTableEntry -|
     ///             |   | CertTableEntry_1 <<<--| - guid            |
     ///             |   | CertTableEntry_2 |    | - offset          |
