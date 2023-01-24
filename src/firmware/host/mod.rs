@@ -151,20 +151,20 @@ impl Firmware {
     }
 
     /// Fetch the SNP Extended Configuration.
-    pub fn snp_get_ext_config(&mut self) -> Result<SnpExtConfig, Indeterminate<Error>> {
+    pub fn snp_get_ext_config(&mut self) -> Result<SnpExtConfig, UserApiError> {
         let mut raw_buf: Vec<u8> = vec![0; _4K_PAGE];
         let mut config: SnpGetExtConfig = SnpGetExtConfig {
             config_address: 0,
             certs_address: raw_buf.as_mut_ptr() as *mut FFICertTableEntry as u64,
-            certs_buf: _4K_PAGE as u32,
+            certs_len: _4K_PAGE as u32,
         };
         if let Err(error) =
             SNP_GET_EXT_CONFIG.ioctl(&mut self.0, &mut Command::from_mut(&mut config))
         {
             // If the error occurred because the buffer was to small, it will have changed the
             // buffer. If it has, we will attempt to resize it.
-            if config.certs_buf > _4K_PAGE as u32 {
-                raw_buf = vec![0; config.certs_buf as usize];
+            if config.certs_len > _4K_PAGE as u32 {
+                raw_buf = vec![0; config.certs_len as usize];
                 config.certs_address = raw_buf.as_mut_ptr() as *mut FFICertTableEntry as u64;
 
                 SNP_GET_EXT_CONFIG.ioctl(&mut self.0, &mut Command::from_mut(&mut config))?;
@@ -173,7 +173,10 @@ impl Firmware {
             }
         }
 
-        Ok(config.as_uapi())
+        match config.as_uapi() {
+            Ok(config) => Ok(config),
+            Err(error) => Err(error.into()),
+        }
     }
 
     /// Set the SNP Extended Configuration.

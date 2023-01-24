@@ -35,6 +35,9 @@ pub enum UserApiError {
 
     /// User API related errors.
     ApiError(SnpCertError),
+
+    /// Uuid parsing errors.
+    UuidError(uuid::Error),
 }
 
 impl error::Error for UserApiError {
@@ -42,6 +45,7 @@ impl error::Error for UserApiError {
         match self {
             UserApiError::ApiError(uapi_error) => Some(uapi_error),
             UserApiError::FirmwareError(firmware_error) => Some(firmware_error),
+            UserApiError::UuidError(uuid_error) => Some(uuid_error),
         }
     }
 }
@@ -51,8 +55,15 @@ impl std::fmt::Display for UserApiError {
         let err_msg: String = match self {
             UserApiError::FirmwareError(error) => format!("Firmware Error Encountered: {error}"),
             UserApiError::ApiError(error) => format!("Certificate Error Encountered: {error}"),
+            UserApiError::UuidError(error) => format!("UUID Error Encountered: {error}"),
         };
         write!(f, "{err_msg}")
+    }
+}
+
+impl std::convert::From<uuid::Error> for UserApiError {
+    fn from(uuid_error: uuid::Error) -> Self {
+        UserApiError::UuidError(uuid_error)
     }
 }
 
@@ -80,8 +91,8 @@ pub enum SnpCertError {
     /// Malformed GUID.
     InvalidGUID,
 
-    /// Malformed Page Allignment
-    PageMisallignment,
+    /// Malformed Page Alignment
+    PageMisalignment,
 
     /// Invalid Buffer Size
     BufferOverflow,
@@ -94,8 +105,8 @@ impl std::fmt::Display for SnpCertError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             SnpCertError::InvalidGUID => write!(f, "Invalid GUID provided in certificate chain."),
-            SnpCertError::PageMisallignment => {
-                write!(f, "Certificate Buffer not alligned with 4K Pages.")
+            SnpCertError::PageMisalignment => {
+                write!(f, "Certificate Buffer not aligned with 4K Pages.")
             }
             SnpCertError::BufferOverflow => {
                 write!(f, "Buffer overflow prevented: Bytes provided exceed space allocated for the buffer provided.")
@@ -512,23 +523,27 @@ pub struct SnpExtConfig {
     ///
     /// GET:
     ///     Length of the buffer which will hold the fetched certificates.
-    pub certs_buf: u32,
+    pub certs_len: u32,
+}
+
+/// Used to round certificate buffers to 4K page alignment.
+fn round_to_whole_pages(size: usize) -> usize {
+    match size % _4K_PAGE {
+        0 => size,
+        rem => size + (_4K_PAGE - rem),
+    }
 }
 
 impl SnpExtConfig {
     /// Used to update the PSP with the cerificates provided.
     pub fn update_certs_only(certificates: Vec<CertTableEntry>) -> Result<Self, SnpCertError> {
-        let mut certs_buffer: usize = _4K_PAGE;
         let certs_length: usize = certificates.iter().map(|entry| entry.data().len()).sum();
-
-        while certs_length > certs_buffer {
-            certs_buffer += _4K_PAGE;
-        }
+        let certs_len: u32 = round_to_whole_pages(certs_length) as u32;
 
         Ok(Self {
             config: None,
             certs: Some(certificates),
-            certs_buf: certs_buffer as u32,
+            certs_len,
         })
     }
 }
@@ -548,7 +563,7 @@ mod test {
         SnpExtConfig {
             config: Some(test_cfg),
             certs: Some(cert_table),
-            certs_buf: 4096,
+            certs_len: 4096,
         }
     }
 

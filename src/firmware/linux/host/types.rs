@@ -116,7 +116,7 @@ pub struct PdhCertExport<'a> {
     pdh_addr: u64,
     pdh_len: u32,
     certs_addr: u64,
-    certs_buf: u32,
+    certs_len: u32,
     _phantom: PhantomData<&'a ()>,
 }
 
@@ -126,7 +126,7 @@ impl<'a> PdhCertExport<'a> {
             pdh_addr: pdh as *mut _ as _,
             pdh_len: std::mem::size_of_val(pdh) as _,
             certs_addr: certs.as_mut_ptr() as _,
-            certs_buf: std::mem::size_of_val(certs) as _,
+            certs_len: std::mem::size_of_val(certs) as _,
             _phantom: PhantomData,
         }
     }
@@ -308,7 +308,7 @@ impl CertTableEntry {
     ///                 | ...              |
     /// offset (n)  --> | RawCertificate_n |
     ///                 |------------------|
-    ///          
+    ///
     /// ```
     ///
     pub fn uapi_to_vec_bytes(table: &mut Vec<UapiCertTableEntry>) -> Result<Vec<u8>, SnpCertError> {
@@ -328,27 +328,16 @@ impl CertTableEntry {
             };
 
             // Append the guid to the byte array.
-            guid.as_bytes().iter().for_each(|byte: &u8| {
-                bytes.push(*byte);
-            });
+            bytes.extend_from_slice(guid.as_bytes());
 
             // Append the offset location to the byte array.
-            offset.to_ne_bytes().iter().for_each(|byte: &u8| {
-                bytes.push(*byte);
-            });
+            bytes.extend_from_slice(&offset.to_ne_bytes());
 
             // Append the length to the byte array.
-            (entry.data.len() as u32)
-                .to_ne_bytes()
-                .iter()
-                .for_each(|byte: &u8| {
-                    bytes.push(*byte);
-                });
+            bytes.extend_from_slice(&(entry.data.len() as u32).to_ne_bytes());
 
             // Copy the certificate data out until concatenating it later.
-            entry.data.as_slice().iter().for_each(|byte: &u8| {
-                raw_certificates.push(*byte);
-            });
+            raw_certificates.extend_from_slice(entry.data.as_slice());
 
             // Increment the offset
             offset += entry.data.len() as u32;
@@ -377,16 +366,14 @@ impl CertTableEntry {
     /// };
     /// ```
     ///
-    pub unsafe fn parse_table(mut data: *mut CertTableEntry) -> Vec<UapiCertTableEntry> {
+    pub unsafe fn parse_table(
+        mut data: *mut CertTableEntry,
+    ) -> Result<Vec<UapiCertTableEntry>, uuid::Error> {
         // Helpful Constance for parsing the data
         const ZERO_GUID: Uuid = Uuid::from_bytes([0x0; 16]);
 
         // Pre-defined re-usable variables.
-        let mut guid: Uuid;
         let table_ptr: *mut u8 = data as *mut u8;
-        let mut cert_addr: *mut u8;
-        let mut cert_end: *mut u8;
-        let mut cert_bytes: Vec<u8> = vec![];
 
         // Create a location to store the final data.
         let mut retval: Vec<UapiCertTableEntry> = vec![];
@@ -397,7 +384,7 @@ impl CertTableEntry {
         loop {
             // Dereference the pointer to parse the table data.
             entry = *data;
-            guid = Uuid::from_slice(entry.guid.as_slice()).unwrap();
+            let guid: Uuid = Uuid::from_slice(entry.guid.as_slice())?;
 
             // Once we find a zeroed GUID, we are done.
             if guid == ZERO_GUID {
@@ -405,8 +392,9 @@ impl CertTableEntry {
             }
 
             // Calculate the beginning and ending pointers of the raw certificate data.
-            cert_addr = table_ptr.offset(entry.offset as isize) as *mut u8;
-            cert_end = cert_addr.add(entry.length as usize) as *mut u8;
+            let mut cert_bytes: Vec<u8> = vec![];
+            let mut cert_addr: *mut u8 = table_ptr.offset(entry.offset as isize) as *mut u8;
+            let cert_end: *mut u8 = cert_addr.add(entry.length as usize) as *mut u8;
 
             // Gather the certificate bytes.
             while cert_addr.ne(&cert_end) {
@@ -421,14 +409,11 @@ impl CertTableEntry {
                 cert_bytes.clone(),
             ));
 
-            // Cleanup the certificate vector for the next iteration.
-            cert_bytes.clear();
-
             // Move the pointer ahead to the next value.
             data = data.offset(1isize);
         }
 
-        retval
+        Ok(retval)
     }
 }
 
@@ -444,7 +429,7 @@ pub struct SnpSetExtConfig {
     pub certs_address: u64,
 
     /// 4K-page aligned length of the buffer holding certificates to be cached.
-    pub certs_buf: u32,
+    pub certs_len: u32,
 }
 
 impl SnpSetExtConfig {
@@ -453,13 +438,13 @@ impl SnpSetExtConfig {
         bytes: &mut Vec<u8>,
     ) -> Result<Self, UserApiError> {
         // Make sure the buffer is is of sufficient size.
-        if data.certs_buf < bytes.len() as u32 {
+        if data.certs_len < bytes.len() as u32 {
             return Err(UserApiError::ApiError(SnpCertError::BufferOverflow));
         }
 
         // Make sure the buffer length is 4K-page aligned.
-        if data.certs_buf > 0 && data.certs_buf as usize % _4K_PAGE != 0 {
-            return Err(UserApiError::ApiError(SnpCertError::PageMisallignment));
+        if data.certs_len > 0 && data.certs_len as usize % _4K_PAGE != 0 {
+            return Err(UserApiError::ApiError(SnpCertError::PageMisalignment));
         }
 
         // Build a default instance, and then set the values as they have been provided.
@@ -477,7 +462,7 @@ impl SnpSetExtConfig {
 
             // Set the pointers to the updated buffer.
             retval.certs_address = bytes.as_mut_ptr() as u64;
-            retval.certs_buf = data.certs_buf;
+            retval.certs_len = data.certs_len;
         }
 
         Ok(retval)
@@ -496,12 +481,12 @@ pub struct SnpGetExtConfig {
     pub certs_address: u64,
 
     /// 4K-page aligned length of the buffer which will hold the fetched certificates.
-    pub certs_buf: u32,
+    pub certs_len: u32,
 }
 
 impl SnpGetExtConfig {
-    pub(crate) fn as_uapi(&mut self) -> SnpExtConfig {
-        SnpExtConfig {
+    pub(crate) fn as_uapi(&mut self) -> Result<SnpExtConfig, uuid::Error> {
+        Ok(SnpExtConfig {
             config: if self.config_address == 0 {
                 None
             } else {
@@ -513,10 +498,10 @@ impl SnpGetExtConfig {
                 unsafe {
                     Some(CertTableEntry::parse_table(
                         self.certs_address as *mut CertTableEntry,
-                    ))
+                    )?)
                 }
             },
-            certs_buf: self.certs_buf,
-        }
+            certs_len: self.certs_len,
+        })
     }
 }
