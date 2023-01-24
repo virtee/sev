@@ -15,7 +15,7 @@ pub fn hexdump(bytes: &[u8]) -> String {
         if (i % 16) == 0 {
             retval.push('\n');
         }
-        retval.push_str(&format!("{:02x} ", byte));
+        retval.push_str(&format!("{byte:02x} "));
     }
     retval.push('\n');
     retval

@@ -176,7 +176,7 @@ fn build_ext_config(cert: bool, cfg: bool) -> SnpExtConfig {
             true => Some(cert_table),
             false => None,
         },
-        certs_buf: match cert {
+        certs_len: match cert {
             true => 2,
             false => 0,
         },

@@ -28,6 +28,7 @@ pub const SNP_GET_EXT_REPORT: Ioctl<WriteRead, &SnpGuestRequest<SnpExtReportReq,
     unsafe { SEV.write_read(SnpGuestIoctl::SnpGetExtReport as u8) };
 
 /// The default structure used for making requests to the PSP as a guest owner.
+#[repr(C)]
 pub struct SnpGuestRequest<'a, 'b, Req, Rsp> {
     /// Message version number (must be non-zero)
     pub message_version: u8,
@@ -38,8 +39,8 @@ pub struct SnpGuestRequest<'a, 'b, Req, Rsp> {
     /// Firmware error address.
     pub fw_err: u64,
 
-    _phantom_req: PhantomData<&'a Req>,
-    _phantom_rsp: PhantomData<&'b Rsp>,
+    _phantom_req: PhantomData<&'a mut Req>,
+    _phantom_rsp: PhantomData<&'b mut Rsp>,
 }
 
 impl<'a, 'b, Req, Rsp> SnpGuestRequest<'a, 'b, Req, Rsp> {
@@ -50,11 +51,11 @@ impl<'a, 'b, Req, Rsp> SnpGuestRequest<'a, 'b, Req, Rsp> {
     /// * `ver` - Option<u8> - Version of the message.
     /// * `req` - &Req - The reference a Request object.
     /// * `rsp` - &Rsp - The reference a Response object.
-    pub fn new(ver: Option<u8>, req: &'a Req, rsp: &'b Rsp) -> Self {
+    pub fn new(ver: Option<u8>, req: &'a mut Req, rsp: &'b mut Rsp) -> Self {
         Self {
             message_version: ver.unwrap_or(1),
-            request_data: req as *const Req as u64,
-            response_data: rsp as *const Rsp as u64,
+            request_data: req as *mut Req as u64,
+            response_data: rsp as *mut Rsp as u64,
             fw_err: Default::default(),
             _phantom_req: PhantomData,
             _phantom_rsp: PhantomData,

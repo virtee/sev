@@ -8,6 +8,8 @@ use {super::*, openssl::ecdsa};
 
 use crate::util::hexdump;
 
+const SIG_PIECE_SIZE: usize = std::mem::size_of::<[u8; 72]>();
+
 /// An ECDSA Signature.
 #[repr(C)]
 #[derive(Copy, Clone, Deserialize, Serialize)]
@@ -16,6 +18,8 @@ pub struct Signature {
     r: [u8; 72],
     #[serde(with = "BigArray")]
     s: [u8; 72],
+    #[serde(with = "BigArray")]
+    _reserved: [u8; 512 - (SIG_PIECE_SIZE * 2)],
 }
 
 impl std::fmt::Debug for Signature {
@@ -42,6 +46,7 @@ impl Default for Signature {
         Signature {
             r: [0u8; 72],
             s: [0u8; 72],
+            _reserved: [0u8; (512 - (SIG_PIECE_SIZE * 2))],
         }
     }
 }
@@ -68,6 +73,7 @@ impl From<ecdsa::EcdsaSig> for Signature {
         Signature {
             r: value.r().as_le_bytes(),
             s: value.s().as_le_bytes(),
+            _reserved: [0; 512 - (SIG_PIECE_SIZE * 2)],
         }
     }
 }

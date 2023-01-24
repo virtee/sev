@@ -5,21 +5,16 @@ use bitfield::bitfield;
 /// When the PSP attempt to retreive an SEV-SNP extended report,
 /// but the buffer is of an incorrect size, this is the exact value
 /// which will be returned in the [`SnpGuestRequest::fw_err`] field.
-///
-/// If this value is found, it is important that
-/// [`SnpExtReportReq::extend_buffer()`] be called to adjust for the
-/// buffer size provided by the PSP.
 pub const INVALID_CERT_BUFFER: u64 = 0x0000000100000000;
 
-pub(crate) use crate::firmware::linux::guest::types::{
-    SnpDerivedKeyReq, SnpDerivedKeyRsp, SnpReportRsp,
-};
+pub(crate) use crate::firmware::linux::guest::types::{SnpDerivedKeyReq, SnpReportRsp};
 
 pub use crate::firmware::linux::guest::types::{
-    AttestationReport, Signature, SnpExtReportReq, SnpGuestPolicy, SnpPlatformInfo, SnpReportReq,
-    SnpTcbVersion,
+    AttestationReport, Signature, SnpDerivedKeyRsp, SnpExtReportReq, SnpGuestPolicy,
+    SnpPlatformInfo, SnpReportReq, SnpTcbVersion,
 };
 
+#[derive(Copy, Clone, Debug)]
 /// Structure of required data for fetching the derived key.
 pub struct SnpDerivedKey {
     /// Selects the root key to derive the key from.
@@ -79,19 +74,6 @@ impl SnpDerivedKey {
     }
 }
 
-/// A raw representation of the PSP Report Response after calling SNP_GET_DERIVED_KEY.
-pub struct DerivedKeyRsp {
-    /// The status of key derivation operation.
-    /// 0h: Success.
-    /// 16h: Invalid parameters
-    pub status: u32,
-
-    _reserved_0: [u8; 28],
-
-    /// The requested derived key if [`DerivedKeyRsp::status`] is 0h.
-    pub key: [u8; 32],
-}
-
 bitfield! {
     /// Data which will be mixed into the derived key.
     ///
@@ -105,7 +87,7 @@ bitfield! {
     /// |5|TCB_VERSION|Indicates that the guest-provided TCB_VERSION will be mixed into the key.|
     /// |63:6|\-|Reserved. Must be zero.|
     #[repr(C)]
-    #[derive(Default)]
+    #[derive(Default, Copy, Clone)]
     pub struct GuestFieldSelect(u64);
     impl Debug;
     /// Check/Set guest policy inclusion in derived key.
