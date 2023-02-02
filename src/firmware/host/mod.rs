@@ -16,6 +16,8 @@ use types::*;
 use super::linux::guest::types::_4K_PAGE;
 use super::linux::host::{ioctl::*, types::CertTableEntry as FFICertTableEntry, types::*};
 
+pub use super::linux::host::types::PlatformStatusFlags;
+
 /// A handle to the SEV platform.
 pub struct Firmware(File);
 
