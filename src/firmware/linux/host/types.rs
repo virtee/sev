@@ -366,6 +366,11 @@ impl CertTableEntry {
     /// };
     /// ```
     ///
+    /// # Safety
+    ///
+    /// Since this function manually parses the bytes of the table and utilizes pointers, it
+    /// violates the Rust memory safety guarentee.
+    ///
     pub unsafe fn parse_table(
         mut data: *mut CertTableEntry,
     ) -> Result<Vec<UapiCertTableEntry>, uuid::Error> {

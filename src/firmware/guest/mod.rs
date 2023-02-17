@@ -5,12 +5,13 @@
 /// Rust-friendly types returned by FFI wrapping APIs.
 pub mod types;
 
+pub use super::linux::host::types::CertTableEntry as FFICertTableEntry;
+
 use std::fs::{File, OpenOptions};
 
 use self::types::*;
 
 use super::host::types::{CertTableEntry, Error, Indeterminate, UserApiError};
-use super::linux::host::types::CertTableEntry as FFICertTableEntry;
 use crate::firmware::linux::guest::ioctl::*;
 
 /// A handle to the SEV, SEV-ES, or SEV-SNP platform.
