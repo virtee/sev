@@ -91,7 +91,7 @@ pub struct SnpExtReportReq {
 impl SnpExtReportReq {
     /// Creates a new exteded report with a one, 4K-page
     /// for the certs_address field and the certs_len field.
-    pub fn new(data: &mut SnpReportReq) -> Self {
+    pub fn new(data: &SnpReportReq) -> Self {
         Self {
             data: *data,
             certs_address: u64::MAX,
