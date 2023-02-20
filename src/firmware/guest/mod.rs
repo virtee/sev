@@ -109,14 +109,19 @@ impl Firmware {
                 &mut ext_report_response,
             );
 
+        // KEEP for Kernels before 47894e0f (5.19), as userspace broke at that hash.
+        if let Err(ioctl_error) = SNP_GET_EXT_REPORT.ioctl(&mut self.0, &mut guest_request) {
+            if guest_request.fw_err != INVALID_CERT_BUFFER {
+                return Err(ioctl_error.into());
+            }
+        }
+
         // The kernel patch by pgonda@google.com in kernel hash 47894e0f
         // changed the ioctl return to succeed instead of returning an
         // error when encountering an invalid certificate length. This was
         // done to keep the cryptography safe, so we will now just check
-        // the guest_request.fw_err for a new value. Any other ioctl errors
-        // need to be propagated up.
-        SNP_GET_EXT_REPORT.ioctl(&mut self.0, &mut guest_request)?;
-
+        // the guest_request.fw_err for a new value.
+        //
         // Check to see if the buffer needs to be resized. If it does, the
         // we need to resize the buffer to the correct size, and
         // re-request for the certificates.
