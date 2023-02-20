@@ -37,13 +37,13 @@ impl Firmware {
     pub fn snp_get_report(
         &mut self,
         message_version: Option<u8>,
-        report_request: &mut SnpReportReq,
+        mut report_request: SnpReportReq,
     ) -> Result<AttestationReport, Indeterminate<Error>> {
         let mut report_response: SnpReportRsp = SnpReportRsp::default();
 
         SNP_GET_REPORT.ioctl(
             &mut self.0,
-            &mut SnpGuestRequest::new(message_version, report_request, &mut report_response),
+            &mut SnpGuestRequest::new(message_version, &mut report_request, &mut report_response),
         )?;
 
         Ok(report_response.report)
@@ -59,7 +59,7 @@ impl Firmware {
     pub fn snp_get_derived_key(
         &mut self,
         message_version: Option<u8>,
-        derived_key_request: &mut SnpDerivedKey,
+        derived_key_request: SnpDerivedKey,
     ) -> Result<SnpDerivedKeyRsp, Indeterminate<Error>> {
         let mut derived_key_response: SnpDerivedKeyRsp = SnpDerivedKeyRsp::default();
 
@@ -67,7 +67,7 @@ impl Firmware {
             &mut self.0,
             &mut SnpGuestRequest::new(
                 message_version,
-                &mut SnpDerivedKeyReq::from_uapi(*derived_key_request),
+                &mut SnpDerivedKeyReq::from_uapi(derived_key_request),
                 &mut derived_key_response,
             ),
         )?;
@@ -85,7 +85,7 @@ impl Firmware {
     pub fn snp_get_ext_report(
         &mut self,
         message_version: Option<u8>,
-        report_request: &mut SnpReportReq,
+        report_request: SnpReportReq,
     ) -> Result<(AttestationReport, Vec<CertTableEntry>), UserApiError> {
         // Define a buffer to store the certificates in.
         let mut certificate_bytes: Vec<u8>;
@@ -93,7 +93,7 @@ impl Firmware {
         // Due to the complex buffer allocation, we will take the SnpReportReq
         // provided by the caller, and create an extended report request object
         // for them.
-        let mut ext_report_request: SnpExtReportReq = SnpExtReportReq::new(report_request);
+        let mut ext_report_request: SnpExtReportReq = SnpExtReportReq::new(&report_request);
 
         // Create an object for the PSP to store the response content in.
         let mut ext_report_response: SnpReportRsp = Default::default();
