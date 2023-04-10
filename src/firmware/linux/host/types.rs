@@ -4,7 +4,7 @@ use crate::certs::sev;
 use crate::firmware::host::types::{
     CertTableEntry as UapiCertTableEntry, SnpCertError, SnpExtConfig, UserApiError,
 };
-use crate::firmware::linux::guest::types::_4K_PAGE;
+use crate::firmware::linux::_4K_PAGE;
 use crate::Version;
 
 use std::marker::PhantomData;

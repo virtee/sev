@@ -13,7 +13,7 @@ use crate::{
 };
 use types::*;
 
-use super::linux::guest::types::_4K_PAGE;
+use super::linux::_4K_PAGE;
 use super::linux::host::{ioctl::*, types::CertTableEntry as FFICertTableEntry, types::*};
 
 /// A handle to the SEV platform.
