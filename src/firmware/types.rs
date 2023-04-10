@@ -7,10 +7,10 @@ use super::*;
 use std::fmt::Debug;
 use std::{error, io};
 
-#[cfg(target_os = "linux")]
-pub use super::Firmware;
-pub use crate::firmware::linux::host::types::{PlatformStatusFlags, SnpConfig, TcbVersion};
+pub use crate::firmware::linux::types::{PlatformStatusFlags, SnpConfig, TcbVersion};
 use crate::firmware::linux::_4K_PAGE;
+#[cfg(target_os = "linux")]
+pub use crate::firmware::Firmware;
 
 use serde::{Deserialize, Serialize};
 
@@ -565,7 +565,7 @@ impl SnpExtConfig {
 mod test {
 
     use super::{CertTableEntry, SnpCertType, SnpConfig, SnpExtConfig};
-    use crate::firmware::linux::host::types::TcbVersion;
+    use crate::firmware::linux::types::TcbVersion;
 
     fn build_ext_config() -> SnpExtConfig {
         let test_cfg: SnpConfig = SnpConfig::new(TcbVersion::new(2, 0, 6, 39), 31);

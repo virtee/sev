@@ -3,7 +3,7 @@
 //! A collection of type-safe ioctl implementations for the AMD Secure Encrypted Virtualization
 //! (SEV) platform. These ioctls are exported by the Linux kernel.
 
-use crate::firmware::host::types::{Error, Indeterminate};
+use crate::firmware::types::{Error, Indeterminate};
 use crate::impl_const_id;
 use crate::launch::linux::sev;
 use iocuddle::*;

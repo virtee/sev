@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Operations for managing the SEV platform.
+
 pub(crate) mod linux;
 pub mod types;
 
@@ -14,8 +15,8 @@ use crate::{
 };
 use types::*;
 
-use linux::host::{ioctl::*, types::CertTableEntry as FFICertTableEntry, types::*};
 use linux::_4K_PAGE;
+use linux::{ioctl::*, types::CertTableEntry as FFICertTableEntry, types::*};
 
 /// A handle to the SEV platform.
 pub struct Firmware(File);
