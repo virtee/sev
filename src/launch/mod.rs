@@ -10,4 +10,3 @@
 mod linux;
 
 pub mod sev;
-pub mod snp;

@@ -4,4 +4,3 @@
 
 pub(crate) mod ioctl;
 pub(crate) mod sev;
-pub(crate) mod snp;

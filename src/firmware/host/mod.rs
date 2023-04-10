@@ -13,8 +13,8 @@ use crate::{
 };
 use types::*;
 
-use super::linux::_4K_PAGE;
 use super::linux::host::{ioctl::*, types::CertTableEntry as FFICertTableEntry, types::*};
+use super::linux::_4K_PAGE;
 
 /// A handle to the SEV platform.
 pub struct Firmware(File);
