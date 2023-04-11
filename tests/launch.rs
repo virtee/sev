@@ -6,8 +6,8 @@ use std::convert::TryFrom;
 use std::os::unix::io::AsRawFd;
 
 use sev::cached_chain;
-use sev::firmware::host::types::Firmware;
-use sev::launch::sev::*;
+use sev::firmware::types::Firmware;
+use sev::launch::*;
 use sev::session::Session;
 
 use kvm_bindings::kvm_userspace_memory_region;
