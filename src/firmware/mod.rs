@@ -3,20 +3,22 @@
 //! Operations for managing the SEV platform.
 
 pub(crate) mod linux;
-pub mod types;
+mod types;
 
-use std::fs::{File, OpenOptions};
-use std::mem::MaybeUninit;
-use std::os::unix::io::{AsRawFd, RawFd};
+pub use types::*;
 
 use crate::{
     certs::{self, sev::Certificate},
     Build, SnpBuild, Version,
 };
-use types::*;
 
-use linux::_4K_PAGE;
-use linux::{ioctl::*, types::CertTableEntry as FFICertTableEntry, types::*};
+use std::{
+    fs::{File, OpenOptions},
+    mem::MaybeUninit,
+    os::unix::io::{AsRawFd, RawFd},
+};
+
+use linux::{ioctl::*, types::CertTableEntry as FFICertTableEntry, types::*, _4K_PAGE};
 
 /// A handle to the SEV platform.
 pub struct Firmware(File);

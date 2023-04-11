@@ -4,13 +4,12 @@
 
 #[cfg(target_os = "linux")]
 use super::*;
-use std::fmt::Debug;
-use std::{error, io};
 
 pub use crate::firmware::linux::types::{PlatformStatusFlags, SnpConfig, TcbVersion};
+
 use crate::firmware::linux::_4K_PAGE;
-#[cfg(target_os = "linux")]
-pub use crate::firmware::Firmware;
+
+use std::{error, fmt::Debug, io};
 
 use serde::{Deserialize, Serialize};
 
