@@ -17,13 +17,13 @@ pub struct Initialized;
 pub struct Measuring(hash::Hasher);
 
 /// Denotes an agreeable measurement with the AMD SP.
-pub struct Verified(launch::sev::Measurement);
+pub struct Verified(launch::Measurement);
 
 /// Describes a secure channel with the AMD SP.
 ///
 /// This is required for facilitating an SEV launch and attestation.
 pub struct Session<T> {
-    policy: launch::sev::Policy,
+    policy: launch::Policy,
 
     /// Transport Encryption Key.
     pub tek: key::Key,
@@ -34,16 +34,16 @@ pub struct Session<T> {
     data: T,
 }
 
-impl launch::sev::Policy {
+impl launch::Policy {
     fn bytes(self) -> [u8; 4] {
         unsafe { std::mem::transmute(self) }
     }
 }
 
-impl std::convert::TryFrom<launch::sev::Policy> for Session<Initialized> {
+impl std::convert::TryFrom<launch::Policy> for Session<Initialized> {
     type Error = std::io::Error;
 
-    fn try_from(value: launch::sev::Policy) -> Result<Self> {
+    fn try_from(value: launch::Policy) -> Result<Self> {
         Ok(Self {
             tek: key::Key::random(16)?,
             tik: key::Key::random(16)?,
@@ -54,7 +54,7 @@ impl std::convert::TryFrom<launch::sev::Policy> for Session<Initialized> {
 }
 
 impl Session<Initialized> {
-    fn session(&self, nonce: [u8; 16], iv: [u8; 16], z: key::Key) -> Result<launch::sev::Session> {
+    fn session(&self, nonce: [u8; 16], iv: [u8; 16], z: key::Key) -> Result<launch::Session> {
         let master = z.derive(16, &nonce, "sev-master-secret")?;
         let kek = master.derive(16, &[], "sev-kek")?;
         let kik = master.derive(16, &[], "sev-kik")?;
@@ -76,7 +76,7 @@ impl Session<Initialized> {
         let wmac = kik.mac(&wrap)?;
         let pmac = self.tik.mac(&self.policy.bytes())?;
 
-        Ok(launch::sev::Session {
+        Ok(launch::Session {
             policy_mac: pmac,
             wrap_mac: wmac,
             wrap_tk: wrap,
@@ -86,7 +86,7 @@ impl Session<Initialized> {
     }
 
     /// Produces data needed to initiate the SEV launch sequence.
-    pub fn start(&self, chain: certs::Chain) -> Result<launch::sev::Start> {
+    pub fn start(&self, chain: certs::Chain) -> Result<launch::Start> {
         use certs::*;
 
         let pdh = chain.verify()?;
@@ -98,7 +98,7 @@ impl Session<Initialized> {
         rand::rand_bytes(&mut nonce)?;
         rand::rand_bytes(&mut iv)?;
 
-        Ok(launch::sev::Start {
+        Ok(launch::Start {
             policy: self.policy,
             cert: crt,
             session: self.session(nonce, iv, z)?,
@@ -107,7 +107,7 @@ impl Session<Initialized> {
 
     /// Like the above start function, yet takes PDH as input instead of deriving it from a
     /// certificate chain.
-    pub fn start_pdh(&self, pdh: certs::sev::Certificate) -> Result<launch::sev::Start> {
+    pub fn start_pdh(&self, pdh: certs::sev::Certificate) -> Result<launch::Start> {
         let (crt, prv) = sev::Certificate::generate(sev::Usage::PDH)?;
 
         let z = key::Key::new(prv.derive(&pdh)?);
@@ -116,7 +116,7 @@ impl Session<Initialized> {
         rand::rand_bytes(&mut nonce)?;
         rand::rand_bytes(&mut iv)?;
 
-        Ok(launch::sev::Start {
+        Ok(launch::Start {
             policy: self.policy,
             cert: crt,
             session: self.session(nonce, iv, z)?,
@@ -141,7 +141,7 @@ impl Session<Initialized> {
         self,
         digest: &[u8],
         build: Build,
-        msr: launch::sev::Measurement,
+        msr: launch::Measurement,
     ) -> Result<Session<Verified>> {
         let key = pkey::PKey::hmac(&self.tik)?;
         let mut sig = sign::Signer::new(hash::MessageDigest::sha256(), &key)?;
@@ -169,7 +169,7 @@ impl Session<Initialized> {
     /// # Safety
     ///
     /// This method must only be used in tests or unattested workflows.
-    pub unsafe fn mock_verify(self, msr: launch::sev::Measurement) -> Result<Session<Verified>> {
+    pub unsafe fn mock_verify(self, msr: launch::Measurement) -> Result<Session<Verified>> {
         Ok(Session {
             policy: self.policy,
             tek: self.tek,
@@ -189,11 +189,7 @@ impl Session<Measuring> {
     }
 
     /// Verifies the session's measurement against the AMD SP's measurement.
-    pub fn verify(
-        mut self,
-        build: Build,
-        msr: launch::sev::Measurement,
-    ) -> Result<Session<Verified>> {
+    pub fn verify(mut self, build: Build, msr: launch::Measurement) -> Result<Session<Verified>> {
         let digest = self.data.0.finish()?;
         let session = Session {
             policy: self.policy,
@@ -210,7 +206,7 @@ impl Session<Measuring> {
     pub fn verify_with_digest(
         self,
         build: Build,
-        msr: launch::sev::Measurement,
+        msr: launch::Measurement,
         digest: &[u8],
     ) -> Result<Session<Verified>> {
         let session = Session {
@@ -226,11 +222,7 @@ impl Session<Measuring> {
 
 impl Session<Verified> {
     /// Creates a packet for a secret to be injected into the guest.
-    pub fn secret(
-        &self,
-        flags: launch::sev::HeaderFlags,
-        data: &[u8],
-    ) -> Result<launch::sev::Secret> {
+    pub fn secret(&self, flags: launch::HeaderFlags, data: &[u8]) -> Result<launch::Secret> {
         let mut iv = [0u8; 16];
         rand::rand_bytes(&mut iv)?;
 
@@ -250,8 +242,8 @@ impl Session<Verified> {
         let mut mac = [0u8; 32];
         sig.sign(&mut mac)?;
 
-        Ok(launch::sev::Secret {
-            header: launch::sev::Header { flags, iv, mac },
+        Ok(launch::Secret {
+            header: launch::Header { flags, iv, mac },
             ciphertext,
         })
     }
@@ -265,7 +257,7 @@ mod initialized {
     #[test]
     fn session() {
         let session = Session {
-            policy: launch::sev::Policy::default(),
+            policy: launch::Policy::default(),
             tek: key::Key::new(vec![0u8; 16]),
             tik: key::Key::new(vec![0u8; 16]),
             data: Initialized,
@@ -315,7 +307,7 @@ mod initialized {
             0x78, 0x52, 0xb8, 0x55,
         ];
 
-        let measurement = launch::sev::Measurement {
+        let measurement = launch::Measurement {
             measure: [
                 0x6f, 0xaa, 0xb2, 0xda, 0xae, 0x38, 0x9b, 0xcd, 0x34, 0x05, 0xa0, 0x5d, 0x6c, 0xaf,
                 0xe3, 0x3c, 0x04, 0x14, 0xf7, 0xbe, 0xdd, 0x0b, 0xae, 0x19, 0xba, 0x5f, 0x38, 0xb7,
@@ -327,8 +319,8 @@ mod initialized {
             ],
         };
 
-        let policy = launch::sev::Policy {
-            flags: launch::sev::PolicyFlags::default(),
+        let policy = launch::Policy {
+            flags: launch::PolicyFlags::default(),
             minfw: Default::default(),
         };
 
