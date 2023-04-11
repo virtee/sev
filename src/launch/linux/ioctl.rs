@@ -5,7 +5,7 @@
 
 use crate::firmware::types::{Error, Indeterminate};
 use crate::impl_const_id;
-use crate::launch::linux::sev;
+use crate::launch::linux::*;
 use iocuddle::*;
 
 use std::marker::PhantomData;
@@ -18,14 +18,14 @@ impl_const_id! {
     /// The ioctl sub number
     pub Id => u32;
 
-    sev::Init = 0,
-    sev::EsInit = 1,
-    sev::LaunchStart<'_> = 2,
-    sev::LaunchUpdateData<'_> = 3,
-    sev::LaunchUpdateVmsa = 4,
-    sev::LaunchSecret<'_> = 5,
-    sev::LaunchMeasure<'_> = 6,
-    sev::LaunchFinish = 7,
+    Init = 0,
+    EsInit = 1,
+    LaunchStart<'_> = 2,
+    LaunchUpdateData<'_> = 3,
+    LaunchUpdateVmsa = 4,
+    LaunchSecret<'_> = 5,
+    LaunchMeasure<'_> = 6,
+    LaunchFinish = 7,
 }
 
 const KVM: Group = Group::new(0xAE);
@@ -44,35 +44,34 @@ const ENC_OP: Ioctl<WriteRead, &c_ulong> = unsafe { KVM.write_read(0xBA) };
 // that ioctl.
 
 /// Initialize the SEV platform context.
-pub const INIT: Ioctl<WriteRead, &Command<sev::Init>> = unsafe { ENC_OP.lie() };
+pub const INIT: Ioctl<WriteRead, &Command<Init>> = unsafe { ENC_OP.lie() };
 
 /// Initialize the SEV-ES platform context.
-pub const ES_INIT: Ioctl<WriteRead, &Command<sev::EsInit>> = unsafe { ENC_OP.lie() };
+pub const ES_INIT: Ioctl<WriteRead, &Command<EsInit>> = unsafe { ENC_OP.lie() };
 
 /// Create encrypted guest context.
-pub const LAUNCH_START: Ioctl<WriteRead, &Command<sev::LaunchStart>> = unsafe { ENC_OP.lie() };
+pub const LAUNCH_START: Ioctl<WriteRead, &Command<LaunchStart>> = unsafe { ENC_OP.lie() };
 
 /// Encrypt guest data with its VEK.
-pub const LAUNCH_UPDATE_DATA: Ioctl<WriteRead, &Command<sev::LaunchUpdateData>> =
+pub const LAUNCH_UPDATE_DATA: Ioctl<WriteRead, &Command<LaunchUpdateData>> =
     unsafe { ENC_OP.lie() };
 
 /// Encrypt the VMSA contents for SEV-ES.
-pub const LAUNCH_UPDATE_VMSA: Ioctl<WriteRead, &Command<sev::LaunchUpdateVmsa>> =
+pub const LAUNCH_UPDATE_VMSA: Ioctl<WriteRead, &Command<LaunchUpdateVmsa>> =
     unsafe { ENC_OP.lie() };
 
 /// Inject a secret into the guest.
-pub const LAUNCH_SECRET: Ioctl<WriteRead, &Command<sev::LaunchSecret>> = unsafe { ENC_OP.lie() };
+pub const LAUNCH_SECRET: Ioctl<WriteRead, &Command<LaunchSecret>> = unsafe { ENC_OP.lie() };
 
 /// Get the guest's measurement.
-pub const LAUNCH_MEASUREMENT: Ioctl<WriteRead, &Command<sev::LaunchMeasure>> =
-    unsafe { ENC_OP.lie() };
+pub const LAUNCH_MEASUREMENT: Ioctl<WriteRead, &Command<LaunchMeasure>> = unsafe { ENC_OP.lie() };
 
 /// Complete the SEV launch flow and transition the guest into
 /// the ready state.
-pub const LAUNCH_FINISH: Ioctl<WriteRead, &Command<sev::LaunchFinish>> = unsafe { ENC_OP.lie() };
+pub const LAUNCH_FINISH: Ioctl<WriteRead, &Command<LaunchFinish>> = unsafe { ENC_OP.lie() };
 
 /// Corresponds to the `KVM_MEMORY_ENCRYPT_REG_REGION` ioctl
-pub const ENC_REG_REGION: Ioctl<Write, &KvmEncRegion> =
+pub const ENC_REG_REGION: Ioctl<iocuddle::Write, &KvmEncRegion> =
     unsafe { KVM.read::<KvmEncRegion>(0xBB).lie() };
 
 /// Corresponds to the kernel struct `kvm_enc_region`

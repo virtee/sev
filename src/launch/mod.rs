@@ -10,7 +10,7 @@ mod linux;
 #[cfg(target_os = "linux")]
 use crate::launch::linux::ioctl::*;
 #[cfg(target_os = "linux")]
-use crate::launch::linux::sev::*;
+use crate::launch::linux::*;
 use crate::*;
 
 use std::io::Result;
