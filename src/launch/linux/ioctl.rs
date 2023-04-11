@@ -3,14 +3,18 @@
 //! A collection of type-safe ioctl implementations for the AMD Secure Encrypted Virtualization
 //! (SEV) platform. These ioctls are exported by the Linux kernel.
 
-use crate::firmware::{Error, Indeterminate};
-use crate::impl_const_id;
-use crate::launch::linux::*;
-use iocuddle::*;
+use crate::{
+    firmware::{Error, Indeterminate},
+    impl_const_id,
+    launch::linux::*,
+};
 
-use std::marker::PhantomData;
-use std::os::raw::c_ulong;
-use std::os::unix::io::AsRawFd;
+use std::{
+    marker::PhantomData,
+    os::{raw::c_ulong, unix::io::AsRawFd},
+};
+
+use iocuddle::*;
 
 // These enum ordinal values are defined in the Linux kernel
 // source code: include/uapi/linux/kvm.h

@@ -8,14 +8,10 @@
 mod linux;
 
 #[cfg(target_os = "linux")]
-use crate::launch::linux::ioctl::*;
-#[cfg(target_os = "linux")]
-use crate::launch::linux::*;
+use crate::launch::linux::{ioctl::*, *};
 use crate::*;
 
-use std::io::Result;
-use std::mem::MaybeUninit;
-use std::os::unix::io::AsRawFd;
+use std::{io::Result, mem::MaybeUninit, os::unix::io::AsRawFd};
 
 use bitflags::bitflags;
 use serde::{Deserialize, Serialize};

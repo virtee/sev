@@ -4,11 +4,12 @@
 
 pub(crate) mod ioctl;
 
-use crate::certs::sev::Certificate;
-use crate::launch::*;
+use crate::{certs::sev::Certificate, launch::*};
 
-use std::marker::PhantomData;
-use std::mem::{size_of_val, MaybeUninit};
+use std::{
+    marker::PhantomData,
+    mem::{size_of_val, MaybeUninit},
+};
 
 /// Initialize the SEV platform context.
 #[repr(C)]

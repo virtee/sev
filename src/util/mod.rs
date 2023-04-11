@@ -5,9 +5,11 @@
 pub mod cached_chain;
 mod impl_const_id;
 
-use std::io::{Read, Result, Write};
-use std::mem::{size_of, MaybeUninit};
-use std::slice::{from_raw_parts, from_raw_parts_mut};
+use std::{
+    io::{Read, Result, Write},
+    mem::{size_of, MaybeUninit},
+    slice::{from_raw_parts, from_raw_parts_mut},
+};
 
 pub fn hexdump(bytes: &[u8]) -> String {
     let mut retval: String = String::new();
