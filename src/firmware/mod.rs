@@ -9,7 +9,7 @@ pub use types::*;
 
 use crate::{
     certs::{self, sev::Certificate},
-    Build, SnpBuild, Version,
+    Build, Version,
 };
 
 use std::{
@@ -18,7 +18,7 @@ use std::{
     os::unix::io::{AsRawFd, RawFd},
 };
 
-use linux::{ioctl::*, types::CertTableEntry as FFICertTableEntry, types::*, _4K_PAGE};
+use linux::{ioctl::*, types::*};
 
 /// A handle to the SEV platform.
 pub struct Firmware(File);
@@ -123,73 +123,6 @@ impl Firmware {
         GET_ID.ioctl(&mut self.0, &mut Command::from_mut(&mut id))?;
 
         Ok(Identifier(id.as_slice().to_vec()))
-    }
-
-    /// Query the SNP platform status.
-    pub fn snp_platform_status(&mut self) -> Result<SnpStatus, Indeterminate<Error>> {
-        let mut info: SnpPlatformStatus = Default::default();
-        SNP_PLATFORM_STATUS.ioctl(&mut self.0, &mut Command::from_mut(&mut info))?;
-
-        Ok(SnpStatus {
-            build: SnpBuild {
-                version: Version {
-                    major: info.version.major,
-                    minor: info.version.minor,
-                },
-                build: info.build_id,
-            },
-            guests: info.guest_count,
-            tcb: SnpTcbStatus {
-                platform_version: info.platform_tcb_version,
-                reported_version: info.reported_tcb_version,
-            },
-            is_rmp_init: info.is_rmp_init == 1,
-            mask_chip_id: info.mask_chip_id == 1,
-            state: match info.state {
-                0 => State::Uninitialized,
-                1 => State::Initialized,
-                // SNP platforms cannot be in the 'Working' State.
-                _ => return Err(Indeterminate::Unknown),
-            },
-        })
-    }
-
-    /// Fetch the SNP Extended Configuration.
-    pub fn snp_get_ext_config(&mut self) -> Result<SnpExtConfig, UserApiError> {
-        let mut raw_buf: Vec<u8> = vec![0; _4K_PAGE];
-        let mut config: SnpGetExtConfig = SnpGetExtConfig {
-            config_address: 0,
-            certs_address: raw_buf.as_mut_ptr() as *mut FFICertTableEntry as u64,
-            certs_len: _4K_PAGE as u32,
-        };
-        if let Err(error) =
-            SNP_GET_EXT_CONFIG.ioctl(&mut self.0, &mut Command::from_mut(&mut config))
-        {
-            // If the error occurred because the buffer was to small, it will have changed the
-            // buffer. If it has, we will attempt to resize it.
-            if config.certs_len > _4K_PAGE as u32 {
-                raw_buf = vec![0; config.certs_len as usize];
-                config.certs_address = raw_buf.as_mut_ptr() as *mut FFICertTableEntry as u64;
-
-                SNP_GET_EXT_CONFIG.ioctl(&mut self.0, &mut Command::from_mut(&mut config))?;
-            } else {
-                return Err(error.into());
-            }
-        }
-
-        match config.as_uapi() {
-            Ok(config) => Ok(config),
-            Err(error) => Err(error.into()),
-        }
-    }
-
-    /// Set the SNP Extended Configuration.
-    pub fn snp_set_ext_config(&mut self, new_config: &SnpExtConfig) -> Result<(), UserApiError> {
-        let mut bytes: Vec<u8> = vec![];
-        let mut config: SnpSetExtConfig = SnpSetExtConfig::from_uapi(new_config, &mut bytes)?;
-
-        SNP_SET_EXT_CONFIG.ioctl(&mut self.0, &mut Command::from_mut(&mut config))?;
-        Ok(())
     }
 }
 

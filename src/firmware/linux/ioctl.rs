@@ -4,11 +4,12 @@
 //! (SEV) platform. These ioctls are exported by the Linux kernel.
 
 use super::types::*;
+
 use crate::impl_const_id;
 
-use iocuddle::*;
-
 use std::marker::PhantomData;
+
+use iocuddle::*;
 
 // These enum ordinal values are defined in the Linux kernel
 // source code: include/uapi/linux/psp-sev.h
@@ -22,10 +23,6 @@ impl_const_id! {
     PdhCertExport<'_> = 0x5,
     PekCertImport<'_> = 0x6,
     GetId<'_> = 0x8, /* GET_ID2 is 0x8, the deprecated GET_ID ioctl is 0x7 */
-
-    SnpPlatformStatus = 0x9,
-    SnpSetExtConfig = 0xA,
-    SnpGetExtConfig = 0xB,
 }
 
 const SEV: Group = Group::new(b'S');
@@ -56,19 +53,6 @@ pub const PEK_CERT_IMPORT: Ioctl<WriteRead, &Command<PekCertImport<'_>>> =
 
 /// Get the CPU's unique ID that can be used for getting a certificate for the CEK public key.
 pub const GET_ID: Ioctl<WriteRead, &Command<GetId<'_>>> = unsafe { SEV.write_read(0) };
-
-/// Return information about the current status and capabilities of the SEV-SNP platform.
-pub const SNP_PLATFORM_STATUS: Ioctl<WriteRead, &Command<SnpPlatformStatus>> =
-    unsafe { SEV.write_read(0) };
-
-/// Set the SNP Extended Configuration Settings.
-/// C IOCTL calls -> sev_ioctl_snp_set_config
-pub const SNP_SET_EXT_CONFIG: Ioctl<WriteRead, &Command<SnpSetExtConfig>> =
-    unsafe { SEV.write_read(0) };
-
-/// Get the SNP Extended Configuration Settings.
-pub const SNP_GET_EXT_CONFIG: Ioctl<WriteRead, &Command<SnpGetExtConfig>> =
-    unsafe { SEV.write_read(0) };
 
 /// The Rust-flavored, FFI-friendly version of `struct sev_issue_cmd` which is
 /// used to pass arguments to the SEV ioctl implementation.
