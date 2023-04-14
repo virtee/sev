@@ -4,7 +4,7 @@
 //! (SEV) platform. These ioctls are exported by the Linux kernel.
 
 use crate::{
-    firmware::{Error, Indeterminate},
+    error::{Error, Indeterminate},
     impl_const_id,
     launch::linux::*,
 };

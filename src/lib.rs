@@ -38,6 +38,10 @@
 #![allow(clippy::unreadable_literal)]
 
 pub mod certs;
+
+/// Error management module.
+pub mod error;
+
 pub mod firmware;
 pub mod launch;
 #[cfg(feature = "openssl")]

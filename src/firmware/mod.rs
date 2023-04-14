@@ -9,6 +9,7 @@ pub use types::*;
 
 use crate::{
     certs::{self, sev::Certificate},
+    error::*,
     Build, Version,
 };
 
