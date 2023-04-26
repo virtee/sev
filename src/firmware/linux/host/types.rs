@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::certs::sev;
-use crate::firmware::host::types::{
-    CertTableEntry as UapiCertTableEntry, SnpCertError, SnpExtConfig, UserApiError,
-};
+use crate::firmware::host::types::{CertTableEntry as UapiCertTableEntry, SnpExtConfig};
+
+use crate::error::{SnpCertError, UserApiError};
+
 use crate::firmware::linux::guest::types::_4K_PAGE;
 use crate::Version;
 

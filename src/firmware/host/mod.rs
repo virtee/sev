@@ -7,6 +7,7 @@ use std::fs::{File, OpenOptions};
 use std::mem::MaybeUninit;
 use std::os::unix::io::{AsRawFd, RawFd};
 
+use crate::error::*;
 use crate::{
     certs::{self, sev::Certificate},
     Build, SnpBuild, Version,

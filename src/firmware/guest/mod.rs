@@ -9,8 +9,9 @@ use std::fs::{File, OpenOptions};
 
 use self::types::*;
 
-use super::host::types::{CertTableEntry, Error, Indeterminate, UserApiError};
+use super::host::types::CertTableEntry;
 use super::linux::host::types::CertTableEntry as FFICertTableEntry;
+use crate::error::*;
 use crate::firmware::linux::guest::ioctl::*;
 
 /// A handle to the SEV, SEV-ES, or SEV-SNP platform.
