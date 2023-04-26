@@ -80,7 +80,7 @@ impl TryFrom<&ec::EcKey<pkey::Private>> for PubKey {
 impl PubKey {
     pub fn generate(group: group::Group) -> Result<(Self, ec::EcKey<pkey::Private>)> {
         let grp: ec::EcGroup = group.try_into()?;
-        let prv = ec::EcKey::generate(&*grp)?;
+        let prv = ec::EcKey::generate(&grp)?;
         Ok((Self::try_from(&prv)?, prv))
     }
 }
