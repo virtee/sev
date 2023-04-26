@@ -45,6 +45,9 @@ pub mod session;
 mod util;
 pub mod vmsa;
 
+/// Error module.
+pub mod error;
+
 pub use util::cached_chain;
 use util::{TypeLoad, TypeSave};
 
