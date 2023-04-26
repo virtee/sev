@@ -68,8 +68,8 @@ impl Session<Initialized> {
 
         let mut wrap = [0u8; 32];
         let mut off = 0;
-        off += crypter.update(&*self.tek, &mut wrap[off..])?;
-        off += crypter.update(&*self.tik, &mut wrap[off..])?;
+        off += crypter.update(&self.tek, &mut wrap[off..])?;
+        off += crypter.update(&self.tik, &mut wrap[off..])?;
         off += crypter.finalize(&mut wrap[off..])?;
         assert_eq!(off, wrap.len());
 
@@ -143,7 +143,7 @@ impl Session<Initialized> {
         build: Build,
         msr: launch::sev::Measurement,
     ) -> Result<Session<Verified>> {
-        let key = pkey::PKey::hmac(&*self.tik)?;
+        let key = pkey::PKey::hmac(&self.tik)?;
         let mut sig = sign::Signer::new(hash::MessageDigest::sha256(), &key)?;
 
         sig.update(&[0x04u8])?;
@@ -234,9 +234,9 @@ impl Session<Verified> {
         let mut iv = [0u8; 16];
         rand::rand_bytes(&mut iv)?;
 
-        let ciphertext = symm::encrypt(symm::Cipher::aes_128_ctr(), &*self.tek, Some(&iv), data)?;
+        let ciphertext = symm::encrypt(symm::Cipher::aes_128_ctr(), &self.tek, Some(&iv), data)?;
 
-        let key = pkey::PKey::hmac(&*self.tik)?;
+        let key = pkey::PKey::hmac(&self.tik)?;
         let mut sig = sign::Signer::new(hash::MessageDigest::sha256(), &key)?;
 
         sig.update(&[0x01u8])?;
