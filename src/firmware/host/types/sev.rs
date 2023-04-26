@@ -2,12 +2,12 @@
 
 //! Operations for managing the SEV platform.
 
-#[cfg(target_os = "linux")]
-use super::*;
 use std::fmt::Debug;
 
+use crate::Build;
+
 #[cfg(target_os = "linux")]
-pub use super::Firmware;
+pub use crate::firmware::host::Firmware;
 pub use crate::firmware::linux::host::types::PlatformStatusFlags;
 
 /// The platform state.
