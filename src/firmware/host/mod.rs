@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Operations for managing the SEV platform.
-pub mod types;
+mod types;
+
+pub use types::*;
 
 use std::fs::{File, OpenOptions};
 use std::mem::MaybeUninit;
@@ -12,7 +14,6 @@ use crate::{
     certs::{self, sev::Certificate},
     Build, Version,
 };
-use types::*;
 
 use super::linux::host::{ioctl::*, types::*};
 
