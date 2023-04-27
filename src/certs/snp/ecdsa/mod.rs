@@ -8,9 +8,7 @@ use crate::util::hexdump;
 #[cfg(feature = "openssl")]
 use crate::certs::snp::{AsLeBytes, FromLe};
 
-#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "serde")]
 use serde_big_array::BigArray;
 
 #[cfg(feature = "openssl")]
@@ -23,15 +21,14 @@ const SIG_PIECE_SIZE: usize = std::mem::size_of::<[u8; 72]>();
 const R_S_SIZE: usize = SIG_PIECE_SIZE * 2usize;
 
 #[repr(C)]
-#[derive(Copy, Clone)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[derive(Copy, Clone, Deserialize, Serialize)]
 /// ECDSA signature.
 pub struct Signature {
-    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    #[serde(with = "BigArray")]
     r: [u8; 72],
-    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    #[serde(with = "BigArray")]
     s: [u8; 72],
-    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    #[serde(with = "BigArray")]
     _reserved: [u8; 512 - R_S_SIZE],
 }
 

@@ -2,11 +2,26 @@
 
 use crate::{certs::snp::ecdsa::Signature, util::hexdump};
 
+#[cfg(feature = "openssl")]
+use crate::certs::snp::{Chain, Verifiable};
+
 use std::fmt::Display;
+
+#[cfg(feature = "openssl")]
+use std::io;
+#[cfg(feature = "openssl")]
+use std::io::{Error, ErrorKind};
+
+#[cfg(feature = "openssl")]
+use std::convert::TryFrom;
 
 use bitfield::bitfield;
 
-#[cfg(feature = "serde")]
+#[cfg(feature = "openssl")]
+use openssl::{ecdsa::EcdsaSig, sha::Sha384};
+
+use serde::{Deserialize, Serialize};
+
 use serde_big_array::BigArray;
 
 /// Structure of required data for fetching the derived key.
@@ -111,8 +126,7 @@ bitfield! {
 /// The firmware guarantees that the ReportedTcb value is never greater than the installed TCB
 /// version
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 pub struct AttestationReport {
     /// Version number of this attestation report. Set to 2h for this specification.
     pub version: u32,
@@ -136,19 +150,19 @@ pub struct AttestationReport {
     /// See [`AttestationReport::_author_key_en`].
     _author_key_en: u32,
     _reserved_0: u32,
-    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    #[serde(with = "BigArray")]
     /// Guest-provided 512 Bits of Data
     pub report_data: [u8; 64],
-    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    #[serde(with = "BigArray")]
     /// The measurement calculated at launch.
     pub measurement: [u8; 48],
     /// Data provided by the hypervisor at launch.
     pub host_data: [u8; 32],
-    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    #[serde(with = "BigArray")]
     /// SHA-384 digest of the ID public key that signed the ID block provided
     /// in SNP_LANUNCH_FINISH.
     pub id_key_digest: [u8; 48],
-    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    #[serde(with = "BigArray")]
     /// SHA-384 digest of the Author public key that certified the ID key,
     /// if provided in SNP_LAUNCH_FINSIH. Zeroes if AUTHOR_KEY_EN is 1.
     pub author_key_digest: [u8; 48],
@@ -159,7 +173,7 @@ pub struct AttestationReport {
     /// Reported TCB version used to derive the VCEK that signed this report.
     pub reported_tcb: TcbVersion,
     _reserved_1: [u8; 24],
-    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    #[serde(with = "BigArray")]
     /// If MaskChipId is set to 0, Identifier unique to the chip.
     /// Otherwise set to 0h.
     pub chip_id: [u8; 64],
@@ -181,7 +195,7 @@ pub struct AttestationReport {
     _reserved_3: u8,
     /// The CurrentTcb at the time the guest was launched or imported.
     pub launch_tcb: TcbVersion,
-    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    #[serde(with = "BigArray")]
     _reserved_4: [u8; 168],
     /// Signature of bytes 0 to 0x29F inclusive of this report.
     /// The format of the signature is found within Signature.
@@ -305,7 +319,7 @@ Launch TCB:
     }
 }
 
-#[cfg(all(feature = "openssl", feature = "serde"))]
+#[cfg(feature = "openssl")]
 impl Verifiable for (&Chain, &AttestationReport) {
     type Output = ();
 
@@ -357,7 +371,7 @@ bitfield! {
     /// | 20     | SINGLE_SOCKET | 0: Guest can be activated on multiple sockets.<br>1: Guest can only be activated on one socket.   >
     ///
     #[derive(Default, Clone, Copy)]
-    #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+    #[derive(Deserialize, Serialize)]
     #[repr(C)]
     pub struct GuestPolicy(u64);
     impl Debug;
@@ -403,8 +417,7 @@ impl Display for GuestPolicy {
 /// the trusted computing base (TCB) of the SNP firmware. A TCB_VERSION is associated with each
 /// image of firmware.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 pub struct TcbVersion {
     /// Current bootloader version. SVN of PSP Bootloader.
     pub boot_loader: u8,
@@ -439,7 +452,7 @@ bitfield! {
     /// Bit 1 representing the status of SMT enablement.
     /// Bits 2-63 are reserved.
     #[derive(Default, Clone, Copy)]
-    #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+    #[derive(Deserialize, Serialize)]
     #[repr(C)]
     pub struct PlatformInfo(u64);
     impl Debug;
