@@ -4,4 +4,6 @@
 //! Rust-friendly API wrappers to communicate with the FFI functions.
 pub mod host;
 
+pub mod guest;
+
 pub(crate) mod linux;
