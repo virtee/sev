@@ -4,8 +4,6 @@ use crate::{error::*, firmware::guest::*};
 
 use static_assertions::const_assert;
 
-pub(crate) const _4K_PAGE: usize = 4096;
-
 /// This may end up being 4 when the Shadow Stack is enabled.
 /// [APMv2 - Table 15-38 - VMPL Permission Mask Definition](https://www.amd.com/system/files/TechDocs/24593.pdf#page=670&zoom=100,0,400)
 const MAX_VMPL: u32 = 3;

@@ -5,22 +5,24 @@ mod types;
 
 pub use types::*;
 
-use std::convert::TryInto;
-use std::fs::{File, OpenOptions};
-use std::mem::MaybeUninit;
-use std::os::unix::io::{AsRawFd, RawFd};
-
-use crate::error::*;
-use crate::{
-    certs::sev::sev::{Certificate, Chain},
-    Build, Version,
-};
-
 use super::linux::host::{
     ioctl::*,
     types::{
         GetId, PdhCertExport, PdhGen, PekCertImport, PekCsr, PekGen, PlatformReset, PlatformStatus,
     },
+};
+
+use crate::{
+    certs::sev::sev::{Certificate, Chain},
+    error::*,
+    Build, Version,
+};
+
+use std::{
+    convert::TryInto,
+    fs::{File, OpenOptions},
+    mem::MaybeUninit,
+    os::unix::io::{AsRawFd, RawFd},
 };
 
 /// The CPU-unique identifier for the platform.

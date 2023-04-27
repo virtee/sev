@@ -6,11 +6,10 @@
 
 use super::*;
 
+use std::{fs, io, mem::size_of};
+
 use codicon::{Decoder, Encoder};
-use core::mem::size_of;
 use serde_big_array::BigArray;
-use std::fs;
-use std::io;
 
 const ATTR_G_SHIFT: usize = 23;
 const ATTR_B_SHIFT: usize = 22;

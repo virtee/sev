@@ -4,15 +4,12 @@
 //! This ensures (at compile time) that the right steps are called in the
 //! right order.
 
-#[cfg(target_os = "linux")]
-use crate::launch::linux::ioctl::*;
-#[cfg(target_os = "linux")]
-use crate::launch::linux::snp::*;
 use crate::Version;
 
-use std::io::Result;
-use std::marker::PhantomData;
-use std::os::unix::io::AsRawFd;
+#[cfg(target_os = "linux")]
+use crate::launch::linux::{ioctl::*, snp::*};
+
+use std::{io::Result, marker::PhantomData, os::unix::io::AsRawFd};
 
 use bitflags::bitflags;
 use serde::{Deserialize, Serialize};

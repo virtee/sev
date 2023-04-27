@@ -2,11 +2,12 @@
 
 //! Types for interacting with the KVM SEV guest management API.
 
-use crate::certs::sev::sev::Certificate;
-use crate::launch::sev::*;
+use crate::{certs::sev::sev::Certificate, launch::sev::*};
 
-use std::marker::PhantomData;
-use std::mem::{size_of_val, MaybeUninit};
+use std::{
+    marker::PhantomData,
+    mem::{size_of_val, MaybeUninit},
+};
 
 /// Initialize the SEV platform context.
 #[repr(C)]

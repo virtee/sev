@@ -4,11 +4,12 @@
 //! (SEV) platform. These ioctls are exported by the Linux kernel.
 
 use super::types::*;
+
 use crate::{firmware::host::SnpPlatformStatus, impl_const_id};
 
-use iocuddle::*;
-
 use std::marker::PhantomData;
+
+use iocuddle::*;
 
 // These enum ordinal values are defined in the Linux kernel
 // source code: include/uapi/linux/psp-sev.h

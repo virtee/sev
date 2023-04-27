@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::certs::sev::sev;
-
-use crate::Version;
+use crate::{certs::sev::sev, Version};
 
 use std::marker::PhantomData;
 

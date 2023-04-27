@@ -6,8 +6,10 @@
 mod key;
 
 use super::*;
-use openssl::*;
+
 use std::io::{Error, ErrorKind, Result};
+
+use openssl::*;
 
 /// Represents a brand-new secure channel with the AMD SP.
 pub struct Initialized;
