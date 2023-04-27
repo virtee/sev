@@ -6,7 +6,7 @@ use std::convert::TryFrom;
 use std::os::unix::io::AsRawFd;
 
 use sev::cached_chain;
-use sev::firmware::host::types::Firmware;
+use sev::firmware::host::Firmware;
 use sev::launch::sev::*;
 use sev::session::Session;
 
