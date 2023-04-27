@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use sev::cached_chain;
-use sev::{certs::sev::Usage, firmware::host::Firmware, Build, Version};
+use sev::{certs::sev::sev::Usage, firmware::host::Firmware, Build, Version};
 
 use serial_test::serial;
 
@@ -71,7 +71,7 @@ fn pdh_generate() {
 #[cfg(feature = "openssl")]
 #[test]
 fn pdh_cert_export() {
-    use sev::certs::Verifiable;
+    use sev::certs::sev::Verifiable;
 
     let mut fw = Firmware::open().unwrap();
     let chain = fw.pdh_cert_export().unwrap();
@@ -90,7 +90,7 @@ fn pdh_cert_export() {
 #[test]
 #[serial]
 fn pek_cert_import() {
-    use sev::certs::{sev::Certificate, Signer, Verifiable};
+    use sev::certs::sev::{sev::Certificate, Signer, Verifiable};
 
     let mut fw = Firmware::open().unwrap();
 

@@ -12,7 +12,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 
 use crate::error::*;
 use crate::{
-    certs::{self, sev::Certificate},
+    certs::sev::sev::{Certificate, Chain},
     Build, Version,
 };
 
@@ -107,7 +107,7 @@ impl Firmware {
     }
 
     /// Export the SEV certificate chain.
-    pub fn pdh_cert_export(&mut self) -> Result<certs::sev::Chain, Indeterminate<Error>> {
+    pub fn pdh_cert_export(&mut self) -> Result<Chain, Indeterminate<Error>> {
         #[allow(clippy::uninit_assumed_init)]
         let mut chain: [Certificate; 3] = unsafe { MaybeUninit::uninit().assume_init() };
         #[allow(clippy::uninit_assumed_init)]
@@ -116,7 +116,7 @@ impl Firmware {
         let mut pdh_cert_export = PdhCertExport::new(&mut pdh, &mut chain);
         PDH_CERT_EXPORT.ioctl(&mut self.0, &mut Command::from_mut(&mut pdh_cert_export))?;
 
-        Ok(certs::sev::Chain {
+        Ok(Chain {
             pdh,
             pek: chain[0],
             oca: chain[1],

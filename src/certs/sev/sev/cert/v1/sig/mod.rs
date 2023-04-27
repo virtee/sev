@@ -4,7 +4,7 @@ pub(crate) mod ecdsa;
 mod rsa;
 
 use super::*;
-use crate::certs::Usage;
+use crate::certs::sev::Usage;
 
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -78,10 +78,10 @@ impl PartialEq for Signature {
 }
 
 #[cfg(feature = "openssl")]
-impl TryFrom<crate::certs::Signature> for Signature {
+impl TryFrom<crate::certs::sev::Signature> for Signature {
     type Error = Error;
 
-    fn try_from(value: crate::certs::Signature) -> Result<Self> {
+    fn try_from(value: crate::certs::sev::Signature) -> Result<Self> {
         if value.id.is_some() {
             return Err(ErrorKind::InvalidInput.into());
         }
@@ -119,7 +119,7 @@ impl TryFrom<crate::certs::Signature> for Signature {
 }
 
 #[cfg(feature = "openssl")]
-impl TryFrom<&Signature> for Option<crate::certs::Signature> {
+impl TryFrom<&Signature> for Option<crate::certs::sev::Signature> {
     type Error = Error;
 
     fn try_from(value: &Signature) -> Result<Self> {
@@ -136,7 +136,7 @@ impl TryFrom<&Signature> for Option<crate::certs::Signature> {
             _ => return Err(ErrorKind::InvalidInput.into()),
         };
 
-        Ok(Some(crate::certs::Signature {
+        Ok(Some(crate::certs::sev::Signature {
             hash,
             kind,
             sig,

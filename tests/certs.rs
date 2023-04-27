@@ -7,7 +7,7 @@ mod rome;
 #[test]
 #[cfg(feature = "openssl")]
 fn test_for_verify_false_positive() {
-    use ::sev::certs::*;
+    use ::sev::certs::sev::*;
     use codicon::Decoder;
 
     // https://github.com/enarx/enarx/issues/520

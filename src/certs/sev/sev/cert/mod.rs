@@ -40,7 +40,7 @@ impl std::fmt::Display for Certificate {
 
         self.encode(&mut hsh, Body).or(Err(Error))?;
 
-        write!(f, "{} {} ", crate::certs::Usage::from(key.usage), key)?;
+        write!(f, "{} {} ", crate::certs::sev::Usage::from(key.usage), key)?;
         for b in hsh.finish()?.iter() {
             write!(f, "{:02x}", *b)?;
         }
@@ -62,7 +62,7 @@ impl PartialEq for Certificate {
     }
 }
 
-impl<U: Copy + Into<crate::certs::Usage>> PartialEq<U> for Certificate {
+impl<U: Copy + Into<crate::certs::sev::Usage>> PartialEq<U> for Certificate {
     fn eq(&self, other: &U) -> bool {
         if let Ok(a) = Usage::try_from(self) {
             return a == (*other).into();
@@ -159,7 +159,7 @@ impl TryFrom<&Certificate> for Usage {
     }
 }
 
-impl TryFrom<&Certificate> for crate::certs::Usage {
+impl TryFrom<&Certificate> for crate::certs::sev::Usage {
     type Error = Error;
 
     fn try_from(value: &Certificate) -> Result<Self> {

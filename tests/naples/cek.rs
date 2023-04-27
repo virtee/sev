@@ -20,7 +20,7 @@ fn encode() {
 #[cfg(feature = "openssl")]
 #[test]
 fn verify() {
-    use ::sev::certs::builtin::naples::ASK;
+    use ::sev::certs::sev::builtin::naples::ASK;
 
     let ask = ca::Certificate::decode(ASK, ()).unwrap();
     let cek = sev::Certificate::decode(CEK, ()).unwrap();
