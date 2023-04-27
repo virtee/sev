@@ -55,7 +55,12 @@ use util::{TypeLoad, TypeSave};
 
 #[cfg(feature = "openssl")]
 use certs::sev::sev;
-use certs::sev::{builtin, ca};
+
+#[cfg(feature = "openssl")]
+use certs::{
+    sev::{builtin as sev_builtin, ca},
+    snp::builtin as snp_builtin,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -176,15 +181,16 @@ pub enum Generation {
     Genoa,
 }
 
+#[cfg(feature = "openssl")]
 impl From<Generation> for ca::Chain {
     fn from(generation: Generation) -> ca::Chain {
         use codicon::Decoder;
 
         let (ark, ask) = match generation {
-            Generation::Naples => (builtin::naples::ARK, builtin::naples::ASK),
-            Generation::Rome => (builtin::rome::ARK, builtin::rome::ASK),
-            Generation::Milan => (builtin::milan::ARK, builtin::milan::ASK),
-            Generation::Genoa => (builtin::genoa::ARK, builtin::genoa::ASK),
+            Generation::Naples => (sev_builtin::naples::ARK, sev_builtin::naples::ASK),
+            Generation::Rome => (sev_builtin::rome::ARK, sev_builtin::rome::ASK),
+            Generation::Milan => (snp_builtin::milan::ARK, snp_builtin::milan::ASK),
+            Generation::Genoa => (snp_builtin::genoa::ARK, snp_builtin::genoa::ASK),
         };
 
         ca::Chain {
