@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use serde::{Deserialize, Serialize};
-use serde_big_array::BigArray;
-
 #[cfg(feature = "openssl")]
 use {super::*, openssl::ecdsa};
 
 use crate::util::hexdump;
+
+use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
 
 const SIG_PIECE_SIZE: usize = std::mem::size_of::<[u8; 72]>();
 

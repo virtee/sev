@@ -8,14 +8,14 @@ use crate::util::hexdump;
 #[cfg(feature = "openssl")]
 use crate::certs::snp::{AsLeBytes, FromLe};
 
+#[cfg(feature = "openssl")]
+use std::convert::TryFrom;
+
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 
 #[cfg(feature = "openssl")]
 use openssl::{bn, ecdsa};
-
-#[cfg(feature = "openssl")]
-use std::convert::TryFrom;
 
 const SIG_PIECE_SIZE: usize = std::mem::size_of::<[u8; 72]>();
 const R_S_SIZE: usize = SIG_PIECE_SIZE * 2usize;
