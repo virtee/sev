@@ -11,7 +11,6 @@ use std::convert::{TryFrom, TryInto};
 
 use bitflags;
 
-#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 bitflags::bitflags! {
@@ -26,8 +25,7 @@ bitflags::bitflags! {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[repr(C)]
 /// Certificates which are accepted for [`CertTableEntry`](self::CertTableEntry)
 pub enum CertType {
@@ -86,8 +84,7 @@ impl TryFrom<&uuid::Uuid> for CertType {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[repr(C)]
 /// An entry with information regarding a specific certificate.
 pub struct CertTableEntry {
@@ -136,8 +133,7 @@ pub struct TcbStatus {
 
 /// A description of the SEV-SNP platform's build information.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
 pub struct Build {
     /// The version information.
     pub version: Version,

@@ -188,7 +188,7 @@ mod snp {
     #[cfg_attr(not(all(has_sev, feature = "dangerous_hw_tests")), ignore)]
     #[test]
     #[serial]
-    fn snp_snp_set_ext_config_std() {
+    fn set_ext_config_std() {
         let mut fw: Firmware = Firmware::open().unwrap();
         let new_config: ExtConfig = build_ext_config(true, true);
         fw.snp_set_ext_config(new_config).unwrap();
@@ -198,7 +198,7 @@ mod snp {
     #[cfg_attr(not(all(has_sev, feature = "dangerous_hw_tests")), ignore)]
     #[test]
     #[serial]
-    fn snp_snp_set_ext_config_certs_only() {
+    fn set_ext_config_certs_only() {
         let mut fw: Firmware = Firmware::open().unwrap();
         let new_config: ExtConfig = build_ext_config(true, false);
         fw.snp_set_ext_config(new_config).unwrap();
@@ -208,7 +208,7 @@ mod snp {
     #[cfg_attr(not(all(has_sev, feature = "dangerous_hw_tests")), ignore)]
     #[test]
     #[serial]
-    fn snp_snp_set_ext_config_cfg_only() {
+    fn set_ext_config_cfg_only() {
         let mut fw: Firmware = Firmware::open().unwrap();
         let new_config: ExtConfig = build_ext_config(false, true);
         fw.snp_set_ext_config(new_config).unwrap();
@@ -218,7 +218,7 @@ mod snp {
     #[cfg_attr(not(all(has_sev, feature = "dangerous_hw_tests")), ignore)]
     #[test]
     #[serial]
-    fn snp_snp_set_ext_invalid_config_std() {
+    fn set_ext_invalid_config_std() {
         let mut fw: Firmware = Firmware::open().unwrap();
         let platform_status: SnpPlatformStatus = fw.snp_platform_status().unwrap();
 
@@ -234,7 +234,7 @@ mod snp {
     #[cfg_attr(not(all(has_sev, feature = "dangerous_hw_tests")), ignore)]
     #[test]
     #[serial]
-    fn snp_snp_get_ext_config_std() {
+    fn get_ext_config_std() {
         let mut fw: Firmware = Firmware::open().unwrap();
         let hw_config: ExtConfig = fw.snp_get_ext_config().unwrap();
         println!("{:?}", hw_config);
