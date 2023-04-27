@@ -2,9 +2,9 @@
 
 //! Utilities for operating on entire certificate chains.
 
-use serde::{Deserialize, Serialize};
-
 use super::*;
+
+use serde::{Deserialize, Serialize};
 
 /// A complete certificate chain.
 #[repr(C)]

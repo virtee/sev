@@ -2,9 +2,9 @@
 
 //! For operating on OCA certificate chains.
 
-use serde::{Deserialize, Serialize};
-
 use super::*;
+
+use serde::{Deserialize, Serialize};
 
 /// A complete OCA certificate chain.
 #[repr(C)]

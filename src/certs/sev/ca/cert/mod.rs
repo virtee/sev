@@ -4,12 +4,12 @@
 
 mod v1;
 
+use super::*;
+
 use std::mem::size_of;
 
 use serde::{de, ser};
 use serde_bytes::{ByteBuf, Bytes};
-
-use super::*;
 
 /// An OCA certificate.
 #[derive(Clone, Copy)]

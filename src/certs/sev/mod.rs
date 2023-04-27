@@ -15,14 +15,16 @@ mod util;
 #[cfg(feature = "openssl")]
 mod crypto;
 
-use std::convert::*;
-use std::io::{Error, ErrorKind, Read, Result, Write};
-
 pub use chain::Chain;
 
 use crate::util::*;
 #[cfg(feature = "openssl")]
 use util::*;
+
+use std::{
+    convert::*,
+    io::{Error, ErrorKind, Read, Result, Write},
+};
 
 #[cfg(feature = "openssl")]
 use openssl::*;
