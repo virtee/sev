@@ -62,11 +62,11 @@ use certs::{
     snp::builtin as snp_builtin,
 };
 
-use serde::{Deserialize, Serialize};
-
 #[cfg(feature = "openssl")]
 use std::convert::TryFrom;
 use std::io::{Read, Write};
+
+use serde::{Deserialize, Serialize};
 
 /// Information about the SEV platform version.
 #[repr(C)]

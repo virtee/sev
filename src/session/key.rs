@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
-use std::convert::*;
-use std::ops::{Deref, DerefMut};
-use std::ptr::write_volatile;
+
+use std::{
+    convert::*,
+    ops::{Deref, DerefMut},
+    ptr::write_volatile,
+};
 
 use openssl::*;
 

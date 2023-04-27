@@ -2,13 +2,13 @@
 
 //! Operations for managing the SEV platform.
 
-use std::fmt::Debug;
-
-use crate::{firmware::host::State, Build};
-
 #[cfg(target_os = "linux")]
 pub use crate::firmware::host::Firmware;
 pub use crate::firmware::linux::host::types::PlatformStatusFlags;
+
+use crate::{firmware::host::State, Build};
+
+use std::fmt::Debug;
 
 /// Information regarding the SEV platform's current status.
 #[derive(Clone, Debug, PartialEq, Eq)]

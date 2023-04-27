@@ -11,14 +11,16 @@
 //! An entire certificate chain can be created using the `sevctl`
 //! utility.
 
-use std::env;
-use std::fs::File;
-use std::io::{ErrorKind, Result};
-use std::path::{Path, PathBuf};
+use crate::certs::sev::Chain;
+
+use std::{
+    env,
+    fs::File,
+    io::{ErrorKind, Result},
+    path::{Path, PathBuf},
+};
 
 use codicon::Decoder;
-
-use crate::certs::sev::Chain;
 
 fn append_rest<P: AsRef<Path>>(path: P) -> PathBuf {
     let mut path = path.as_ref().to_path_buf();

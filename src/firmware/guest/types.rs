@@ -8,12 +8,10 @@ use crate::certs::snp::{Chain, Verifiable};
 use std::fmt::Display;
 
 #[cfg(feature = "openssl")]
-use std::io;
-#[cfg(feature = "openssl")]
-use std::io::{Error, ErrorKind};
-
-#[cfg(feature = "openssl")]
-use std::convert::TryFrom;
+use std::{
+    convert::TryFrom,
+    io::{self, Error, ErrorKind},
+};
 
 use bitfield::bitfield;
 
@@ -21,7 +19,6 @@ use bitfield::bitfield;
 use openssl::{ecdsa::EcdsaSig, sha::Sha384};
 
 use serde::{Deserialize, Serialize};
-
 use serde_big_array::BigArray;
 
 /// Structure of required data for fetching the derived key.
