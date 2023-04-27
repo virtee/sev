@@ -3,7 +3,7 @@
 #![cfg(feature = "openssl")]
 
 mod initialized {
-    use ::sev::{certs::builtin::naples::*, certs::*, launch, session::Session};
+    use ::sev::{certs::sev::builtin::naples::*, certs::sev::*, launch, session::Session};
     use codicon::Decoder;
     use std::convert::*;
 

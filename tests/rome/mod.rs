@@ -12,5 +12,5 @@ const CEK: &[u8] = include_bytes!("cek.cert");
 const PEK: &[u8] = include_bytes!("pek.cert");
 const PDH: &[u8] = include_bytes!("pdh.cert");
 
-use ::sev::certs::*;
+use ::sev::certs::sev::*;
 use codicon::{Decoder, Encoder};

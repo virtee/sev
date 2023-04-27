@@ -86,8 +86,8 @@ impl Session<Initialized> {
     }
 
     /// Produces data needed to initiate the SEV launch sequence.
-    pub fn start(&self, chain: certs::Chain) -> Result<launch::sev::Start> {
-        use certs::*;
+    pub fn start(&self, chain: certs::sev::Chain) -> Result<launch::sev::Start> {
+        use certs::sev::*;
 
         let pdh = chain.verify()?;
         let (crt, prv) = sev::Certificate::generate(sev::Usage::PDH)?;
@@ -107,7 +107,7 @@ impl Session<Initialized> {
 
     /// Like the above start function, yet takes PDH as input instead of deriving it from a
     /// certificate chain.
-    pub fn start_pdh(&self, pdh: certs::sev::Certificate) -> Result<launch::sev::Start> {
+    pub fn start_pdh(&self, pdh: certs::sev::sev::Certificate) -> Result<launch::sev::Start> {
         let (crt, prv) = sev::Certificate::generate(sev::Usage::PDH)?;
 
         let z = key::Key::new(prv.derive(&pdh)?);

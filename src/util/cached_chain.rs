@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 use codicon::Decoder;
 
-use crate::certs::Chain;
+use crate::certs::sev::Chain;
 
 fn append_rest<P: AsRef<Path>>(path: P) -> PathBuf {
     let mut path = path.as_ref().to_path_buf();

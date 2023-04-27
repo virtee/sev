@@ -37,7 +37,9 @@
 #![allow(clippy::identity_op)]
 #![allow(clippy::unreadable_literal)]
 
+/// SEV and SEV-SNP certificates interface.
 pub mod certs;
+
 pub mod firmware;
 pub mod launch;
 #[cfg(feature = "openssl")]
@@ -52,8 +54,8 @@ pub use util::cached_chain;
 use util::{TypeLoad, TypeSave};
 
 #[cfg(feature = "openssl")]
-use certs::sev;
-use certs::{builtin, ca};
+use certs::sev::sev;
+use certs::sev::{builtin, ca};
 
 use serde::{Deserialize, Serialize};
 
@@ -139,7 +141,7 @@ impl codicon::Encoder<()> for Build {
 /// // `openssl` feature enabled.
 ///
 /// use std::convert::TryFrom;
-/// use sev::certs::Usage;
+/// use sev::certs::sev::Usage;
 /// use sev::firmware::host::types::Firmware;
 /// use sev::Generation;
 ///
@@ -197,7 +199,7 @@ impl TryFrom<&sev::Chain> for Generation {
     type Error = ();
 
     fn try_from(schain: &sev::Chain) -> Result<Self, Self::Error> {
-        use crate::certs::Verifiable;
+        use crate::certs::sev::Verifiable;
 
         let naples: ca::Chain = Generation::Naples.into();
         let rome: ca::Chain = Generation::Rome.into();
