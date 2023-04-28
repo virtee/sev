@@ -6,8 +6,13 @@
 use crate::{
     error::{Error, Indeterminate},
     impl_const_id,
-    launch::linux::{sev, snp},
 };
+
+#[cfg(feature = "sev")]
+use crate::launch::linux::sev;
+
+#[cfg(feature = "snp")]
+use crate::launch::linux::snp;
 
 use std::{
     marker::PhantomData,
@@ -18,6 +23,7 @@ use iocuddle::*;
 
 // These enum ordinal values are defined in the Linux kernel
 // source code: include/uapi/linux/kvm.h
+#[cfg(all(feature = "sev", feature = "snp"))]
 impl_const_id! {
     /// The ioctl sub number
     pub Id => u32;
@@ -30,6 +36,32 @@ impl_const_id! {
     sev::LaunchSecret<'_> = 5,
     sev::LaunchMeasure<'_> = 6,
     sev::LaunchFinish = 7,
+
+    snp::Init = 22,
+    snp::LaunchStart<'_> = 23,
+    snp::LaunchUpdate<'_> = 24,
+    snp::LaunchFinish<'_> = 25,
+}
+
+#[cfg(all(feature = "sev", not(feature = "snp")))]
+impl_const_id! {
+    /// The ioctl sub number
+    pub Id => u32;
+
+    sev::Init = 0,
+    sev::EsInit = 1,
+    sev::LaunchStart<'_> = 2,
+    sev::LaunchUpdateData<'_> = 3,
+    sev::LaunchUpdateVmsa = 4,
+    sev::LaunchSecret<'_> = 5,
+    sev::LaunchMeasure<'_> = 6,
+    sev::LaunchFinish = 7,
+}
+
+#[cfg(all(not(feature = "sev"), feature = "snp"))]
+impl_const_id! {
+    /// The ioctl sub number
+    pub Id => u32;
 
     snp::Init = 22,
     snp::LaunchStart<'_> = 23,
@@ -53,48 +85,61 @@ const ENC_OP: Ioctl<WriteRead, &c_ulong> = unsafe { KVM.write_read(0xBA) };
 // that ioctl.
 
 /// Initialize the SEV platform context.
+#[cfg(feature = "sev")]
 pub const INIT: Ioctl<WriteRead, &Command<sev::Init>> = unsafe { ENC_OP.lie() };
 
 /// Initialize the SEV-ES platform context.
+#[cfg(feature = "sev")]
 pub const ES_INIT: Ioctl<WriteRead, &Command<sev::EsInit>> = unsafe { ENC_OP.lie() };
 
 /// Create encrypted guest context.
+#[cfg(feature = "sev")]
 pub const LAUNCH_START: Ioctl<WriteRead, &Command<sev::LaunchStart>> = unsafe { ENC_OP.lie() };
 
 /// Encrypt guest data with its VEK.
+#[cfg(feature = "sev")]
 pub const LAUNCH_UPDATE_DATA: Ioctl<WriteRead, &Command<sev::LaunchUpdateData>> =
     unsafe { ENC_OP.lie() };
 
 /// Encrypt the VMSA contents for SEV-ES.
+#[cfg(feature = "sev")]
 pub const LAUNCH_UPDATE_VMSA: Ioctl<WriteRead, &Command<sev::LaunchUpdateVmsa>> =
     unsafe { ENC_OP.lie() };
 
 /// Inject a secret into the guest.
+#[cfg(feature = "sev")]
 pub const LAUNCH_SECRET: Ioctl<WriteRead, &Command<sev::LaunchSecret>> = unsafe { ENC_OP.lie() };
 
 /// Get the guest's measurement.
+#[cfg(feature = "sev")]
 pub const LAUNCH_MEASUREMENT: Ioctl<WriteRead, &Command<sev::LaunchMeasure>> =
     unsafe { ENC_OP.lie() };
 
 /// Complete the SEV launch flow and transition the guest into
 /// the ready state.
+#[cfg(feature = "sev")]
 pub const LAUNCH_FINISH: Ioctl<WriteRead, &Command<sev::LaunchFinish>> = unsafe { ENC_OP.lie() };
 
 /// Corresponds to the `KVM_MEMORY_ENCRYPT_REG_REGION` ioctl
+#[cfg(any(feature = "sev", feature = "snp"))]
 pub const ENC_REG_REGION: Ioctl<Write, &KvmEncRegion> =
     unsafe { KVM.read::<KvmEncRegion>(0xBB).lie() };
 
 /// Initialize the SEV-SNP platform in KVM.
+#[cfg(feature = "snp")]
 pub const SNP_INIT: Ioctl<WriteRead, &Command<snp::Init>> = unsafe { ENC_OP.lie() };
 
 /// Initialize the flow to launch a guest.
+#[cfg(feature = "snp")]
 pub const SNP_LAUNCH_START: Ioctl<WriteRead, &Command<snp::LaunchStart>> = unsafe { ENC_OP.lie() };
 
 /// Insert pages into the guest physical address space.
+#[cfg(feature = "snp")]
 pub const SNP_LAUNCH_UPDATE: Ioctl<WriteRead, &Command<snp::LaunchUpdate>> =
     unsafe { ENC_OP.lie() };
 
 /// Complete the guest launch flow.
+#[cfg(feature = "snp")]
 pub const SNP_LAUNCH_FINISH: Ioctl<WriteRead, &Command<snp::LaunchFinish>> =
     unsafe { ENC_OP.lie() };
 

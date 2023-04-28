@@ -11,15 +11,21 @@
 //! An entire certificate chain can be created using the `sevctl`
 //! utility.
 
+#[cfg(feature = "sev")]
 use crate::certs::sev::Chain;
 
 use std::{
     env,
-    fs::File,
-    io::{ErrorKind, Result},
     path::{Path, PathBuf},
 };
 
+#[cfg(feature = "sev")]
+use std::{
+    fs::File,
+    io::{ErrorKind, Result},
+};
+
+#[cfg(feature = "sev")]
 use codicon::Decoder;
 
 fn append_rest<P: AsRef<Path>>(path: P) -> PathBuf {
@@ -62,6 +68,7 @@ pub fn path() -> Vec<PathBuf> {
 }
 
 /// Searches for and decodes an SEV certificate chain.
+#[cfg(feature = "sev")]
 pub fn get() -> Result<Chain> {
     let not_found: std::io::Error = ErrorKind::NotFound.into();
 

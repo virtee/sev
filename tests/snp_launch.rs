@@ -1,18 +1,27 @@
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(feature = "snp")]
 use sev::firmware::host::Firmware;
+
+#[cfg(feature = "snp")]
 use sev::launch::snp::*;
 
-pub use kvm_bindings::kvm_segment as KvmSegment;
+#[cfg(feature = "snp")]
 use kvm_bindings::kvm_userspace_memory_region;
+
+#[cfg(feature = "snp")]
 use kvm_ioctls::{Kvm, VcpuExit};
+
+#[cfg(feature = "snp")]
 use mmarinus::{perms, Map};
 
 // one page of `hlt`
+#[cfg(feature = "snp")]
 const CODE: &[u8; 4096] = &[
     0xf4; 4096 // hlt
 ];
 
+#[cfg(feature = "snp")]
 #[cfg_attr(not(has_sev), ignore)]
 #[test]
 fn snp() {
