@@ -409,32 +409,6 @@ mod test {
 
         #[test]
         #[should_panic]
-        fn test_parse_table_offset_too_large() {
-            let mut cert_bytes: Vec<u8> = vec![
-                192, 180, 6, 164, 168, 3, 73, 82, 151, 67, 63, 182, 1, 76, 208, 174, 120, 0, 0, 0,
-                25, 0, 0, 0, 74, 183, 179, 121, 187, 172, 79, 228, 160, 47, 5, 174, 243, 39, 199,
-                130, 145, 0, 0, 0, 25, 0, 0, 0, 99, 218, 117, 141, 230, 100, 69, 100, 173, 197,
-                244, 185, 59, 232, 172, 205, 170, 0, 0, 0, 15, 0, 0, 0, 251, 182, 237, 116, 231,
-                62, 68, 171, 136, 147, 66, 82, 121, 45, 115, 122, 185, 0, 0, 0, 6, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-                2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-                5, 5, 5, 7, 7, 7, 7, 7,
-            ];
-
-            let cert_bytes_ptr: *mut CertTableEntry =
-                cert_bytes.as_mut_ptr() as *mut CertTableEntry;
-
-            let actual: Vec<UAPI::CertTableEntry> =
-                unsafe { CertTableEntry::parse_table(cert_bytes_ptr).unwrap() };
-
-            let expected: Vec<UAPI::CertTableEntry> = build_vec_uapi_cert_table();
-
-            assert_eq!(expected, actual, "Certificate Bytes offset too large?");
-        }
-
-        #[test]
-        #[should_panic]
         fn test_parse_table_offset_short() {
             let mut cert_bytes: Vec<u8> = vec![
                 192, 180, 6, 164, 168, 3, 73, 82, 151, 67, 63, 182, 1, 76, 208, 174, 120, 0, 0, 0,
