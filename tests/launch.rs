@@ -2,24 +2,31 @@
 
 #![cfg(feature = "openssl")]
 
-use std::convert::TryFrom;
-use std::os::unix::io::AsRawFd;
+#[cfg(feature = "sev")]
+use std::{convert::TryFrom, os::unix::io::AsRawFd};
 
-use sev::cached_chain;
-use sev::firmware::host::Firmware;
-use sev::launch::sev::*;
-use sev::session::Session;
+#[cfg(feature = "sev")]
+use sev::{cached_chain, firmware::host::Firmware, launch::sev::*, session::Session};
 
+#[cfg(feature = "sev")]
 use kvm_bindings::kvm_userspace_memory_region;
+
+#[cfg(feature = "sev")]
 use kvm_ioctls::{Kvm, VcpuExit};
+
+#[cfg(feature = "sev")]
 use mmarinus::{perms, Map};
+
+#[cfg(feature = "sev")]
 use serial_test::serial;
 
 // has to be a multiple of 16
+#[cfg(feature = "sev")]
 const CODE: &[u8; 16] = &[
     0xf4; 16 // hlt
 ];
 
+#[cfg(feature = "sev")]
 #[cfg_attr(not(has_sev), ignore)]
 #[test]
 #[serial]

@@ -11,6 +11,7 @@ use std::{
     slice::{from_raw_parts, from_raw_parts_mut},
 };
 
+#[cfg(any(feature = "sev", feature = "snp"))]
 pub fn hexdump(bytes: &[u8]) -> String {
     let mut retval: String = String::new();
     for (i, byte) in bytes.iter().enumerate() {

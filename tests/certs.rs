@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(feature = "sev")]
 mod naples;
+
+#[cfg(feature = "sev")]
 mod rome;
 
-#[cfg(feature = "openssl")]
+#[cfg(all(feature = "openssl", feature = "sev"))]
 mod sev {
     use super::*;
 
@@ -19,6 +22,7 @@ mod sev {
     }
 }
 
+#[cfg(feature = "snp")]
 mod snp {
     #[cfg(feature = "openssl")]
     use sev::certs::snp::{builtin::milan, ca, Certificate, Chain, Verifiable};

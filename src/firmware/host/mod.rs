@@ -5,25 +5,31 @@ mod types;
 
 pub use types::*;
 
-use super::linux::host::{
-    ioctl::*,
-    types::{
-        GetId, PdhCertExport, PdhGen, PekCertImport, PekCsr, PekGen, PlatformReset, PlatformStatus,
-    },
+use super::linux::host::{ioctl::*, types::GetId};
+
+#[cfg(feature = "sev")]
+use super::linux::host::types::{
+    PdhCertExport, PdhGen, PekCertImport, PekCsr, PekGen, PlatformReset, PlatformStatus,
 };
 
+use crate::error::*;
+
+#[cfg(feature = "sev")]
 use crate::{
     certs::sev::sev::{Certificate, Chain},
-    error::*,
     Build, Version,
 };
 
 use std::{
-    convert::TryInto,
     fs::{File, OpenOptions},
-    mem::MaybeUninit,
     os::unix::io::{AsRawFd, RawFd},
 };
+
+#[cfg(feature = "sev")]
+use std::mem::MaybeUninit;
+
+#[cfg(feature = "snp")]
+use std::convert::TryInto;
 
 /// The CPU-unique identifier for the platform.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -57,12 +63,14 @@ impl Firmware {
     }
 
     /// Reset the platform persistent state.
+    #[cfg(feature = "sev")]
     pub fn platform_reset(&mut self) -> Result<(), Indeterminate<Error>> {
         PLATFORM_RESET.ioctl(&mut self.0, &mut Command::from(&PlatformReset))?;
         Ok(())
     }
 
     /// Query the platform status.
+    #[cfg(feature = "sev")]
     pub fn platform_status(&mut self) -> Result<Status, Indeterminate<Error>> {
         let mut info: PlatformStatus = Default::default();
         PLATFORM_STATUS.ioctl(&mut self.0, &mut Command::from_mut(&mut info))?;
@@ -87,12 +95,14 @@ impl Firmware {
     }
 
     /// Generate a new Platform Encryption Key (PEK).
+    #[cfg(feature = "sev")]
     pub fn pek_generate(&mut self) -> Result<(), Indeterminate<Error>> {
         PEK_GEN.ioctl(&mut self.0, &mut Command::from(&PekGen))?;
         Ok(())
     }
 
     /// Request a signature for the PEK.
+    #[cfg(feature = "sev")]
     pub fn pek_csr(&mut self) -> Result<Certificate, Indeterminate<Error>> {
         #[allow(clippy::uninit_assumed_init)]
         let mut pek: Certificate = unsafe { MaybeUninit::uninit().assume_init() };
@@ -103,12 +113,14 @@ impl Firmware {
     }
 
     /// Generate a new Platform Diffie-Hellman (PDH) key pair.
+    #[cfg(feature = "sev")]
     pub fn pdh_generate(&mut self) -> Result<(), Indeterminate<Error>> {
         PDH_GEN.ioctl(&mut self.0, &mut Command::from(&PdhGen))?;
         Ok(())
     }
 
     /// Export the SEV certificate chain.
+    #[cfg(feature = "sev")]
     pub fn pdh_cert_export(&mut self) -> Result<Chain, Indeterminate<Error>> {
         #[allow(clippy::uninit_assumed_init)]
         let mut chain: [Certificate; 3] = unsafe { MaybeUninit::uninit().assume_init() };
@@ -127,6 +139,7 @@ impl Firmware {
     }
 
     /// Take ownership of the SEV platform.
+    #[cfg(feature = "sev")]
     pub fn pek_cert_import(
         &mut self,
         pek: &Certificate,
@@ -141,6 +154,7 @@ impl Firmware {
     ///
     /// This is especially helpful for sending AMD an HTTP request to fetch
     /// the signed CEK certificate.
+    #[cfg(any(feature = "sev", feature = "snp"))]
     pub fn get_identifier(&mut self) -> Result<Identifier, Indeterminate<Error>> {
         let mut bytes = [0u8; 64];
         let mut id = GetId::new(&mut bytes);
@@ -160,6 +174,7 @@ impl Firmware {
     ///
     /// let status: PlatformStatus = firmware.platform_status().unwrap();
     /// ```
+    #[cfg(feature = "snp")]
     pub fn snp_platform_status(&mut self) -> Result<SnpPlatformStatus, Indeterminate<Error>> {
         let mut platform_status: SnpPlatformStatus = SnpPlatformStatus::default();
 
@@ -177,6 +192,7 @@ impl Firmware {
     ///
     /// firmware.reset_config().unwrap();
     /// ```
+    #[cfg(feature = "snp")]
     pub fn snp_reset_config(&mut self) -> Result<(), UserApiError> {
         let mut config: FFI::types::SnpSetExtConfig = FFI::types::SnpSetExtConfig {
             config_address: 0,
@@ -196,6 +212,7 @@ impl Firmware {
     ///
     /// let status: ExtConfig = firmware.get_ext_config().unwrap();
     /// ```
+    #[cfg(feature = "snp")]
     pub fn snp_get_ext_config(&mut self) -> Result<ExtConfig, UserApiError> {
         let mut raw_buf: Vec<u8> = vec![0; _4K_PAGE];
         let mut config = FFI::types::SnpGetExtConfig {
@@ -248,6 +265,7 @@ impl Firmware {
     ///
     /// let status: bool = firmware.set_ext_config(ext_config).unwrap();
     /// ```
+    #[cfg(feature = "snp")]
     pub fn snp_set_ext_config(&mut self, mut new_config: ExtConfig) -> Result<(), UserApiError> {
         let mut bytes: Vec<u8> = vec![];
 

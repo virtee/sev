@@ -42,7 +42,7 @@ pub mod certs;
 
 pub mod firmware;
 pub mod launch;
-#[cfg(feature = "openssl")]
+#[cfg(all(feature = "openssl", feature = "sev"))]
 pub mod session;
 mod util;
 pub mod vmsa;
@@ -53,17 +53,9 @@ pub mod error;
 pub use util::cached_chain;
 use util::{TypeLoad, TypeSave};
 
-#[cfg(feature = "openssl")]
+#[cfg(all(feature = "openssl", feature = "sev"))]
 use certs::sev::sev;
 
-#[cfg(feature = "openssl")]
-use certs::{
-    sev::{builtin as sev_builtin, ca},
-    snp::builtin as snp_builtin,
-};
-
-#[cfg(feature = "openssl")]
-use std::convert::TryFrom;
 use std::io::{Read, Write};
 
 use serde::{Deserialize, Serialize};
@@ -169,59 +161,18 @@ impl codicon::Encoder<()> for Build {
 /// ```
 pub enum Generation {
     /// First generation EPYC (SEV).
+    #[cfg(feature = "sev")]
     Naples,
 
     /// Second generation EPYC (SEV, SEV-ES).
+    #[cfg(feature = "sev")]
     Rome,
 
     /// Third generation EPYC (SEV, SEV-ES, SEV-SNP).
+    #[cfg(feature = "snp")]
     Milan,
 
     /// Fourth generation EPYC (SEV, SEV-ES, SEV-SNP).
+    #[cfg(feature = "snp")]
     Genoa,
-}
-
-#[cfg(feature = "openssl")]
-impl From<Generation> for ca::Chain {
-    fn from(generation: Generation) -> ca::Chain {
-        use codicon::Decoder;
-
-        let (ark, ask) = match generation {
-            Generation::Naples => (sev_builtin::naples::ARK, sev_builtin::naples::ASK),
-            Generation::Rome => (sev_builtin::rome::ARK, sev_builtin::rome::ASK),
-            Generation::Milan => (snp_builtin::milan::ARK, snp_builtin::milan::ASK),
-            Generation::Genoa => (snp_builtin::genoa::ARK, snp_builtin::genoa::ASK),
-        };
-
-        ca::Chain {
-            ask: ca::Certificate::decode(&mut &*ask, ()).unwrap(),
-            ark: ca::Certificate::decode(&mut &*ark, ()).unwrap(),
-        }
-    }
-}
-
-#[cfg(feature = "openssl")]
-impl TryFrom<&sev::Chain> for Generation {
-    type Error = ();
-
-    fn try_from(schain: &sev::Chain) -> Result<Self, Self::Error> {
-        use crate::certs::sev::Verifiable;
-
-        let naples: ca::Chain = Generation::Naples.into();
-        let rome: ca::Chain = Generation::Rome.into();
-        let milan: ca::Chain = Generation::Milan.into();
-        let genoa: ca::Chain = Generation::Genoa.into();
-
-        Ok(if (&naples.ask, &schain.cek).verify().is_ok() {
-            Generation::Naples
-        } else if (&rome.ask, &schain.cek).verify().is_ok() {
-            Generation::Rome
-        } else if (&milan.ask, &schain.cek).verify().is_ok() {
-            Generation::Milan
-        } else if (&genoa.ask, &schain.cek).verify().is_ok() {
-            Generation::Genoa
-        } else {
-            return Err(());
-        })
-    }
 }

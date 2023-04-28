@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(feature = "snp")]
 use sev::firmware::guest::*;
 
+#[cfg(feature = "snp")]
 #[cfg_attr(not(has_sev_guest), ignore)]
 #[test]
 fn get_report() {
@@ -12,6 +14,7 @@ fn get_report() {
     fw.get_report(None, Some(unique_data), 1).unwrap();
 }
 
+#[cfg(feature = "snp")]
 #[cfg_attr(not(has_sev_guest), ignore)]
 #[test]
 fn get_ext_report() {
@@ -22,6 +25,7 @@ fn get_ext_report() {
     fw.get_ext_report(None, Some(unique_data), 1).unwrap();
 }
 
+#[cfg(feature = "snp")]
 #[cfg_attr(not(has_sev_guest), ignore)]
 #[test]
 fn get_derived_key() {

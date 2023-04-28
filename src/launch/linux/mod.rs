@@ -3,5 +3,9 @@
 //! Operations and types for launching on Linux
 
 pub(crate) mod ioctl;
+
+#[cfg(feature = "sev")]
 pub(crate) mod sev;
+
+#[cfg(feature = "snp")]
 pub(crate) mod snp;
