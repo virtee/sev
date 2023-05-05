@@ -194,8 +194,10 @@ impl Firmware {
     /// ```
     #[cfg(feature = "snp")]
     pub fn snp_reset_config(&mut self) -> Result<(), UserApiError> {
+        let config: Config = Config::new(TcbVersion::default(), 0);
+
         let mut config: FFI::types::SnpSetExtConfig = FFI::types::SnpSetExtConfig {
-            config_address: 0,
+            config_address: &config as *const Config as u64,
             certs_address: 0,
             certs_len: 0,
         };
