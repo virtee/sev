@@ -57,9 +57,19 @@ impl Certificate {
         Ok(Self(X509::from_pem(pem)?))
     }
 
+    /// Serialize a Certificate struct to PEM.
+    pub fn to_pem(&self) -> Result<Vec<u8>> {
+        Ok(self.0.to_pem()?)
+    }
+
     /// Create a Certificate from a DER-encoded X509 structure.
     pub fn from_der(der: &[u8]) -> Result<Self> {
         Ok(Self(X509::from_der(der)?))
+    }
+
+    /// Serialize a Certificate struct to DER.
+    pub fn to_der(&self) -> Result<Vec<u8>> {
+        Ok(self.0.to_der()?)
     }
 
     /// Retrieve the underlying X509 public key for a Certificate.
