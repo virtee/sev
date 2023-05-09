@@ -48,7 +48,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
         let mut launcher = Launcher {
             vm_fd,
             sev,
-            state: PhantomData::default(),
+            state: PhantomData,
         };
 
         let init = Init::default();
@@ -73,7 +73,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
         let launcher = Launcher {
             vm_fd: self.vm_fd,
             sev: self.sev,
-            state: PhantomData::default(),
+            state: PhantomData,
         };
 
         Ok(launcher)
