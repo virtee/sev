@@ -29,6 +29,24 @@ impl<'a> Verifiable for &'a Chain {
     }
 }
 
+impl Chain {
+    /// Deserialize a PEM-encoded ARK and ASK pair to a CA chain.
+    pub fn from_pem(ark: &[u8], ask: &[u8]) -> Result<Self> {
+        Ok(Self {
+            ark: Certificate::from_pem(ark)?,
+            ask: Certificate::from_pem(ask)?,
+        })
+    }
+
+    /// Deserialize a DER-encoded ARK and ASK pair to a CA chain.
+    pub fn from_der(ark: &[u8], ask: &[u8]) -> Result<Self> {
+        Ok(Self {
+            ark: Certificate::from_der(ark)?,
+            ask: Certificate::from_der(ask)?,
+        })
+    }
+}
+
 mod tests {
     #[test]
     fn milan_ca_chain_verifiable() {
