@@ -109,4 +109,20 @@ impl Chain {
             vcek: vcek.unwrap(),
         })
     }
+
+    /// Deserialize a PEM-encoded ARK, ASK, and VCEK to a SEV-SNP chain.
+    pub fn from_pem(ark: &[u8], ask: &[u8], vcek: &[u8]) -> Result<Self> {
+        Ok(Self {
+            ca: ca::Chain::from_pem(ark, ask)?,
+            vcek: Certificate::from_pem(vcek)?,
+        })
+    }
+
+    /// Deserialize a DER-encoded ARK, ASK, and VCEK to a SEV-SNP chain.
+    pub fn from_der(ark: &[u8], ask: &[u8], vcek: &[u8]) -> Result<Self> {
+        Ok(Self {
+            ca: ca::Chain::from_der(ark, ask)?,
+            vcek: Certificate::from_der(vcek)?,
+        })
+    }
 }
