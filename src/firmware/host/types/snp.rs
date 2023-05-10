@@ -7,7 +7,10 @@ pub(crate) use crate::firmware::linux::{host as FFI, _4K_PAGE};
 
 use crate::Version;
 
-use std::convert::{TryFrom, TryInto};
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt::Display,
+};
 
 use bitflags;
 
@@ -381,7 +384,7 @@ impl Config {
 /// TcbVersion represents the version of the firmware.
 ///
 /// (Chapter 2.2; Table 3)
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(C)]
 pub struct TcbVersion {
     /// Current bootloader version.
@@ -398,6 +401,22 @@ pub struct TcbVersion {
     pub microcode: u8,
 }
 
+impl Display for TcbVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            r#"
+TCB Version:
+  Microcode:   {}
+  SNP:         {}
+  TEE:         {}
+  Boot Loader: {}
+  "#,
+            self.microcode, self.snp, self.tee, self.bootloader
+        )
+    }
+}
+
 impl TcbVersion {
     /// Creates a new instance of a TcbVersion
     pub fn new(bootloader: u8, tee: u8, snp: u8, microcode: u8) -> Self {
@@ -407,18 +426,6 @@ impl TcbVersion {
             snp,
             microcode,
             _reserved: Default::default(),
-        }
-    }
-}
-
-impl From<FFI::types::TcbVersion> for TcbVersion {
-    fn from(value: FFI::types::TcbVersion) -> Self {
-        Self {
-            bootloader: value.bootloader,
-            tee: value.tee,
-            _reserved: value.reserved,
-            snp: value.snp,
-            microcode: value.microcode,
         }
     }
 }

@@ -50,39 +50,6 @@ impl From<&mut Vec<u8>> for RawData {
     }
 }
 
-/// TcbVersion represents the version of the firmware.
-///
-/// (Chapter 2.2; Table 3)
-#[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
-#[repr(C)]
-pub struct TcbVersion {
-    /// Current bootloader version.
-    /// SVN of PSP bootloader.
-    pub bootloader: u8,
-    /// Current PSP OS version.
-    /// SVN of PSP operating system.
-    pub tee: u8,
-    pub reserved: [u8; 4],
-    /// Version of the SNP firmware.
-    /// Security Version Number (SVN) of SNP firmware.
-    pub snp: u8,
-    /// Lowest current patch level of all the cores.
-    pub microcode: u8,
-}
-
-impl TcbVersion {
-    /// Creates a new instance of a TcbVersion
-    pub fn new(bootloader: u8, tee: u8, snp: u8, microcode: u8) -> Self {
-        Self {
-            bootloader,
-            tee,
-            reserved: Default::default(),
-            snp,
-            microcode,
-        }
-    }
-}
-
 /// Structure used for interacting with the Linux Kernel.
 ///
 /// The original C structure looks like this:
@@ -322,24 +289,6 @@ mod test {
             let mut value: Vec<u8> = vec![2; 20];
             let actual: RawData = (&mut value).into();
             let expected: RawData = RawData::Vector(value);
-            assert_eq!(expected, actual);
-        }
-    }
-
-    mod tcb_version {
-        use crate::firmware::linux::host::types::TcbVersion;
-
-        #[test]
-        fn test_new() {
-            let expected: TcbVersion = TcbVersion {
-                bootloader: 2,
-                tee: 3,
-                reserved: [0; 4],
-                snp: 5,
-                microcode: 6,
-            };
-
-            let actual: TcbVersion = TcbVersion::new(2, 3, 5, 6);
             assert_eq!(expected, actual);
         }
     }

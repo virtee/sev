@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{certs::snp::ecdsa::Signature, util::hexdump};
+use crate::{certs::snp::ecdsa::Signature, firmware::host::TcbVersion, util::hexdump};
 
 #[cfg(feature = "openssl")]
 use crate::certs::snp::{Chain, Verifiable};
@@ -406,39 +406,6 @@ impl Display for GuestPolicy {
             self.migrate_ma_allowed(),
             self.debug_allowed(),
             self.single_socket_required()
-        )
-    }
-}
-
-/// The TCB_VERSION is a structure containing the security version numbers of each component in
-/// the trusted computing base (TCB) of the SNP firmware. A TCB_VERSION is associated with each
-/// image of firmware.
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
-pub struct TcbVersion {
-    /// Current bootloader version. SVN of PSP Bootloader.
-    pub boot_loader: u8,
-    /// Current PSP OS version. SVN of PSP Operating System.
-    pub tee: u8,
-    reserved: [u8; 4],
-    /// Version of the SNP firmware. Security Version Number (SVN) of SNP firmware.
-    pub snp: u8,
-    /// Lowest current patch level of all the cores.
-    pub microcode: u8,
-}
-
-impl Display for TcbVersion {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            r#"
-TCB Version:
-  Microcode:   {}
-  SNP:         {}
-  TEE:         {}
-  Boot Loader: {}
-  "#,
-            self.microcode, self.snp, self.tee, self.boot_loader
         )
     }
 }
