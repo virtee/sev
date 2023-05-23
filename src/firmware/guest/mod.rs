@@ -83,17 +83,17 @@ impl Firmware {
     /// // Open a connection to the AMD Secure Processor.
     /// let mut fw: Firmware = Firmware::open().unwrap();
     ///
-    /// // Set the VMPL level.
+    /// // Set the VMPL level (OPTIONAL).
     /// let vmpl = 1;
     ///
     /// // Request the attestation report with our unique_data.
-    /// let attestation_report: AttestationReport = fw.get_report(Some(msg_ver), Some(unique_data), vmpl).unwrap();
+    /// let attestation_report: AttestationReport = fw.get_report(Some(msg_ver), Some(unique_data), Some(vmpl)).unwrap();
     /// ```
     pub fn get_report(
         &mut self,
         message_version: Option<u8>,
         data: Option<[u8; 64]>,
-        vmpl: u32,
+        vmpl: Option<u32>,
     ) -> Result<AttestationReport, UserApiError> {
         let mut input = ReportReq::new(data, vmpl)?;
         let mut response = ReportRsp::default();
@@ -117,9 +117,10 @@ impl Firmware {
         &mut self,
         message_version: Option<u8>,
         data: Option<[u8; 64]>,
-        vmpl: u32,
+        vmpl: Option<u32>,
     ) -> Result<(AttestationReport, Vec<CertTableEntry>), UserApiError> {
         let mut report_request = ReportReq::new(data, vmpl)?;
+
         let mut report_response = ReportRsp::default();
 
         // Define a buffer to store the certificates in.

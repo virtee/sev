@@ -124,7 +124,7 @@ impl Default for ReportReq {
     fn default() -> Self {
         Self {
             report_data: [0; 64],
-            vmpl: Default::default(),
+            vmpl: 1,
             _reserved: Default::default(),
         }
     }
@@ -137,16 +137,22 @@ impl ReportReq {
     ///
     /// * `report_data` - (Optional) 64 bytes of unique data to be included in the generated report.
     /// * `vmpl` - The VMPL level the guest VM is running on.
-    pub fn new(report_data: Option<[u8; 64]>, vmpl: u32) -> Result<Self, UserApiError> {
-        if vmpl > MAX_VMPL {
-            return Err(UserApiError::VmplError);
+    pub fn new(report_data: Option<[u8; 64]>, vmpl: Option<u32>) -> Result<Self, UserApiError> {
+        let mut request = Self::default();
+
+        if let Some(report_data) = report_data {
+            request.report_data = report_data;
         }
 
-        Ok(Self {
-            report_data: report_data.unwrap_or([0; 64]),
-            vmpl,
-            _reserved: Default::default(),
-        })
+        if let Some(vmpl) = vmpl {
+            if vmpl > MAX_VMPL {
+                return Err(UserApiError::VmplError);
+            } else {
+                request.vmpl = vmpl;
+            }
+        }
+
+        Ok(request)
     }
 }
 
@@ -225,7 +231,7 @@ mod test {
                 _reserved: [0; 28],
             };
 
-            let actual: ReportReq = ReportReq::new(Some(report_data), 0).unwrap();
+            let actual: ReportReq = ReportReq::new(Some(report_data), Some(0)).unwrap();
 
             assert_eq!(expected, actual);
         }
@@ -245,7 +251,7 @@ mod test {
                 _reserved: [0; 28],
             };
 
-            let actual: ReportReq = ReportReq::new(Some(report_data), 0).unwrap();
+            let actual: ReportReq = ReportReq::new(Some(report_data), Some(0)).unwrap();
 
             assert_eq!(expected, actual);
         }
