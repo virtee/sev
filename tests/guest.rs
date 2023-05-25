@@ -11,7 +11,7 @@ fn get_report() {
 
     let mut fw = Firmware::open().unwrap();
 
-    fw.get_report(None, Some(unique_data), 1).unwrap();
+    fw.get_report(None, Some(unique_data), None).unwrap();
 }
 
 #[cfg(feature = "snp")]
@@ -22,7 +22,7 @@ fn get_ext_report() {
 
     let mut fw = Firmware::open().unwrap();
 
-    fw.get_ext_report(None, Some(unique_data), 1).unwrap();
+    fw.get_ext_report(None, Some(unique_data), None).unwrap();
 }
 
 #[cfg(feature = "snp")]
