@@ -56,6 +56,14 @@ use util::{TypeLoad, TypeSave};
 #[cfg(all(feature = "openssl", feature = "sev"))]
 use certs::sev::sev;
 
+#[cfg(feature = "openssl")]
+use certs::sev::ca::{Certificate, Chain as CertSevCaChain};
+
+#[cfg(feature = "openssl")]
+use certs::{sev::builtin as SevBuiltin, snp::builtin as SnpBuiltin};
+
+#[cfg(feature = "openssl")]
+use std::convert::TryFrom;
 use std::io::{Read, Write};
 
 use serde::{Deserialize, Serialize};
@@ -175,4 +183,49 @@ pub enum Generation {
     /// Fourth generation EPYC (SEV, SEV-ES, SEV-SNP).
     #[cfg(feature = "snp")]
     Genoa,
+}
+
+#[cfg(feature = "openssl")]
+impl From<Generation> for CertSevCaChain {
+    fn from(generation: Generation) -> CertSevCaChain {
+        use codicon::Decoder;
+
+        let (ark, ask) = match generation {
+            Generation::Naples => (SevBuiltin::naples::ARK, SevBuiltin::naples::ASK),
+            Generation::Rome => (SevBuiltin::rome::ARK, SevBuiltin::rome::ASK),
+            Generation::Milan => (SnpBuiltin::milan::ARK, SnpBuiltin::milan::ASK),
+            Generation::Genoa => (SnpBuiltin::genoa::ARK, SnpBuiltin::genoa::ASK),
+        };
+
+        CertSevCaChain {
+            ask: Certificate::decode(&mut &*ask, ()).unwrap(),
+            ark: Certificate::decode(&mut &*ark, ()).unwrap(),
+        }
+    }
+}
+
+#[cfg(feature = "openssl")]
+impl TryFrom<&sev::Chain> for Generation {
+    type Error = ();
+
+    fn try_from(schain: &sev::Chain) -> Result<Self, Self::Error> {
+        use crate::certs::sev::Verifiable;
+
+        let naples: CertSevCaChain = Generation::Naples.into();
+        let rome: CertSevCaChain = Generation::Rome.into();
+        let milan: CertSevCaChain = Generation::Milan.into();
+        let genoa: CertSevCaChain = Generation::Genoa.into();
+
+        Ok(if (&naples.ask, &schain.cek).verify().is_ok() {
+            Generation::Naples
+        } else if (&rome.ask, &schain.cek).verify().is_ok() {
+            Generation::Rome
+        } else if (&milan.ask, &schain.cek).verify().is_ok() {
+            Generation::Milan
+        } else if (&genoa.ask, &schain.cek).verify().is_ok() {
+            Generation::Genoa
+        } else {
+            return Err(());
+        })
+    }
 }
