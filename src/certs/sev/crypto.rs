@@ -96,6 +96,7 @@ where
     U: Debug,
     Usage: PartialEq<U>,
 {
+    /// Verifies the provided signatures signed or did not sign the message digest provided.
     pub fn verify(
         &self,
         msg: &impl codicon::Encoder<Body, Error = Error>,

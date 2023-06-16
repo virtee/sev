@@ -29,8 +29,9 @@ use std::{
 #[cfg(feature = "openssl")]
 use openssl::*;
 
+/// OpenSSL body
 #[cfg(feature = "openssl")]
-struct Body;
+pub struct Body;
 
 #[cfg(feature = "openssl")]
 /// An interface for types that may contain entities such as
@@ -53,8 +54,9 @@ pub trait Signer<T> {
     fn sign(&self, target: &mut T) -> Result<Self::Output>;
 }
 
+/// OpenSSL related signature
 #[cfg(feature = "openssl")]
-struct Signature {
+pub struct Signature {
     id: Option<[u8; 16]>,
     sig: Vec<u8>,
     kind: pkey::Id,
@@ -71,12 +73,24 @@ pub struct PrivateKey<U> {
     usage: U,
 }
 
+/// Represents a public key.
 #[cfg(feature = "openssl")]
-struct PublicKey<U> {
+pub struct PublicKey<U> {
     id: Option<[u8; 16]>,
     key: pkey::PKey<pkey::Public>,
     hash: hash::MessageDigest,
     usage: U,
+}
+
+#[cfg(feature = "openssl")]
+impl<U> PublicKey<U> {
+    /// Obtains the OpenSSL EcKey<Public> within.
+    pub fn ec_key(
+        &self,
+    ) -> std::result::Result<openssl::ec::EcKey<openssl::pkey::Public>, openssl::error::ErrorStack>
+    {
+        self.key.ec_key()
+    }
 }
 
 /// Denotes a certificate's usage.

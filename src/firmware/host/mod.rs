@@ -17,7 +17,7 @@ use crate::error::*;
 #[cfg(feature = "sev")]
 use crate::{
     certs::sev::sev::{Certificate, Chain},
-    Build, Version,
+    Build as CertBuild, Version as CertVersion,
 };
 
 use std::{
@@ -76,8 +76,8 @@ impl Firmware {
         PLATFORM_STATUS.ioctl(&mut self.0, &mut Command::from_mut(&mut info))?;
 
         Ok(Status {
-            build: Build {
-                version: Version {
+            build: CertBuild {
+                version: CertVersion {
                     major: info.version.major,
                     minor: info.version.minor,
                 },
