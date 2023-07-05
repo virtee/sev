@@ -60,7 +60,7 @@ use certs::sev::sev;
 use certs::sev::ca::{Certificate, Chain as CertSevCaChain};
 
 #[cfg(feature = "openssl")]
-use certs::{sev::builtin as SevBuiltin, snp::builtin as SnpBuiltin};
+use certs::sev::builtin as SevBuiltin;
 
 #[cfg(feature = "openssl")]
 use std::convert::TryFrom;
@@ -177,11 +177,11 @@ pub enum Generation {
     Rome,
 
     /// Third generation EPYC (SEV, SEV-ES, SEV-SNP).
-    #[cfg(feature = "snp")]
+    #[cfg(any(feature = "sev", feature = "snp"))]
     Milan,
 
     /// Fourth generation EPYC (SEV, SEV-ES, SEV-SNP).
-    #[cfg(feature = "snp")]
+    #[cfg(any(feature = "sev", feature = "snp"))]
     Genoa,
 }
 
@@ -193,8 +193,8 @@ impl From<Generation> for CertSevCaChain {
         let (ark, ask) = match generation {
             Generation::Naples => (SevBuiltin::naples::ARK, SevBuiltin::naples::ASK),
             Generation::Rome => (SevBuiltin::rome::ARK, SevBuiltin::rome::ASK),
-            Generation::Milan => (SnpBuiltin::milan::ARK, SnpBuiltin::milan::ASK),
-            Generation::Genoa => (SnpBuiltin::genoa::ARK, SnpBuiltin::genoa::ASK),
+            Generation::Milan => (SevBuiltin::milan::ARK, SevBuiltin::milan::ASK),
+            Generation::Genoa => (SevBuiltin::genoa::ARK, SevBuiltin::genoa::ASK),
         };
 
         CertSevCaChain {
