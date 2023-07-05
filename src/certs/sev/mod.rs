@@ -31,7 +31,7 @@ use openssl::*;
 
 /// OpenSSL body
 #[cfg(feature = "openssl")]
-pub struct Body;
+pub(crate) struct Body;
 
 #[cfg(feature = "openssl")]
 /// An interface for types that may contain entities such as
@@ -56,7 +56,7 @@ pub trait Signer<T> {
 
 /// OpenSSL related signature
 #[cfg(feature = "openssl")]
-pub struct Signature {
+pub(crate) struct Signature {
     id: Option<[u8; 16]>,
     sig: Vec<u8>,
     kind: pkey::Id,
@@ -75,7 +75,7 @@ pub struct PrivateKey<U> {
 
 /// Represents a public key.
 #[cfg(feature = "openssl")]
-pub struct PublicKey<U> {
+pub(crate) struct PublicKey<U> {
     id: Option<[u8; 16]>,
     key: pkey::PKey<pkey::Public>,
     hash: hash::MessageDigest,

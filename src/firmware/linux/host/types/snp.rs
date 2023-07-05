@@ -186,8 +186,8 @@ impl CertTableEntry {
 
             // Calculate the beginning and ending pointers of the raw certificate data.
             let mut cert_bytes: Vec<u8> = vec![];
-            let mut cert_addr: *mut u8 = table_ptr.offset(entry.offset as isize) as *mut u8;
-            let cert_end: *mut u8 = cert_addr.add(entry.length as usize) as *mut u8;
+            let mut cert_addr: *mut u8 = table_ptr.offset(entry.offset as isize);
+            let cert_end: *mut u8 = cert_addr.add(entry.length as usize);
 
             // Gather the certificate bytes.
             while cert_addr != cert_end {
