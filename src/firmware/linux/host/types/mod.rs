@@ -41,3 +41,9 @@ impl<'a> GetId<'a> {
         unsafe { std::slice::from_raw_parts(self.id_addr as *const u8, self.id_len as _) }
     }
 }
+
+/// Reset the platform's persistent state.
+///
+/// (Chapter 5.5)
+#[cfg(any(feature = "sev", feature = "snp"))]
+pub struct PlatformReset;

@@ -4,11 +4,6 @@ use crate::{certs::sev::sev, Version};
 
 use std::marker::PhantomData;
 
-/// Reset the platform's persistent state.
-///
-/// (Chapter 5.5)
-pub struct PlatformReset;
-
 bitflags::bitflags! {
     /// The platform's status flags.
     #[derive(Default)]
