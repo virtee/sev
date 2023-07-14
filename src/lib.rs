@@ -56,13 +56,13 @@ use util::{TypeLoad, TypeSave};
 #[cfg(all(feature = "openssl", feature = "sev"))]
 use certs::sev::sev;
 
-#[cfg(feature = "openssl")]
+#[cfg(all(feature = "sev", feature = "openssl"))]
 use certs::sev::ca::{Certificate, Chain as CertSevCaChain};
 
-#[cfg(feature = "openssl")]
+#[cfg(all(feature = "sev", feature = "openssl"))]
 use certs::sev::builtin as SevBuiltin;
 
-#[cfg(feature = "openssl")]
+#[cfg(all(feature = "sev", feature = "openssl"))]
 use std::convert::TryFrom;
 use std::io::{Read, Write};
 
@@ -185,15 +185,19 @@ pub enum Generation {
     Genoa,
 }
 
-#[cfg(feature = "openssl")]
+#[cfg(all(feature = "sev", feature = "openssl"))]
 impl From<Generation> for CertSevCaChain {
     fn from(generation: Generation) -> CertSevCaChain {
         use codicon::Decoder;
 
         let (ark, ask) = match generation {
+            #[cfg(feature = "sev")]
             Generation::Naples => (SevBuiltin::naples::ARK, SevBuiltin::naples::ASK),
+            #[cfg(feature = "sev")]
             Generation::Rome => (SevBuiltin::rome::ARK, SevBuiltin::rome::ASK),
+            #[cfg(any(feature = "sev", feature = "snp"))]
             Generation::Milan => (SevBuiltin::milan::ARK, SevBuiltin::milan::ASK),
+            #[cfg(any(feature = "sev", feature = "snp"))]
             Generation::Genoa => (SevBuiltin::genoa::ARK, SevBuiltin::genoa::ASK),
         };
 
@@ -204,7 +208,7 @@ impl From<Generation> for CertSevCaChain {
     }
 }
 
-#[cfg(feature = "openssl")]
+#[cfg(all(feature = "sev", feature = "openssl"))]
 impl TryFrom<&sev::Chain> for Generation {
     type Error = ();
 
