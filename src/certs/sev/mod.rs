@@ -82,7 +82,7 @@ pub(crate) struct PublicKey<U> {
     usage: U,
 }
 
-#[cfg(feature = "openssl")]
+#[cfg(all(feature = "sev", feature = "openssl"))]
 impl<U> PublicKey<U> {
     /// Obtains the OpenSSL EcKey<Public> within.
     pub fn ec_key(

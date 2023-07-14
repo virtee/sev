@@ -54,7 +54,7 @@ impl LegacyAttestationReport {
     }
 }
 
-#[cfg(feature = "openssl")]
+#[cfg(all(feature = "sev", feature = "openssl"))]
 impl Verifiable for (&Certificate, &LegacyAttestationReport) {
     type Output = ();
 
