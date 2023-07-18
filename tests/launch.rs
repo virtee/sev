@@ -3,6 +3,9 @@
 #![cfg(feature = "openssl")]
 
 #[cfg(feature = "sev")]
+use std::slice::from_raw_parts;
+
+#[cfg(feature = "sev")]
 use std::{convert::TryFrom, os::unix::io::AsRawFd};
 
 #[cfg(feature = "sev")]
@@ -13,9 +16,6 @@ use kvm_bindings::kvm_userspace_memory_region;
 
 #[cfg(feature = "sev")]
 use kvm_ioctls::{Kvm, VcpuExit};
-
-#[cfg(feature = "sev")]
-use mmarinus::{perms, Map};
 
 #[cfg(feature = "sev")]
 use serial_test::serial;
@@ -45,18 +45,21 @@ fn sev() {
     let kvm = Kvm::new().unwrap();
     let vm = kvm.create_vm().unwrap();
 
+    // Allocate a 1kB page of memory for the address space of the VM.
     const MEM_SIZE: usize = 0x1000;
-    let address_space = Map::bytes(MEM_SIZE)
-        .anywhere()
-        .anonymously()
-        .with(perms::ReadWrite)
-        .unwrap();
+    let address_space = unsafe { libc::mmap(0 as _, MEM_SIZE, 3, 34, -1, 0) };
+
+    if address_space == libc::MAP_FAILED {
+        panic!("mmap() failed");
+    }
+
+    let address_space: &[u8] = unsafe { from_raw_parts(address_space as *mut u8, MEM_SIZE) };
 
     let mem_region = kvm_userspace_memory_region {
         slot: 0,
         guest_phys_addr: 0,
-        memory_size: address_space.size() as _,
-        userspace_addr: address_space.addr() as _,
+        memory_size: MEM_SIZE as _,
+        userspace_addr: address_space.as_ptr() as _,
         flags: 0,
     };
 
@@ -79,7 +82,9 @@ fn sev() {
     let session = session.verify(build, measurement).unwrap();
     let secret = session.secret(HeaderFlags::default(), CODE).unwrap();
 
-    launcher.inject(&secret, address_space.addr()).unwrap();
+    launcher
+        .inject(&secret, address_space.as_ptr() as usize)
+        .unwrap();
 
     let _handle = launcher.finish().unwrap();
 

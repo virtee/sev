@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[cfg(feature = "snp")]
+use std::slice::from_raw_parts_mut;
+
+#[cfg(feature = "snp")]
 use sev::firmware::host::Firmware;
 
 #[cfg(feature = "snp")]
@@ -11,9 +14,6 @@ use kvm_bindings::kvm_userspace_memory_region;
 
 #[cfg(feature = "snp")]
 use kvm_ioctls::{Kvm, VcpuExit};
-
-#[cfg(feature = "snp")]
-use mmarinus::{perms, Map};
 
 // one page of `hlt`
 #[cfg(feature = "snp")]
@@ -30,19 +30,25 @@ fn snp() {
 
     const MEM_ADDR: u64 = 0x1000;
 
-    let mut address_space = Map::bytes(CODE.len())
-        .anywhere()
-        .anonymously()
-        .with(perms::ReadWrite)
-        .unwrap();
+    // Allocate a 1kB page of memory for the address space of the VM.
+    let address_space = unsafe { libc::mmap(0 as _, CODE.len(), 3, 34, -1, 0) };
+
+    if address_space == libc::MAP_FAILED {
+        panic!("mmap() failed");
+    }
+
+    let address_space: &mut [u8] =
+        unsafe { from_raw_parts_mut(address_space as *mut u8, CODE.len()) };
 
     address_space[..CODE.len()].copy_from_slice(&CODE[..]);
+
+    let userspace_addr = address_space as *const [u8] as *const u8 as u64;
 
     let mem_region = kvm_userspace_memory_region {
         slot: 0,
         guest_phys_addr: MEM_ADDR,
-        memory_size: address_space.size() as _,
-        userspace_addr: address_space.addr() as _,
+        memory_size: CODE.len() as _,
+        userspace_addr,
         flags: 0,
     };
 
