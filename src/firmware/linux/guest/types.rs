@@ -95,7 +95,7 @@ pub struct ExtReportReq {
 impl ExtReportReq {
     /// Creates a new exteded report with a one, 4K-page
     /// for the certs_address field and the certs_len field.
-    pub fn new(data: &mut ReportReq) -> Self {
+    pub fn new(data: &ReportReq) -> Self {
         Self {
             data: *data,
             certs_address: u64::MAX,

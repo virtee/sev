@@ -180,7 +180,7 @@ pub struct Command<'a, T: Id> {
 
 impl<'a, T: Id> Command<'a, T> {
     /// create the command from a mutable subcommand
-    pub fn from_mut(sev: &'a mut impl AsRawFd, subcmd: &'a mut T) -> Self {
+    pub fn from_mut(sev: &'a impl AsRawFd, subcmd: &'a mut T) -> Self {
         Self {
             code: T::ID,
             data: subcmd as *mut T as _,
@@ -191,7 +191,7 @@ impl<'a, T: Id> Command<'a, T> {
     }
 
     /// create the command from a subcommand reference
-    pub fn from(sev: &'a mut impl AsRawFd, subcmd: &'a T) -> Self {
+    pub fn from(sev: &'a impl AsRawFd, subcmd: &'a T) -> Self {
         Self {
             code: T::ID,
             data: subcmd as *const T as _,
