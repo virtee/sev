@@ -11,6 +11,7 @@ readme = "README.md"
 keywords = ["amd", "sev"]
 categories = ["os", "os::linux-apis", "parsing", "network-programming", "hardware-support"]
 exclude = [ ".gitignore", ".github/*" ]
+rust-verson = "1.66.1"
 
 [badges]
 # See https://doc.rust-lang.org/cargo/reference/manifest.html#the-badges-section
