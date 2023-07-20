@@ -104,7 +104,7 @@ impl CertTableEntry {
     ///
     /// ```
     ///
-    pub fn uapi_to_vec_bytes(table: &mut Vec<UAPI::CertTableEntry>) -> Result<Vec<u8>, CertError> {
+    pub fn uapi_to_vec_bytes(table: &Vec<UAPI::CertTableEntry>) -> Result<Vec<u8>, CertError> {
         // Create the vector to return for later.
         let mut bytes: Vec<u8> = vec![];
 

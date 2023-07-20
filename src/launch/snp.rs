@@ -53,7 +53,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
 
         let init = Init::default();
 
-        let mut cmd = Command::from(&mut launcher.sev, &init);
+        let mut cmd = Command::from(&launcher.sev, &init);
         SNP_INIT
             .ioctl(&mut launcher.vm_fd, &mut cmd)
             .map_err(|e| cmd.encapsulate(e))?;
@@ -64,7 +64,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
     /// Initialize the flow to launch a guest.
     pub fn start(mut self, start: Start) -> Result<Launcher<Started, U, V>> {
         let mut launch_start = LaunchStart::from(start);
-        let mut cmd = Command::from_mut(&mut self.sev, &mut launch_start);
+        let mut cmd = Command::from_mut(&self.sev, &mut launch_start);
 
         SNP_LAUNCH_START
             .ioctl(&mut self.vm_fd, &mut cmd)
@@ -84,7 +84,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
     /// Encrypt guest SNP data.
     pub fn update_data(&mut self, update: Update) -> Result<()> {
         let launch_update_data = LaunchUpdate::from(update);
-        let mut cmd = Command::from(&mut self.sev, &launch_update_data);
+        let mut cmd = Command::from(&self.sev, &launch_update_data);
 
         KvmEncRegion::new(update.uaddr).register(&mut self.vm_fd)?;
 
@@ -98,7 +98,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
     /// Complete the SNP launch process.
     pub fn finish(mut self, finish: Finish) -> Result<(U, V)> {
         let launch_finish = LaunchFinish::from(finish);
-        let mut cmd = Command::from(&mut self.sev, &launch_finish);
+        let mut cmd = Command::from(&self.sev, &launch_finish);
 
         SNP_LAUNCH_FINISH
             .ioctl(&mut self.vm_fd, &mut cmd)

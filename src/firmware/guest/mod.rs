@@ -119,7 +119,7 @@ impl Firmware {
         data: Option<[u8; 64]>,
         vmpl: Option<u32>,
     ) -> Result<(AttestationReport, Vec<CertTableEntry>), UserApiError> {
-        let mut report_request = ReportReq::new(data, vmpl)?;
+        let report_request = ReportReq::new(data, vmpl)?;
 
         let mut report_response = ReportRsp::default();
 
@@ -129,7 +129,7 @@ impl Firmware {
         // Due to the complex buffer allocation, we will take the ReportReq
         // provided by the caller, and create an extended report request object
         // for them.
-        let mut ext_report_request = ExtReportReq::new(&mut report_request);
+        let mut ext_report_request = ExtReportReq::new(&report_request);
 
         // Construct the object needed to perform the IOCTL request.
         // *NOTE:* This is __important__ because a fw_err value which matches
