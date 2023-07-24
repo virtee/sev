@@ -52,7 +52,6 @@ impl_const_id! {
 impl_const_id! {
     pub Id => u32;
 
-    PlatformReset = 0x0,
     GetId<'_> = 0x8, /* GET_ID2 is 0x8, the deprecated GET_ID ioctl is 0x7 */
     SnpPlatformStatus = 0x9,
     SnpSetExtConfig = 0xA,
@@ -62,7 +61,7 @@ impl_const_id! {
 const SEV: Group = Group::new(b'S');
 
 /// Resets the SEV platform's persistent state.
-#[cfg(any(feature = "sev", feature = "snp"))]
+#[cfg(feature = "sev")]
 pub const PLATFORM_RESET: Ioctl<WriteRead, &Command<PlatformReset>> = unsafe { SEV.write_read(0) };
 
 /// Gathers a status report from the SEV firmware.
@@ -141,7 +140,7 @@ impl<'a, T: Id> Command<'a, T> {
     /// the caller's address space in its response. Note: this does not actually prevent the host
     /// platform/kernel from writing to the caller's address space if it wants to. This is primarily
     /// a semantic tool for programming against the SEV ioctl API.
-    #[cfg(any(feature = "sev", feature = "snp"))]
+    #[cfg(feature = "sev")]
     pub fn from(subcmd: &'a T) -> Self {
         Command {
             code: T::ID,

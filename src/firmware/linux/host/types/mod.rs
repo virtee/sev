@@ -45,5 +45,5 @@ impl<'a> GetId<'a> {
 /// Reset the platform's persistent state.
 ///
 /// (Chapter 5.5)
-#[cfg(any(feature = "sev", feature = "snp"))]
+#[cfg(feature = "sev")]
 pub struct PlatformReset;
