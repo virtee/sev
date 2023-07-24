@@ -9,11 +9,8 @@ use super::linux::host::{ioctl::*, types::GetId};
 
 #[cfg(feature = "sev")]
 use super::linux::host::types::{
-    PdhCertExport, PdhGen, PekCertImport, PekCsr, PekGen, PlatformStatus,
+    PdhCertExport, PdhGen, PekCertImport, PekCsr, PekGen, PlatformReset, PlatformStatus,
 };
-
-#[cfg(any(feature = "sev", feature = "snp"))]
-use super::linux::host::types::PlatformReset;
 
 use crate::error::*;
 
@@ -66,7 +63,7 @@ impl Firmware {
     }
 
     /// Reset the platform persistent state.
-    #[cfg(any(feature = "sev", feature = "snp"))]
+    #[cfg(feature = "sev")]
     pub fn platform_reset(&mut self) -> Result<(), Indeterminate<Error>> {
         PLATFORM_RESET.ioctl(&mut self.0, &mut Command::from(&PlatformReset))?;
         Ok(())
