@@ -112,6 +112,25 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
         Ok(())
     }
 
+    /// Register the encrypted memory region to a virtual machine.
+    /// Corresponds to the `KVM_MEMORY_ENCRYPT_REG_REGION` ioctl.
+    pub fn register_kvm_enc_region(&mut self, data: &[u8]) -> Result<()> {
+        KvmEncRegion::new(data).register(&mut self.vm_fd)?;
+        Ok(())
+    }
+
+    /// Encrypt guest data with its VEK, while the KVM encrypted memory region is not registered.
+    pub fn update_data_without_registration(&mut self, data: &[u8]) -> Result<()> {
+        let launch_update_data = LaunchUpdateData::new(data);
+        let mut cmd = Command::from(&self.sev, &launch_update_data);
+
+        LAUNCH_UPDATE_DATA
+            .ioctl(&mut self.vm_fd, &mut cmd)
+            .map_err(|e| cmd.encapsulate(e))?;
+
+        Ok(())
+    }
+
     /// Encrypt the VMSA on SEV-ES.
     pub fn update_vmsa(&mut self) -> Result<()> {
         let launch_update_vmsa = LaunchUpdateVmsa::new();
