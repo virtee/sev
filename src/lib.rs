@@ -233,3 +233,70 @@ impl TryFrom<&sev::Chain> for Generation {
         })
     }
 }
+
+/// The C FFI interface to the library.
+#[cfg(feature = "capi")]
+pub mod capi {
+    use crate::{
+        error::Indeterminate,
+        launch::sev::{Launcher, New},
+    };
+
+    use std::{
+        collections::HashMap,
+        io,
+        os::{fd::RawFd, raw::c_int},
+        sync::Mutex,
+    };
+
+    use lazy_static::lazy_static;
+
+    lazy_static! {
+        static ref INIT_MAP: Mutex<HashMap<RawFd, Launcher<New, RawFd, RawFd>>> =
+            Mutex::new(HashMap::new());
+    }
+
+    fn set_fw_err(ptr: *mut c_int, err: io::Error) {
+        unsafe { *ptr = Indeterminate::from(err).into() };
+    }
+
+    /// A C FFI interface to the SEV_INIT ioctl.
+    #[no_mangle]
+    pub extern "C" fn sev_init(vm_fd: c_int, sev_fd: c_int, fw_err: *mut c_int) -> c_int {
+        let vm: RawFd = vm_fd;
+        let sev: RawFd = sev_fd;
+
+        match Launcher::new(vm, sev) {
+            Ok(launcher) => {
+                let mut map = INIT_MAP.lock().unwrap();
+                map.insert(vm_fd, launcher);
+
+                0
+            }
+            Err(e) => {
+                set_fw_err(fw_err, e);
+                -1
+            }
+        }
+    }
+
+    /// A C FFI interface to the SEV_ES_INIT ioctl.
+    #[no_mangle]
+    pub extern "C" fn sev_es_init(vm_fd: c_int, sev_fd: c_int, fw_err: *mut c_int) -> c_int {
+        let vm: RawFd = vm_fd;
+        let sev: RawFd = sev_fd;
+
+        match Launcher::new_es(vm, sev) {
+            Ok(launcher) => {
+                let mut map = INIT_MAP.lock().unwrap();
+                map.insert(vm_fd, launcher);
+
+                0
+            }
+            Err(e) => {
+                set_fw_err(fw_err, e);
+                -1
+            }
+        }
+    }
+}
