@@ -1,4 +1,5 @@
 addReviewers: true
 
 reviewers:
-  - @codeowners
+  - tylerfanelli
+  - larrydewey
