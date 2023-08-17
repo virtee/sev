@@ -1,0 +1,4 @@
+addAssignees: true
+
+assignees:
+  - @codeowners
