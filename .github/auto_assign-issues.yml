@@ -1,4 +1,5 @@
 addAssignees: true
 
 assignees:
-  - @codeowners
+  - tylerfanelli
+  - larrydewey
