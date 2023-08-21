@@ -326,8 +326,8 @@ mod test {
                 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
                 5, 5, 5, 7, 7, 7, 7, 7, 7,
             ];
-            let mut data: Vec<UAPI::CertTableEntry> = build_vec_uapi_cert_table();
-            let actual: Vec<u8> = CertTableEntry::uapi_to_vec_bytes(&mut data).unwrap();
+            let data: Vec<UAPI::CertTableEntry> = build_vec_uapi_cert_table();
+            let actual: Vec<u8> = CertTableEntry::uapi_to_vec_bytes(&data).unwrap();
             assert_eq!(expected, actual);
         }
 

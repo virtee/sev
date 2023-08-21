@@ -76,7 +76,7 @@ fn snp() {
 
     let update = Update::new(
         mem_region.guest_phys_addr >> 12,
-        address_space.as_ref(),
+        address_space,
         false,
         PageType::Normal,
         (dp, dp, dp),

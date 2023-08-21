@@ -95,7 +95,7 @@ fn sev() {
     vcpu.set_sregs(&sregs).unwrap();
 
     let mut regs = vcpu.get_regs().unwrap();
-    regs.rip = std::ptr::null() as *const u64 as u64;
+    regs.rip = std::ptr::null::<u64>() as u64;
     regs.rflags = 2;
     vcpu.set_regs(&regs).unwrap();
 
