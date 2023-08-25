@@ -15,7 +15,7 @@ use serde_bytes::{ByteBuf, Bytes};
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union Certificate {
-    version: u32,
+    pub(crate) version: u32,
     v1: v1::Certificate,
 }
 

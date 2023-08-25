@@ -238,14 +238,18 @@ impl TryFrom<&sev::Chain> for Generation {
 #[cfg(feature = "capi")]
 pub mod capi {
     use crate::{
+        certs::sev::sev::Certificate,
         error::Indeterminate,
-        launch::sev::{Launcher, New},
+        launch::sev::{Launcher, New, Policy, Session, Start, Started},
     };
 
     use std::{
         collections::HashMap,
         io,
-        os::{fd::RawFd, raw::c_int},
+        os::{
+            fd::RawFd,
+            raw::{c_int, c_void},
+        },
         sync::Mutex,
     };
 
@@ -253,6 +257,8 @@ pub mod capi {
 
     lazy_static! {
         static ref INIT_MAP: Mutex<HashMap<RawFd, Launcher<New, RawFd, RawFd>>> =
+            Mutex::new(HashMap::new());
+        static ref STARTED_MAP: Mutex<HashMap<RawFd, Launcher<Started, RawFd, RawFd>>> =
             Mutex::new(HashMap::new());
     }
 
@@ -292,6 +298,51 @@ pub mod capi {
                 map.insert(vm_fd, launcher);
 
                 0
+            }
+            Err(e) => {
+                set_fw_err(fw_err, e);
+                -1
+            }
+        }
+    }
+
+    /// A C FFI interface to the SEV_LAUNCH_START ioctl.
+    ///
+    /// # Safety
+    ///
+    /// The caller of this function is responsible for ensuring that the pointer arguments are
+    /// valid.
+    #[no_mangle]
+    pub extern "C" fn sev_launch_start(
+        vm_fd: c_int,
+        policy: u32,
+        cert_bytes: *const c_void,
+        session_bytes: *const c_void,
+        fw_err: *mut c_int,
+    ) -> c_int {
+        let mut map = INIT_MAP.lock().unwrap();
+        let launcher = match map.remove(&vm_fd) {
+            Some(l) => l,
+            None => return -1,
+        };
+
+        let policy = Policy::from(policy);
+        let cert: Certificate = unsafe { *(cert_bytes as *const Certificate) };
+        let session: Session = unsafe { *(session_bytes as *const Session) };
+
+        let start = Start {
+            policy,
+            cert,
+            session,
+        };
+
+        match launcher.start(start) {
+            Ok(started) => {
+                let mut map = STARTED_MAP.lock().unwrap();
+                if map.insert(vm_fd, started).is_none() {
+                    return 0;
+                }
+                -1
             }
             Err(e) => {
                 set_fw_err(fw_err, e);
