@@ -237,11 +237,7 @@ impl TryFrom<&sev::Chain> for Generation {
 /// The C FFI interface to the library.
 #[cfg(feature = "capi")]
 pub mod capi {
-    use crate::{
-        certs::sev::sev::Certificate,
-        error::Indeterminate,
-        launch::sev::{Launcher, Measured, Measurement, New, Policy, Session, Start, Started},
-    };
+    use crate::{certs::sev::sev::Certificate, error::Indeterminate, launch::sev::*};
 
     use std::{
         collections::HashMap,
@@ -249,7 +245,7 @@ pub mod capi {
         mem::size_of,
         os::{
             fd::RawFd,
-            raw::{c_int, c_uchar, c_void},
+            raw::{c_char, c_int, c_uchar, c_void},
         },
         slice::{from_raw_parts, from_raw_parts_mut},
         sync::Mutex,
@@ -449,6 +445,48 @@ pub mod capi {
             Err(e) => {
                 set_fw_err(fw_err, e);
 
+                -1
+            }
+        }
+    }
+
+    /// A C FFI interface to the SEV_LAUNCH_SECRET ioctl.
+    ///
+    /// # Safety
+    ///
+    /// The caller of this function is responsible for ensuring that the pointer arguments are
+    /// valid.
+    #[no_mangle]
+    pub extern "C" fn sev_inject_launch_secret(
+        vm_fd: c_int,
+        header_bytes: *const c_char,
+        ct_bytes: *const c_char,
+        ct_size: u32,
+        paddr: u64,
+        fw_err: *mut c_int,
+    ) -> c_int {
+        let mut map = MEASURED_MAP.lock().unwrap();
+        let launcher = match map.get_mut(&vm_fd) {
+            Some(l) => l,
+            None => return -1,
+        };
+
+        let header = (header_bytes as *const u8) as *const Header;
+        let ciphertext = {
+            let bytes: &[u8] = unsafe { from_raw_parts(ct_bytes as *const u8, ct_size as usize) };
+
+            bytes.to_owned().to_vec()
+        };
+
+        let secret = Secret {
+            header: unsafe { *header },
+            ciphertext,
+        };
+
+        match launcher.inject(&secret, paddr as usize) {
+            Ok(()) => 0,
+            Err(e) => {
+                set_fw_err(fw_err, e);
                 -1
             }
         }
