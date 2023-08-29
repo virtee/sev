@@ -491,4 +491,27 @@ pub mod capi {
             }
         }
     }
+
+    /// A C FFI interface to the SEV_LAUNCH_FINISH ioctl.
+    ///
+    /// # Safety
+    ///
+    /// The caller of this function is responsible for ensuring that the pointer arguments are
+    /// valid.
+    #[no_mangle]
+    pub extern "C" fn sev_launch_finish(vm_fd: c_int, fw_err: *mut c_int) -> c_int {
+        let mut map = MEASURED_MAP.lock().unwrap();
+        let launcher = match map.remove(&vm_fd) {
+            Some(l) => l,
+            None => return -1,
+        };
+
+        match launcher.finish() {
+            Ok(_) => 0,
+            Err(e) => {
+                set_fw_err(fw_err, e);
+                -1
+            }
+        }
+    }
 }
