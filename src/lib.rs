@@ -240,17 +240,18 @@ pub mod capi {
     use crate::{
         certs::sev::sev::Certificate,
         error::Indeterminate,
-        launch::sev::{Launcher, New, Policy, Session, Start, Started},
+        launch::sev::{Launcher, Measured, Measurement, New, Policy, Session, Start, Started},
     };
 
     use std::{
         collections::HashMap,
         io,
+        mem::size_of,
         os::{
             fd::RawFd,
-            raw::{c_int, c_void},
+            raw::{c_int, c_uchar, c_void},
         },
-        slice::from_raw_parts,
+        slice::{from_raw_parts, from_raw_parts_mut},
         sync::Mutex,
     };
 
@@ -260,6 +261,8 @@ pub mod capi {
         static ref INIT_MAP: Mutex<HashMap<RawFd, Launcher<New, RawFd, RawFd>>> =
             Mutex::new(HashMap::new());
         static ref STARTED_MAP: Mutex<HashMap<RawFd, Launcher<Started, RawFd, RawFd>>> =
+            Mutex::new(HashMap::new());
+        static ref MEASURED_MAP: Mutex<HashMap<RawFd, Launcher<Measured, RawFd, RawFd>>> =
             Mutex::new(HashMap::new());
     }
 
@@ -400,5 +403,54 @@ pub mod capi {
         }
 
         0
+    }
+
+    /// A C FFI interface to the SEV_LAUNCH_MEASURE ioctl.
+    ///
+    /// # Safety
+    ///
+    /// The caller of this function is responsible for ensuring that the pointer arguments are
+    /// valid.
+    ///
+    /// The "measurement_data" argument should be a valid pointer able to hold the meausurement's
+    /// bytes. The measurement is 48 bytes in size.
+    #[no_mangle]
+    pub unsafe extern "C" fn sev_launch_measure(
+        vm_fd: c_int,
+        measurement_data: *mut c_uchar,
+        fw_err: &mut c_int,
+    ) -> c_int {
+        let mut map = STARTED_MAP.lock().unwrap();
+        let launcher = match map.remove(&vm_fd) {
+            Some(l) => l,
+            None => return -1,
+        };
+
+        match launcher.measure() {
+            Ok(m) => {
+                let mut map = MEASURED_MAP.lock().unwrap();
+                let measure = m.measurement();
+                let slice: &mut [u8] = unsafe {
+                    from_raw_parts_mut(
+                        (&measure as *const Measurement) as *mut u8,
+                        size_of::<Measurement>(),
+                    )
+                };
+                map.insert(vm_fd, m);
+
+                libc::memcpy(
+                    measurement_data as _,
+                    slice.as_ptr() as _,
+                    size_of::<Measurement>(),
+                );
+
+                0
+            }
+            Err(e) => {
+                set_fw_err(fw_err, e);
+
+                -1
+            }
+        }
     }
 }
