@@ -250,6 +250,7 @@ pub mod capi {
             fd::RawFd,
             raw::{c_int, c_void},
         },
+        slice::from_raw_parts,
         sync::Mutex,
     };
 
@@ -349,5 +350,55 @@ pub mod capi {
                 -1
             }
         }
+    }
+
+    /// A C FFI interface to the SEV_LAUNCH_UPDATE ioctl.
+    ///
+    /// # Safety
+    ///
+    /// The caller of this function is responsible for ensuring that the pointer arguments are
+    /// valid.
+    #[no_mangle]
+    pub extern "C" fn sev_launch_update_data(
+        vm_fd: c_int,
+        uaddr: u64,
+        len: u64,
+        fw_err: *mut c_int,
+    ) -> c_int {
+        let mut map = STARTED_MAP.lock().unwrap();
+        let launcher = match map.get_mut(&vm_fd) {
+            Some(l) => l,
+            None => return -1,
+        };
+
+        let slice: &[u8] = unsafe { from_raw_parts(uaddr as *const u8, len as usize) };
+        if let Err(e) = launcher.update_data(slice) {
+            set_fw_err(fw_err, e);
+            return -1;
+        }
+
+        0
+    }
+
+    /// A C FFI interface to the SEV_LAUNCH_UPDATE_VMSA ioctl.
+    ///
+    /// # Safety
+    ///
+    /// The caller of this function is responsible for ensuring that the pointer arguments are
+    /// valid.
+    #[no_mangle]
+    pub extern "C" fn sev_launch_update_vmsa(vm_fd: c_int, fw_err: *mut c_int) -> c_int {
+        let mut map = STARTED_MAP.lock().unwrap();
+        let launcher = match map.get_mut(&vm_fd) {
+            Some(l) => l,
+            None => return -1,
+        };
+
+        if let Err(e) = launcher.update_vmsa() {
+            set_fw_err(fw_err, e);
+            return -1;
+        }
+
+        0
     }
 }
