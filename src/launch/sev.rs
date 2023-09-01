@@ -4,12 +4,15 @@
 //! This ensures (at compile time) that the right steps are called in the
 //! right order.
 
+use crate::error::{Error::InvalidLen, Indeterminate};
+
 #[cfg(target_os = "linux")]
 use crate::launch::linux::ioctl::*;
 #[cfg(target_os = "linux")]
 use crate::launch::linux::sev::*;
 use crate::*;
 
+use std::convert::TryFrom;
 use std::io::Result;
 use std::mem::MaybeUninit;
 use std::os::unix::io::AsRawFd;
@@ -25,6 +28,10 @@ pub struct Started(Handle);
 
 /// Launcher type-state that indicates the availability of a measurement.
 pub struct Measured(Handle, Measurement);
+
+/// Launcher type-state that indicates the launcher is finished launching, and it's attestation
+/// report can be fetched.
+pub struct Finished;
 
 /// Facilitates the correct execution of the SEV launch process.
 pub struct Launcher<T, U: AsRawFd, V: AsRawFd> {
@@ -163,6 +170,53 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Measured, U, V> {
             .ioctl(&mut self.vm_fd, &mut cmd)
             .map_err(|e| cmd.encapsulate(e))?;
         Ok(self.state.0)
+    }
+
+    /// Complete the SEV launch process, and produce another Launcher capable of fetching an
+    /// attestation report.
+    pub fn finish_attestable(mut self) -> Result<Launcher<Finished, U, V>> {
+        let mut cmd = Command::from(&self.sev, &LaunchFinish);
+        LAUNCH_FINISH
+            .ioctl(&mut self.vm_fd, &mut cmd)
+            .map_err(|e| cmd.encapsulate(e))?;
+
+        let next = Launcher {
+            state: Finished,
+            vm_fd: self.vm_fd,
+            sev: self.sev,
+        };
+
+        Ok(next)
+    }
+}
+
+impl<U: AsRawFd, V: AsRawFd> Launcher<Finished, U, V> {
+    /// Get the attestation report of the VM.
+    pub fn report(&mut self, mnonce: [u8; 16]) -> Result<Vec<u8>> {
+        let mut first = LaunchAttestation::default();
+        let mut cmd = Command::from_mut(&self.sev, &mut first);
+        let mut len = 0;
+
+        let e = LAUNCH_ATTESTATION
+            .ioctl(&mut self.vm_fd, &mut cmd)
+            .map_err(|e| cmd.encapsulate(e));
+        if let Err(err) = e {
+            if let Indeterminate::Known(InvalidLen) = err {
+                len = first.len;
+            } else {
+                return Err(err.into());
+            }
+        }
+
+        let mut bytes = vec![0u8; usize::try_from(len).unwrap()];
+        let mut second = LaunchAttestation::new(mnonce, &mut bytes);
+        cmd = Command::from_mut(&self.sev, &mut second);
+
+        LAUNCH_ATTESTATION
+            .ioctl(&mut self.vm_fd, &mut cmd)
+            .map_err(|e| cmd.encapsulate(e))?;
+
+        Ok(bytes)
     }
 }
 

@@ -22,7 +22,7 @@ const POLICY_OFFSET: usize = MNONCE_SIZE + DIGEST_SIZE;
 const MEASURABLE_BYTES: usize = MNONCE_SIZE + DIGEST_SIZE + POLICY_SIZE;
 
 /// An attestation report structure.
-#[derive(Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize)]
 #[repr(C)]
 pub struct LegacyAttestationReport {
     /// 128-bit Nonce from the Command Buffer.
