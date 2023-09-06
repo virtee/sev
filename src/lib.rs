@@ -260,6 +260,8 @@ pub mod capi {
             Mutex::new(HashMap::new());
         static ref MEASURED_MAP: Mutex<HashMap<RawFd, Launcher<Measured, RawFd, RawFd>>> =
             Mutex::new(HashMap::new());
+        static ref FINISHED_MAP: Mutex<HashMap<RawFd, Launcher<Finished, RawFd, RawFd>>> =
+            Mutex::new(HashMap::new());
     }
 
     fn set_fw_err(ptr: *mut c_int, err: io::Error) {
@@ -506,8 +508,13 @@ pub mod capi {
             None => return -1,
         };
 
-        match launcher.finish() {
-            Ok(_) => 0,
+        match launcher.finish_attestable() {
+            Ok(l) => {
+                let mut map = FINISHED_MAP.lock().unwrap();
+                map.insert(vm_fd, l);
+
+                0
+            }
             Err(e) => {
                 set_fw_err(fw_err, e);
                 -1
