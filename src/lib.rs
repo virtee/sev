@@ -245,7 +245,7 @@ pub mod capi {
         mem::size_of,
         os::{
             fd::RawFd,
-            raw::{c_char, c_int, c_uchar, c_void},
+            raw::{c_char, c_int, c_uchar, c_ulonglong, c_void},
         },
         slice::{from_raw_parts, from_raw_parts_mut},
         sync::Mutex,
@@ -498,6 +498,9 @@ pub mod capi {
     ///
     /// # Safety
     ///
+    /// The caller of this function is responsible for ensuring that the mnonce is 16 bytes in
+    /// size.
+    ///
     /// The caller of this function is responsible for ensuring that the pointer arguments are
     /// valid.
     #[no_mangle]
@@ -520,5 +523,54 @@ pub mod capi {
                 -1
             }
         }
+    }
+
+    /// A C FFI interface to the SEV_ATTESTATION_REPORT ioctl.
+    ///
+    /// # Safety
+    ///
+    /// The caller of this function is responsible for ensuring that the pointer arguments are
+    /// valid.
+    #[allow(unused_assignments)]
+    #[no_mangle]
+    pub unsafe extern "C" fn sev_attestation_report(
+        vm_fd: c_int,
+        mnonce: *const c_uchar,
+        mnonce_len: u32,
+        mut bytes: *mut c_uchar,
+        len: *mut c_ulonglong,
+        fw_err: *mut c_int,
+    ) -> c_int {
+        let mut map = FINISHED_MAP.lock().unwrap();
+        let launcher = match map.get_mut(&vm_fd) {
+            Some(l) => l,
+            None => return -1,
+        };
+
+        if mnonce_len != 16 {
+            return -1;
+        }
+
+        let m: &[u8] = from_raw_parts(mnonce, 16);
+
+        let mut mnonce_cpy = [0u8; 16];
+        mnonce_cpy.copy_from_slice(m);
+
+        match launcher.report(mnonce_cpy) {
+            Ok(r) => {
+                *len = r.len() as _;
+                bytes = libc::malloc(r.len()) as *mut c_uchar;
+
+                libc::memcpy(bytes as _, r.as_ptr() as _, r.len());
+
+                0
+            }
+            Err(e) => {
+                set_fw_err(fw_err, e);
+                -1
+            }
+        };
+
+        -1
     }
 }
