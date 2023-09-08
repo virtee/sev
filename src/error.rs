@@ -7,6 +7,9 @@ use std::{
     io,
 };
 
+#[cfg(feature = "capi")]
+use std::os::raw::c_int;
+
 /// An error representingthe upper 32 bits of a SW_EXITINFO2 field set by the VMM.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum VmmError {
@@ -542,5 +545,55 @@ impl From<u32> for Indeterminate<Error> {
             0x27 => Error::InvalidKey,
             _ => return Indeterminate::Unknown,
         })
+    }
+}
+
+#[cfg(feature = "capi")]
+impl From<Indeterminate<Error>> for c_int {
+    fn from(err: Indeterminate<Error>) -> Self {
+        match err {
+            Indeterminate::Unknown => -0x01,
+            Indeterminate::Known(e) => match e {
+                Error::IoError(_) => -0x01,
+                Error::InvalidPlatformState => 0x01,
+                Error::InvalidGuestState => 0x02,
+                Error::InvalidConfig => 0x03,
+                Error::InvalidLen => 0x04,
+                Error::AlreadyOwned => 0x05,
+                Error::InvalidCertificate => 0x06,
+                Error::PolicyFailure => 0x07,
+                Error::Inactive => 0x08,
+                Error::InvalidAddress => 0x09,
+                Error::BadSignature => 0x0A,
+                Error::BadMeasurement => 0x0B,
+                Error::AsidOwned => 0x0C,
+                Error::InvalidAsid => 0x0D,
+                Error::WbinvdRequired => 0x0E,
+                Error::DfFlushRequired => 0x0F,
+                Error::InvalidGuest => 0x10,
+                Error::InvalidCommand => 0x11,
+                Error::Active => 0x12,
+                Error::HardwarePlatform => 0x13,
+                Error::HardwareUnsafe => 0x14,
+                Error::Unsupported => 0x15,
+                Error::InvalidParam => 0x16,
+                Error::ResourceLimit => 0x17,
+                Error::SecureDataInvalid => 0x18,
+                Error::InvalidPageSize => 0x19,
+                Error::InvalidPageState => 0x1A,
+                Error::InvalidMdataEntry => 0x1B,
+                Error::InvalidPageOwner => 0x1C,
+                Error::AEADOFlow => 0x1D,
+                Error::RbModeExited => 0x1F,
+                Error::RMPInitRequired => 0x20,
+                Error::BadSvn => 0x21,
+                Error::BadVersion => 0x22,
+                Error::ShutdownRequired => 0x23,
+                Error::UpdateFailed => 0x24,
+                Error::RestoreRequired => 0x25,
+                Error::RMPInitFailed => 0x26,
+                Error::InvalidKey => 0x27,
+            },
+        }
     }
 }

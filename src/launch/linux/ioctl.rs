@@ -36,6 +36,7 @@ impl_const_id! {
     sev::LaunchSecret<'_> = 5,
     sev::LaunchMeasure<'_> = 6,
     sev::LaunchFinish = 7,
+    sev::LaunchAttestation<'_> = 20,
 
     snp::Init = 22,
     snp::LaunchStart<'_> = 23,
@@ -56,6 +57,7 @@ impl_const_id! {
     sev::LaunchSecret<'_> = 5,
     sev::LaunchMeasure<'_> = 6,
     sev::LaunchFinish = 7,
+    sev::LaunchAttestation<'_> = 20,
 }
 
 #[cfg(all(not(feature = "sev"), feature = "snp"))]
@@ -119,6 +121,11 @@ pub const LAUNCH_MEASUREMENT: Ioctl<WriteRead, &Command<sev::LaunchMeasure>> =
 /// the ready state.
 #[cfg(feature = "sev")]
 pub const LAUNCH_FINISH: Ioctl<WriteRead, &Command<sev::LaunchFinish>> = unsafe { ENC_OP.lie() };
+
+/// Fetch a legacy SEV VM's attestation report.
+#[cfg(feature = "sev")]
+pub const LAUNCH_ATTESTATION: Ioctl<WriteRead, &Command<sev::LaunchAttestation>> =
+    unsafe { ENC_OP.lie() };
 
 /// Corresponds to the `KVM_MEMORY_ENCRYPT_REG_REGION` ioctl
 #[cfg(any(feature = "sev", feature = "snp"))]

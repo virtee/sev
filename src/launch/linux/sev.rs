@@ -17,6 +17,7 @@ pub struct Init;
 #[repr(C)]
 pub struct EsInit;
 
+#[derive(Clone, Copy)]
 #[repr(transparent)]
 pub struct Handle(u32);
 
@@ -128,3 +129,24 @@ impl<'a> LaunchMeasure<'a> {
 /// ready state.
 #[repr(C)]
 pub struct LaunchFinish;
+
+/// Fetch a finished guest's attestation report.
+#[derive(Default)]
+#[repr(C)]
+pub struct LaunchAttestation<'a> {
+    mnonce: [u8; 16],
+    addr: u64,
+    pub len: u32,
+    _phantom: PhantomData<&'a mut Vec<u8>>,
+}
+
+impl<'a> LaunchAttestation<'a> {
+    pub fn new(mnonce: [u8; 16], bytes: &'a mut Vec<u8>) -> Self {
+        Self {
+            mnonce,
+            addr: bytes.as_mut_ptr() as _,
+            len: bytes.capacity() as _,
+            _phantom: PhantomData,
+        }
+    }
+}
