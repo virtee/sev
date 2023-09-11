@@ -269,6 +269,11 @@ pub mod capi {
     }
 
     /// A C FFI interface to the SEV_INIT ioctl.
+    ///
+    /// # Safety
+    ///
+    /// The caller of this function is responsible for ensuring that the pointer arguments are
+    /// valid.
     #[no_mangle]
     pub unsafe extern "C" fn sev_init(vm_fd: c_int, sev_fd: c_int, fw_err: *mut c_int) -> c_int {
         let vm: RawFd = vm_fd;
@@ -289,6 +294,11 @@ pub mod capi {
     }
 
     /// A C FFI interface to the SEV_ES_INIT ioctl.
+    ///
+    /// # Safety
+    ///
+    /// The caller of this function is responsible for ensuring that the pointer arguments are
+    /// valid.
     #[no_mangle]
     pub unsafe extern "C" fn sev_es_init(vm_fd: c_int, sev_fd: c_int, fw_err: *mut c_int) -> c_int {
         let vm: RawFd = vm_fd;
