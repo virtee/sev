@@ -270,7 +270,7 @@ pub mod capi {
 
     /// A C FFI interface to the SEV_INIT ioctl.
     #[no_mangle]
-    pub extern "C" fn sev_init(vm_fd: c_int, sev_fd: c_int, fw_err: *mut c_int) -> c_int {
+    pub unsafe extern "C" fn sev_init(vm_fd: c_int, sev_fd: c_int, fw_err: *mut c_int) -> c_int {
         let vm: RawFd = vm_fd;
         let sev: RawFd = sev_fd;
 
@@ -290,7 +290,7 @@ pub mod capi {
 
     /// A C FFI interface to the SEV_ES_INIT ioctl.
     #[no_mangle]
-    pub extern "C" fn sev_es_init(vm_fd: c_int, sev_fd: c_int, fw_err: *mut c_int) -> c_int {
+    pub unsafe extern "C" fn sev_es_init(vm_fd: c_int, sev_fd: c_int, fw_err: *mut c_int) -> c_int {
         let vm: RawFd = vm_fd;
         let sev: RawFd = sev_fd;
 
@@ -315,7 +315,7 @@ pub mod capi {
     /// The caller of this function is responsible for ensuring that the pointer arguments are
     /// valid.
     #[no_mangle]
-    pub extern "C" fn sev_launch_start(
+    pub unsafe extern "C" fn sev_launch_start(
         vm_fd: c_int,
         policy: u32,
         cert_bytes: *const c_void,
@@ -360,7 +360,7 @@ pub mod capi {
     /// The caller of this function is responsible for ensuring that the pointer arguments are
     /// valid.
     #[no_mangle]
-    pub extern "C" fn sev_launch_update_data(
+    pub unsafe extern "C" fn sev_launch_update_data(
         vm_fd: c_int,
         uaddr: u64,
         len: u64,
@@ -388,7 +388,7 @@ pub mod capi {
     /// The caller of this function is responsible for ensuring that the pointer arguments are
     /// valid.
     #[no_mangle]
-    pub extern "C" fn sev_launch_update_vmsa(vm_fd: c_int, fw_err: *mut c_int) -> c_int {
+    pub unsafe extern "C" fn sev_launch_update_vmsa(vm_fd: c_int, fw_err: *mut c_int) -> c_int {
         let mut map = STARTED_MAP.lock().unwrap();
         let launcher = match map.get_mut(&vm_fd) {
             Some(l) => l,
@@ -504,7 +504,7 @@ pub mod capi {
     /// The caller of this function is responsible for ensuring that the pointer arguments are
     /// valid.
     #[no_mangle]
-    pub extern "C" fn sev_launch_finish(vm_fd: c_int, fw_err: *mut c_int) -> c_int {
+    pub unsafe extern "C" fn sev_launch_finish(vm_fd: c_int, fw_err: *mut c_int) -> c_int {
         let mut map = MEASURED_MAP.lock().unwrap();
         let launcher = match map.remove(&vm_fd) {
             Some(l) => l,
