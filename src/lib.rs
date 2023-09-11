@@ -245,7 +245,7 @@ pub mod capi {
         mem::size_of,
         os::{
             fd::RawFd,
-            raw::{c_char, c_int, c_uchar, c_ulonglong, c_void},
+            raw::{c_int, c_uchar, c_ulonglong, c_void},
         },
         slice::{from_raw_parts, from_raw_parts_mut},
         sync::Mutex,
@@ -459,12 +459,12 @@ pub mod capi {
     /// The caller of this function is responsible for ensuring that the pointer arguments are
     /// valid.
     #[no_mangle]
-    pub extern "C" fn sev_inject_launch_secret(
+    pub unsafe extern "C" fn sev_inject_launch_secret(
         vm_fd: c_int,
-        header_bytes: *const c_char,
-        ct_bytes: *const c_char,
+        header_bytes: *const c_uchar,
+        ct_bytes: *const c_uchar,
         ct_size: u32,
-        paddr: u64,
+        paddr: *const c_void,
         fw_err: *mut c_int,
     ) -> c_int {
         let mut map = MEASURED_MAP.lock().unwrap();
@@ -473,9 +473,9 @@ pub mod capi {
             None => return -1,
         };
 
-        let header = (header_bytes as *const u8) as *const Header;
+        let header = header_bytes as *const Header;
         let ciphertext = {
-            let bytes: &[u8] = unsafe { from_raw_parts(ct_bytes as *const u8, ct_size as usize) };
+            let bytes: &[u8] = unsafe { from_raw_parts(ct_bytes, ct_size as usize) };
 
             bytes.to_owned().to_vec()
         };
