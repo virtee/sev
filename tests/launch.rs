@@ -99,10 +99,8 @@ fn sev() {
     regs.rflags = 2;
     vcpu.set_regs(&regs).unwrap();
 
-    loop {
-        match vcpu.run().unwrap() {
-            VcpuExit::Hlt => break,
-            exit_reason => panic!("unexpected exit reason: {:?}", exit_reason),
-        }
+    match vcpu.run().unwrap() {
+        VcpuExit::Hlt => return,
+        exit_reason => panic!("unexpected exit reason: {:?}", exit_reason),
     }
 }
