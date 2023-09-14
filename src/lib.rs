@@ -28,6 +28,15 @@
 //! expected to run as a process with the necessary privileges to interact
 //! with the device nodes.
 //!
+//! ## Using the C API
+//!
+//! Projects in C can take advantage of the C API for the SEV [`launch`] ioctls.
+//! To install the C API, users can use `cargo-c` with the features they would
+//! like to produce and install a `pkg-config` file, a static library, a dynamic
+//! library, and a C header:
+//!
+//! `cargo cinstall --prefix=/usr --libdir=/usr/lib64`
+//!
 //! [`firmware`]: ./src/firmware/
 //! [`launch`]: ./src/launch/
 
