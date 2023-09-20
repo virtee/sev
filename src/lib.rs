@@ -255,7 +255,7 @@ pub mod capi {
         mem::size_of,
         os::{
             fd::RawFd,
-            raw::{c_int, c_uchar, c_ulonglong, c_void},
+            raw::{c_int, c_uchar, c_uint, c_void},
         },
         slice::{from_raw_parts, from_raw_parts_mut},
         sync::Mutex,
@@ -558,7 +558,7 @@ pub mod capi {
         mnonce: *const c_uchar,
         mnonce_len: u32,
         mut bytes: *mut c_uchar,
-        len: *mut c_ulonglong,
+        len: *mut c_uint,
         fw_err: *mut c_int,
     ) -> c_int {
         let mut map = FINISHED_MAP.lock().unwrap();
