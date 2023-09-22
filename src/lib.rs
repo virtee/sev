@@ -244,352 +244,349 @@ impl TryFrom<&sev::Chain> for Generation {
 }
 
 /// The C FFI interface to the library.
-#[cfg(feature = "capi")]
-pub mod capi {
-    use crate::{certs::sev::sev::Certificate, error::Indeterminate, launch::sev::*};
+use crate::{certs::sev::sev::Certificate as SevCertificate, error::Indeterminate, launch::sev::*};
 
-    use std::{
-        collections::HashMap,
-        io,
-        mem::size_of,
-        os::{
-            fd::RawFd,
-            raw::{c_int, c_uchar, c_uint, c_void},
-        },
-        slice::{from_raw_parts, from_raw_parts_mut},
-        sync::Mutex,
+use std::{
+    collections::HashMap,
+    io,
+    mem::size_of,
+    os::{
+        fd::RawFd,
+        raw::{c_int, c_uchar, c_uint, c_void},
+    },
+    slice::{from_raw_parts, from_raw_parts_mut},
+    sync::Mutex,
+};
+
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref INIT_MAP: Mutex<HashMap<RawFd, Launcher<New, RawFd, RawFd>>> =
+        Mutex::new(HashMap::new());
+    static ref STARTED_MAP: Mutex<HashMap<RawFd, Launcher<Started, RawFd, RawFd>>> =
+        Mutex::new(HashMap::new());
+    static ref MEASURED_MAP: Mutex<HashMap<RawFd, Launcher<Measured, RawFd, RawFd>>> =
+        Mutex::new(HashMap::new());
+    static ref FINISHED_MAP: Mutex<HashMap<RawFd, Launcher<Finished, RawFd, RawFd>>> =
+        Mutex::new(HashMap::new());
+}
+
+fn set_fw_err(ptr: *mut c_int, err: io::Error) {
+    unsafe { *ptr = Indeterminate::from(err).into() };
+}
+
+/// A C FFI interface to the SEV_INIT ioctl.
+///
+/// # Safety
+///
+/// The caller of this function is responsible for ensuring that the pointer arguments are
+/// valid.
+#[no_mangle]
+pub unsafe extern "C" fn sev_init(vm_fd: c_int, sev_fd: c_int, fw_err: *mut c_int) -> c_int {
+    let vm: RawFd = vm_fd;
+    let sev: RawFd = sev_fd;
+
+    match Launcher::new(vm, sev) {
+        Ok(launcher) => {
+            let mut map = INIT_MAP.lock().unwrap();
+            map.insert(vm_fd, launcher);
+
+            0
+        }
+        Err(e) => {
+            set_fw_err(fw_err, e);
+            -1
+        }
+    }
+}
+
+/// A C FFI interface to the SEV_ES_INIT ioctl.
+///
+/// # Safety
+///
+/// The caller of this function is responsible for ensuring that the pointer arguments are
+/// valid.
+#[no_mangle]
+pub unsafe extern "C" fn sev_es_init(vm_fd: c_int, sev_fd: c_int, fw_err: *mut c_int) -> c_int {
+    let vm: RawFd = vm_fd;
+    let sev: RawFd = sev_fd;
+
+    match Launcher::new_es(vm, sev) {
+        Ok(launcher) => {
+            let mut map = INIT_MAP.lock().unwrap();
+            map.insert(vm_fd, launcher);
+
+            0
+        }
+        Err(e) => {
+            set_fw_err(fw_err, e);
+            -1
+        }
+    }
+}
+
+/// A C FFI interface to the SEV_LAUNCH_START ioctl.
+///
+/// # Safety
+///
+/// The caller of this function is responsible for ensuring that the pointer arguments are
+/// valid.
+#[no_mangle]
+pub unsafe extern "C" fn sev_launch_start(
+    vm_fd: c_int,
+    policy: u32,
+    cert_bytes: *const c_void,
+    session_bytes: *const c_void,
+    fw_err: *mut c_int,
+) -> c_int {
+    let mut map = INIT_MAP.lock().unwrap();
+    let launcher = match map.remove(&vm_fd) {
+        Some(l) => l,
+        None => return -1,
     };
 
-    use lazy_static::lazy_static;
+    let policy = Policy::from(policy);
+    let cert: SevCertificate = unsafe { *(cert_bytes as *const SevCertificate) };
+    let session: Session = unsafe { *(session_bytes as *const Session) };
 
-    lazy_static! {
-        static ref INIT_MAP: Mutex<HashMap<RawFd, Launcher<New, RawFd, RawFd>>> =
-            Mutex::new(HashMap::new());
-        static ref STARTED_MAP: Mutex<HashMap<RawFd, Launcher<Started, RawFd, RawFd>>> =
-            Mutex::new(HashMap::new());
-        static ref MEASURED_MAP: Mutex<HashMap<RawFd, Launcher<Measured, RawFd, RawFd>>> =
-            Mutex::new(HashMap::new());
-        static ref FINISHED_MAP: Mutex<HashMap<RawFd, Launcher<Finished, RawFd, RawFd>>> =
-            Mutex::new(HashMap::new());
-    }
+    let start = Start {
+        policy,
+        cert,
+        session,
+    };
 
-    fn set_fw_err(ptr: *mut c_int, err: io::Error) {
-        unsafe { *ptr = Indeterminate::from(err).into() };
-    }
-
-    /// A C FFI interface to the SEV_INIT ioctl.
-    ///
-    /// # Safety
-    ///
-    /// The caller of this function is responsible for ensuring that the pointer arguments are
-    /// valid.
-    #[no_mangle]
-    pub unsafe extern "C" fn sev_init(vm_fd: c_int, sev_fd: c_int, fw_err: *mut c_int) -> c_int {
-        let vm: RawFd = vm_fd;
-        let sev: RawFd = sev_fd;
-
-        match Launcher::new(vm, sev) {
-            Ok(launcher) => {
-                let mut map = INIT_MAP.lock().unwrap();
-                map.insert(vm_fd, launcher);
-
-                0
+    match launcher.start(start) {
+        Ok(started) => {
+            let mut map = STARTED_MAP.lock().unwrap();
+            if map.insert(vm_fd, started).is_none() {
+                return 0;
             }
-            Err(e) => {
-                set_fw_err(fw_err, e);
-                -1
-            }
+            -1
         }
-    }
-
-    /// A C FFI interface to the SEV_ES_INIT ioctl.
-    ///
-    /// # Safety
-    ///
-    /// The caller of this function is responsible for ensuring that the pointer arguments are
-    /// valid.
-    #[no_mangle]
-    pub unsafe extern "C" fn sev_es_init(vm_fd: c_int, sev_fd: c_int, fw_err: *mut c_int) -> c_int {
-        let vm: RawFd = vm_fd;
-        let sev: RawFd = sev_fd;
-
-        match Launcher::new_es(vm, sev) {
-            Ok(launcher) => {
-                let mut map = INIT_MAP.lock().unwrap();
-                map.insert(vm_fd, launcher);
-
-                0
-            }
-            Err(e) => {
-                set_fw_err(fw_err, e);
-                -1
-            }
-        }
-    }
-
-    /// A C FFI interface to the SEV_LAUNCH_START ioctl.
-    ///
-    /// # Safety
-    ///
-    /// The caller of this function is responsible for ensuring that the pointer arguments are
-    /// valid.
-    #[no_mangle]
-    pub unsafe extern "C" fn sev_launch_start(
-        vm_fd: c_int,
-        policy: u32,
-        cert_bytes: *const c_void,
-        session_bytes: *const c_void,
-        fw_err: *mut c_int,
-    ) -> c_int {
-        let mut map = INIT_MAP.lock().unwrap();
-        let launcher = match map.remove(&vm_fd) {
-            Some(l) => l,
-            None => return -1,
-        };
-
-        let policy = Policy::from(policy);
-        let cert: Certificate = unsafe { *(cert_bytes as *const Certificate) };
-        let session: Session = unsafe { *(session_bytes as *const Session) };
-
-        let start = Start {
-            policy,
-            cert,
-            session,
-        };
-
-        match launcher.start(start) {
-            Ok(started) => {
-                let mut map = STARTED_MAP.lock().unwrap();
-                if map.insert(vm_fd, started).is_none() {
-                    return 0;
-                }
-                -1
-            }
-            Err(e) => {
-                set_fw_err(fw_err, e);
-                -1
-            }
-        }
-    }
-
-    /// A C FFI interface to the SEV_LAUNCH_UPDATE ioctl.
-    ///
-    /// # Safety
-    ///
-    /// The caller of this function is responsible for ensuring that the pointer arguments are
-    /// valid.
-    #[no_mangle]
-    pub unsafe extern "C" fn sev_launch_update_data(
-        vm_fd: c_int,
-        uaddr: u64,
-        len: u64,
-        fw_err: *mut c_int,
-    ) -> c_int {
-        let mut map = STARTED_MAP.lock().unwrap();
-        let launcher = match map.get_mut(&vm_fd) {
-            Some(l) => l,
-            None => return -1,
-        };
-
-        let slice: &[u8] = unsafe { from_raw_parts(uaddr as *const u8, len as usize) };
-        if let Err(e) = launcher.update_data(slice) {
+        Err(e) => {
             set_fw_err(fw_err, e);
-            return -1;
+            -1
         }
+    }
+}
 
-        0
+/// A C FFI interface to the SEV_LAUNCH_UPDATE ioctl.
+///
+/// # Safety
+///
+/// The caller of this function is responsible for ensuring that the pointer arguments are
+/// valid.
+#[no_mangle]
+pub unsafe extern "C" fn sev_launch_update_data(
+    vm_fd: c_int,
+    uaddr: u64,
+    len: u64,
+    fw_err: *mut c_int,
+) -> c_int {
+    let mut map = STARTED_MAP.lock().unwrap();
+    let launcher = match map.get_mut(&vm_fd) {
+        Some(l) => l,
+        None => return -1,
+    };
+
+    let slice: &[u8] = unsafe { from_raw_parts(uaddr as *const u8, len as usize) };
+    if let Err(e) = launcher.update_data(slice) {
+        set_fw_err(fw_err, e);
+        return -1;
     }
 
-    /// A C FFI interface to the SEV_LAUNCH_UPDATE_VMSA ioctl.
-    ///
-    /// # Safety
-    ///
-    /// The caller of this function is responsible for ensuring that the pointer arguments are
-    /// valid.
-    #[no_mangle]
-    pub unsafe extern "C" fn sev_launch_update_vmsa(vm_fd: c_int, fw_err: *mut c_int) -> c_int {
-        let mut map = STARTED_MAP.lock().unwrap();
-        let launcher = match map.get_mut(&vm_fd) {
-            Some(l) => l,
-            None => return -1,
-        };
+    0
+}
 
-        if let Err(e) = launcher.update_vmsa() {
-            set_fw_err(fw_err, e);
-            return -1;
-        }
+/// A C FFI interface to the SEV_LAUNCH_UPDATE_VMSA ioctl.
+///
+/// # Safety
+///
+/// The caller of this function is responsible for ensuring that the pointer arguments are
+/// valid.
+#[no_mangle]
+pub unsafe extern "C" fn sev_launch_update_vmsa(vm_fd: c_int, fw_err: *mut c_int) -> c_int {
+    let mut map = STARTED_MAP.lock().unwrap();
+    let launcher = match map.get_mut(&vm_fd) {
+        Some(l) => l,
+        None => return -1,
+    };
 
-        0
+    if let Err(e) = launcher.update_vmsa() {
+        set_fw_err(fw_err, e);
+        return -1;
     }
 
-    /// A C FFI interface to the SEV_LAUNCH_MEASURE ioctl.
-    ///
-    /// # Safety
-    ///
-    /// The caller of this function is responsible for ensuring that the pointer arguments are
-    /// valid.
-    ///
-    /// The "measurement_data" argument should be a valid pointer able to hold the meausurement's
-    /// bytes. The measurement is 48 bytes in size.
-    #[no_mangle]
-    pub unsafe extern "C" fn sev_launch_measure(
-        vm_fd: c_int,
-        measurement_data: *mut c_uchar,
-        fw_err: &mut c_int,
-    ) -> c_int {
-        let mut map = STARTED_MAP.lock().unwrap();
-        let launcher = match map.remove(&vm_fd) {
-            Some(l) => l,
-            None => return -1,
-        };
+    0
+}
 
-        match launcher.measure() {
-            Ok(m) => {
-                let mut map = MEASURED_MAP.lock().unwrap();
-                let measure = m.measurement();
-                let slice: &mut [u8] = unsafe {
-                    from_raw_parts_mut(
-                        (&measure as *const Measurement) as *mut u8,
-                        size_of::<Measurement>(),
-                    )
-                };
-                map.insert(vm_fd, m);
+/// A C FFI interface to the SEV_LAUNCH_MEASURE ioctl.
+///
+/// # Safety
+///
+/// The caller of this function is responsible for ensuring that the pointer arguments are
+/// valid.
+///
+/// The "measurement_data" argument should be a valid pointer able to hold the meausurement's
+/// bytes. The measurement is 48 bytes in size.
+#[no_mangle]
+pub unsafe extern "C" fn sev_launch_measure(
+    vm_fd: c_int,
+    measurement_data: *mut c_uchar,
+    fw_err: &mut c_int,
+) -> c_int {
+    let mut map = STARTED_MAP.lock().unwrap();
+    let launcher = match map.remove(&vm_fd) {
+        Some(l) => l,
+        None => return -1,
+    };
 
-                libc::memcpy(
-                    measurement_data as _,
-                    slice.as_ptr() as _,
+    match launcher.measure() {
+        Ok(m) => {
+            let mut map = MEASURED_MAP.lock().unwrap();
+            let measure = m.measurement();
+            let slice: &mut [u8] = unsafe {
+                from_raw_parts_mut(
+                    (&measure as *const Measurement) as *mut u8,
                     size_of::<Measurement>(),
-                );
+                )
+            };
+            map.insert(vm_fd, m);
 
-                0
-            }
-            Err(e) => {
-                set_fw_err(fw_err, e);
+            libc::memcpy(
+                measurement_data as _,
+                slice.as_ptr() as _,
+                size_of::<Measurement>(),
+            );
 
-                -1
-            }
+            0
+        }
+        Err(e) => {
+            set_fw_err(fw_err, e);
+
+            -1
         }
     }
+}
 
-    /// A C FFI interface to the SEV_LAUNCH_SECRET ioctl.
-    ///
-    /// # Safety
-    ///
-    /// The caller of this function is responsible for ensuring that the pointer arguments are
-    /// valid.
-    #[no_mangle]
-    pub unsafe extern "C" fn sev_inject_launch_secret(
-        vm_fd: c_int,
-        header_bytes: *const c_uchar,
-        ct_bytes: *const c_uchar,
-        ct_size: u32,
-        paddr: *const c_void,
-        fw_err: *mut c_int,
-    ) -> c_int {
-        let mut map = MEASURED_MAP.lock().unwrap();
-        let launcher = match map.get_mut(&vm_fd) {
-            Some(l) => l,
-            None => return -1,
-        };
+/// A C FFI interface to the SEV_LAUNCH_SECRET ioctl.
+///
+/// # Safety
+///
+/// The caller of this function is responsible for ensuring that the pointer arguments are
+/// valid.
+#[no_mangle]
+pub unsafe extern "C" fn sev_inject_launch_secret(
+    vm_fd: c_int,
+    header_bytes: *const c_uchar,
+    ct_bytes: *const c_uchar,
+    ct_size: u32,
+    paddr: *const c_void,
+    fw_err: *mut c_int,
+) -> c_int {
+    let mut map = MEASURED_MAP.lock().unwrap();
+    let launcher = match map.get_mut(&vm_fd) {
+        Some(l) => l,
+        None => return -1,
+    };
 
-        let header = header_bytes as *const Header;
-        let ciphertext = {
-            let bytes: &[u8] = unsafe { from_raw_parts(ct_bytes, ct_size as usize) };
+    let header = header_bytes as *const Header;
+    let ciphertext = {
+        let bytes: &[u8] = unsafe { from_raw_parts(ct_bytes, ct_size as usize) };
 
-            bytes.to_owned().to_vec()
-        };
+        bytes.to_owned().to_vec()
+    };
 
-        let secret = Secret {
-            header: unsafe { *header },
-            ciphertext,
-        };
+    let secret = Secret {
+        header: unsafe { *header },
+        ciphertext,
+    };
 
-        match launcher.inject(&secret, paddr as usize) {
-            Ok(()) => 0,
-            Err(e) => {
-                set_fw_err(fw_err, e);
-                -1
-            }
+    match launcher.inject(&secret, paddr as usize) {
+        Ok(()) => 0,
+        Err(e) => {
+            set_fw_err(fw_err, e);
+            -1
         }
     }
+}
 
-    /// A C FFI interface to the SEV_LAUNCH_FINISH ioctl.
-    ///
-    /// # Safety
-    ///
-    /// The caller of this function is responsible for ensuring that the mnonce is 16 bytes in
-    /// size.
-    ///
-    /// The caller of this function is responsible for ensuring that the pointer arguments are
-    /// valid.
-    #[no_mangle]
-    pub unsafe extern "C" fn sev_launch_finish(vm_fd: c_int, fw_err: *mut c_int) -> c_int {
-        let mut map = MEASURED_MAP.lock().unwrap();
-        let launcher = match map.remove(&vm_fd) {
-            Some(l) => l,
-            None => return -1,
-        };
+/// A C FFI interface to the SEV_LAUNCH_FINISH ioctl.
+///
+/// # Safety
+///
+/// The caller of this function is responsible for ensuring that the mnonce is 16 bytes in
+/// size.
+///
+/// The caller of this function is responsible for ensuring that the pointer arguments are
+/// valid.
+#[no_mangle]
+pub unsafe extern "C" fn sev_launch_finish(vm_fd: c_int, fw_err: *mut c_int) -> c_int {
+    let mut map = MEASURED_MAP.lock().unwrap();
+    let launcher = match map.remove(&vm_fd) {
+        Some(l) => l,
+        None => return -1,
+    };
 
-        match launcher.finish_attestable() {
-            Ok(l) => {
-                let mut map = FINISHED_MAP.lock().unwrap();
-                map.insert(vm_fd, l);
+    match launcher.finish_attestable() {
+        Ok(l) => {
+            let mut map = FINISHED_MAP.lock().unwrap();
+            map.insert(vm_fd, l);
 
-                0
-            }
-            Err(e) => {
-                set_fw_err(fw_err, e);
-                -1
-            }
+            0
+        }
+        Err(e) => {
+            set_fw_err(fw_err, e);
+            -1
         }
     }
+}
 
-    /// A C FFI interface to the SEV_ATTESTATION_REPORT ioctl.
-    ///
-    /// # Safety
-    ///
-    /// The caller of this function is responsible for ensuring that the pointer arguments are
-    /// valid.
-    #[allow(unused_assignments)]
-    #[no_mangle]
-    pub unsafe extern "C" fn sev_attestation_report(
-        vm_fd: c_int,
-        mnonce: *const c_uchar,
-        mnonce_len: u32,
-        mut bytes: *mut c_uchar,
-        len: *mut c_uint,
-        fw_err: *mut c_int,
-    ) -> c_int {
-        let mut map = FINISHED_MAP.lock().unwrap();
-        let launcher = match map.get_mut(&vm_fd) {
-            Some(l) => l,
-            None => return -1,
-        };
+/// A C FFI interface to the SEV_ATTESTATION_REPORT ioctl.
+///
+/// # Safety
+///
+/// The caller of this function is responsible for ensuring that the pointer arguments are
+/// valid.
+#[allow(unused_assignments)]
+#[no_mangle]
+pub unsafe extern "C" fn sev_attestation_report(
+    vm_fd: c_int,
+    mnonce: *const c_uchar,
+    mnonce_len: u32,
+    mut bytes: *mut c_uchar,
+    len: *mut c_uint,
+    fw_err: *mut c_int,
+) -> c_int {
+    let mut map = FINISHED_MAP.lock().unwrap();
+    let launcher = match map.get_mut(&vm_fd) {
+        Some(l) => l,
+        None => return -1,
+    };
 
-        if mnonce_len != 16 {
-            return -1;
-        }
-
-        let m: &[u8] = from_raw_parts(mnonce, 16);
-
-        let mut mnonce_cpy = [0u8; 16];
-        mnonce_cpy.copy_from_slice(m);
-
-        match launcher.report(mnonce_cpy) {
-            Ok(r) => {
-                *len = r.len() as _;
-                bytes = libc::malloc(r.len()) as *mut c_uchar;
-
-                libc::memcpy(bytes as _, r.as_ptr() as _, r.len());
-
-                0
-            }
-            Err(e) => {
-                set_fw_err(fw_err, e);
-                -1
-            }
-        };
-
-        -1
+    if mnonce_len != 16 {
+        return -1;
     }
+
+    let m: &[u8] = from_raw_parts(mnonce, 16);
+
+    let mut mnonce_cpy = [0u8; 16];
+    mnonce_cpy.copy_from_slice(m);
+
+    match launcher.report(mnonce_cpy) {
+        Ok(r) => {
+            *len = r.len() as _;
+            bytes = libc::malloc(r.len()) as *mut c_uchar;
+
+            libc::memcpy(bytes as _, r.as_ptr() as _, r.len());
+
+            0
+        }
+        Err(e) => {
+            set_fw_err(fw_err, e);
+            -1
+        }
+    };
+
+    -1
 }

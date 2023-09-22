@@ -7,7 +7,6 @@ use std::{
     io,
 };
 
-#[cfg(feature = "capi")]
 use std::os::raw::c_int;
 
 /// An error representingthe upper 32 bits of a SW_EXITINFO2 field set by the VMM.
@@ -548,7 +547,6 @@ impl From<u32> for Indeterminate<Error> {
     }
 }
 
-#[cfg(feature = "capi")]
 impl From<Indeterminate<Error>> for c_int {
     fn from(err: Indeterminate<Error>) -> Self {
         match err {
