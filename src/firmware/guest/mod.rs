@@ -10,6 +10,7 @@ mod types;
 
 pub use types::*;
 
+#[cfg(target_os = "linux")]
 use crate::{
     error::*,
     firmware::{
@@ -21,6 +22,7 @@ use crate::{
     },
 };
 
+#[cfg(target_os = "linux")]
 use std::fs::{File, OpenOptions};
 
 // Disabled until upstream Linux kernel is patched.
@@ -47,8 +49,10 @@ use std::fs::{File, OpenOptions};
 // }
 
 /// A handle to the SEV-SNP guest device.
+#[cfg(target_os = "linux")]
 pub struct Firmware(File);
 
+#[cfg(target_os = "linux")]
 impl Firmware {
     /// Generate a new file handle to the SEV guest platform via `/dev/sev-guest`.
     ///

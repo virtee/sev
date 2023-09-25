@@ -4,6 +4,7 @@ use super::*;
 
 use std::fmt::{Debug, Formatter};
 
+#[cfg(target_os = "linux")]
 impl<U> PrivateKey<U> {
     pub(crate) fn derive(&self, cert: &sev::Certificate) -> Result<Vec<u8>> {
         let key = PublicKey::try_from(cert)?;

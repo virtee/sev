@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{error::CertError, firmware::host as UAPI};
+#[cfg(target_os = "linux")]
+use crate::error::CertError;
+
+use crate::firmware::host as UAPI;
 
 use uuid::Uuid;
 
@@ -104,6 +107,7 @@ impl CertTableEntry {
     ///
     /// ```
     ///
+    #[cfg(target_os = "linux")]
     pub fn uapi_to_vec_bytes(table: &Vec<UAPI::CertTableEntry>) -> Result<Vec<u8>, CertError> {
         // Create the vector to return for later.
         let mut bytes: Vec<u8> = vec![];

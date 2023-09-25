@@ -5,30 +5,37 @@ mod types;
 
 pub use types::*;
 
+#[cfg(target_os = "linux")]
 use super::linux::host::{ioctl::*, types::GetId};
 
 #[cfg(feature = "sev")]
+#[cfg(target_os = "linux")]
 use super::linux::host::types::{
     PdhCertExport, PdhGen, PekCertImport, PekCsr, PekGen, PlatformReset, PlatformStatus,
 };
 
+#[cfg(target_os = "linux")]
 use crate::error::*;
 
 #[cfg(feature = "sev")]
+#[cfg(target_os = "linux")]
 use crate::{
     certs::sev::sev::{Certificate, Chain},
     Build as CertBuild, Version as CertVersion,
 };
 
+#[cfg(target_os = "linux")]
 use std::{
     fs::{File, OpenOptions},
     os::unix::io::{AsRawFd, RawFd},
 };
 
 #[cfg(feature = "sev")]
+#[cfg(target_os = "linux")]
 use std::mem::MaybeUninit;
 
 #[cfg(feature = "snp")]
+#[cfg(target_os = "linux")]
 use std::convert::TryInto;
 
 /// The CPU-unique identifier for the platform.
@@ -52,8 +59,10 @@ impl std::fmt::Display for Identifier {
 }
 
 /// A handle to the SEV platform.
+#[cfg(target_os = "linux")]
 pub struct Firmware(File);
 
+#[cfg(target_os = "linux")]
 impl Firmware {
     /// Create a handle to the SEV platform.
     pub fn open() -> std::io::Result<Firmware> {
@@ -284,6 +293,7 @@ impl Firmware {
     }
 }
 
+#[cfg(target_os = "linux")]
 impl AsRawFd for Firmware {
     fn as_raw_fd(&self) -> RawFd {
         self.0.as_raw_fd()
