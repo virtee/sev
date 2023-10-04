@@ -2,8 +2,6 @@
 
 //! Operations for managing the SEV platform.
 
-#[cfg(target_os = "linux")]
-pub use crate::firmware::host::Firmware;
 pub use crate::firmware::linux::host::types::PlatformStatusFlags;
 
 use crate::{firmware::host::State, Build};

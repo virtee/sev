@@ -71,9 +71,29 @@ use certs::sev::ca::{Certificate, Chain as CertSevCaChain};
 #[cfg(all(feature = "sev", feature = "openssl"))]
 use certs::sev::builtin as SevBuiltin;
 
+#[cfg(feature = "sev")]
+use crate::{certs::sev::sev::Certificate as SevCertificate, error::Indeterminate, launch::sev::*};
+
 #[cfg(all(feature = "sev", feature = "openssl"))]
 use std::convert::TryFrom;
+
 use std::io::{Read, Write};
+
+#[cfg(feature = "sev")]
+use std::{
+    collections::HashMap,
+    io,
+    mem::size_of,
+    os::{
+        fd::RawFd,
+        raw::{c_int, c_uchar, c_uint, c_void},
+    },
+    slice::{from_raw_parts, from_raw_parts_mut},
+    sync::Mutex,
+};
+
+#[cfg(feature = "sev")]
+use lazy_static::lazy_static;
 
 use serde::{Deserialize, Serialize};
 
@@ -243,23 +263,9 @@ impl TryFrom<&sev::Chain> for Generation {
     }
 }
 
-/// The C FFI interface to the library.
-use crate::{certs::sev::sev::Certificate as SevCertificate, error::Indeterminate, launch::sev::*};
+// The C FFI interface to the library.
 
-use std::{
-    collections::HashMap,
-    io,
-    mem::size_of,
-    os::{
-        fd::RawFd,
-        raw::{c_int, c_uchar, c_uint, c_void},
-    },
-    slice::{from_raw_parts, from_raw_parts_mut},
-    sync::Mutex,
-};
-
-use lazy_static::lazy_static;
-
+#[cfg(feature = "sev")]
 lazy_static! {
     static ref INIT_MAP: Mutex<HashMap<RawFd, Launcher<New, RawFd, RawFd>>> =
         Mutex::new(HashMap::new());
@@ -271,6 +277,7 @@ lazy_static! {
         Mutex::new(HashMap::new());
 }
 
+#[cfg(feature = "sev")]
 fn set_fw_err(ptr: *mut c_int, err: io::Error) {
     unsafe { *ptr = Indeterminate::from(err).into() };
 }
@@ -281,6 +288,7 @@ fn set_fw_err(ptr: *mut c_int, err: io::Error) {
 ///
 /// The caller of this function is responsible for ensuring that the pointer arguments are
 /// valid.
+#[cfg(feature = "sev")]
 #[no_mangle]
 pub unsafe extern "C" fn sev_init(vm_fd: c_int, sev_fd: c_int, fw_err: *mut c_int) -> c_int {
     let vm: RawFd = vm_fd;
@@ -306,6 +314,7 @@ pub unsafe extern "C" fn sev_init(vm_fd: c_int, sev_fd: c_int, fw_err: *mut c_in
 ///
 /// The caller of this function is responsible for ensuring that the pointer arguments are
 /// valid.
+#[cfg(feature = "sev")]
 #[no_mangle]
 pub unsafe extern "C" fn sev_es_init(vm_fd: c_int, sev_fd: c_int, fw_err: *mut c_int) -> c_int {
     let vm: RawFd = vm_fd;
@@ -331,6 +340,7 @@ pub unsafe extern "C" fn sev_es_init(vm_fd: c_int, sev_fd: c_int, fw_err: *mut c
 ///
 /// The caller of this function is responsible for ensuring that the pointer arguments are
 /// valid.
+#[cfg(feature = "sev")]
 #[no_mangle]
 pub unsafe extern "C" fn sev_launch_start(
     vm_fd: c_int,
@@ -376,6 +386,7 @@ pub unsafe extern "C" fn sev_launch_start(
 ///
 /// The caller of this function is responsible for ensuring that the pointer arguments are
 /// valid.
+#[cfg(feature = "sev")]
 #[no_mangle]
 pub unsafe extern "C" fn sev_launch_update_data(
     vm_fd: c_int,
@@ -404,6 +415,7 @@ pub unsafe extern "C" fn sev_launch_update_data(
 ///
 /// The caller of this function is responsible for ensuring that the pointer arguments are
 /// valid.
+#[cfg(feature = "sev")]
 #[no_mangle]
 pub unsafe extern "C" fn sev_launch_update_vmsa(vm_fd: c_int, fw_err: *mut c_int) -> c_int {
     let mut map = STARTED_MAP.lock().unwrap();
@@ -429,6 +441,7 @@ pub unsafe extern "C" fn sev_launch_update_vmsa(vm_fd: c_int, fw_err: *mut c_int
 ///
 /// The "measurement_data" argument should be a valid pointer able to hold the meausurement's
 /// bytes. The measurement is 48 bytes in size.
+#[cfg(feature = "sev")]
 #[no_mangle]
 pub unsafe extern "C" fn sev_launch_measure(
     vm_fd: c_int,
@@ -475,6 +488,7 @@ pub unsafe extern "C" fn sev_launch_measure(
 ///
 /// The caller of this function is responsible for ensuring that the pointer arguments are
 /// valid.
+#[cfg(feature = "sev")]
 #[no_mangle]
 pub unsafe extern "C" fn sev_inject_launch_secret(
     vm_fd: c_int,
@@ -520,6 +534,7 @@ pub unsafe extern "C" fn sev_inject_launch_secret(
 ///
 /// The caller of this function is responsible for ensuring that the pointer arguments are
 /// valid.
+#[cfg(feature = "sev")]
 #[no_mangle]
 pub unsafe extern "C" fn sev_launch_finish(vm_fd: c_int, fw_err: *mut c_int) -> c_int {
     let mut map = MEASURED_MAP.lock().unwrap();
@@ -548,6 +563,7 @@ pub unsafe extern "C" fn sev_launch_finish(vm_fd: c_int, fw_err: *mut c_int) -> 
 ///
 /// The caller of this function is responsible for ensuring that the pointer arguments are
 /// valid.
+#[cfg(feature = "sev")]
 #[allow(unused_assignments)]
 #[no_mangle]
 pub unsafe extern "C" fn sev_attestation_report(

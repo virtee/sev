@@ -24,6 +24,7 @@ is-it-maintained-open-issues = { repository = "virtee/sev" }
 [lib]
 crate-type = ["staticlib", "dylib", "rlib"]
 name = 'sev'
+path = "src/lib.rs"
 doc = false
 
 [features]
