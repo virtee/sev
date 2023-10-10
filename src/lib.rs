@@ -50,8 +50,9 @@
 pub mod certs;
 
 pub mod firmware;
+#[cfg(target_os = "linux")]
 pub mod launch;
-#[cfg(all(feature = "openssl", feature = "sev"))]
+#[cfg(all(target_os = "linux", feature = "openssl", feature = "sev"))]
 pub mod session;
 mod util;
 pub mod vmsa;

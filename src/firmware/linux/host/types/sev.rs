@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{certs::sev::sev, Version};
+#[cfg(target_os = "linux")]
+use crate::certs::sev::sev;
 
+use crate::Version;
+
+#[cfg(target_os = "linux")]
 use std::marker::PhantomData;
 
 bitflags::bitflags! {
@@ -46,18 +50,21 @@ pub struct PlatformStatus {
 /// Generate a new Platform Endorsement Key (PEK).
 ///
 /// (Chapter 5.7)
+#[cfg(target_os = "linux")]
 pub struct PekGen;
 
 /// Request certificate signing.
 ///
 /// (Chapter 5.8; Table 27)
 #[repr(C, packed)]
+#[cfg(target_os = "linux")]
 pub struct PekCsr<'a> {
     addr: u64,
     len: u32,
     _phantom: PhantomData<&'a ()>,
 }
 
+#[cfg(target_os = "linux")]
 impl<'a> PekCsr<'a> {
     pub fn new(cert: &'a mut sev::Certificate) -> Self {
         Self {
@@ -71,6 +78,7 @@ impl<'a> PekCsr<'a> {
 /// Join the platform to the domain.
 ///
 /// (Chapter 5.9; Table 29)
+#[cfg(target_os = "linux")]
 #[repr(C, packed)]
 pub struct PekCertImport<'a> {
     pek_addr: u64,
@@ -80,6 +88,7 @@ pub struct PekCertImport<'a> {
     _phantom: PhantomData<&'a ()>,
 }
 
+#[cfg(target_os = "linux")]
 impl<'a> PekCertImport<'a> {
     pub fn new(pek: &'a sev::Certificate, oca: &'a sev::Certificate) -> Self {
         Self {
@@ -95,11 +104,13 @@ impl<'a> PekCertImport<'a> {
 /// (Re)generate the Platform Diffie-Hellman (PDH).
 ///
 /// (Chapter 5.10)
+#[cfg(target_os = "linux")]
 pub struct PdhGen;
 
 /// Retrieve the PDH and the platform certificate chain.
 ///
 /// (Chapter 5.11)
+#[cfg(target_os = "linux")]
 #[repr(C, packed)]
 pub struct PdhCertExport<'a> {
     pdh_addr: u64,
@@ -109,6 +120,7 @@ pub struct PdhCertExport<'a> {
     _phantom: PhantomData<&'a ()>,
 }
 
+#[cfg(target_os = "linux")]
 impl<'a> PdhCertExport<'a> {
     pub fn new(pdh: &'a mut sev::Certificate, certs: &'a mut [sev::Certificate; 3]) -> Self {
         Self {

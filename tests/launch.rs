@@ -34,8 +34,8 @@ fn sev() {
     let mut sev = Firmware::open().unwrap();
     let build = sev.platform_status().unwrap().build;
     let chain = cached_chain::get().expect(
-        r#"could not find certificate chain
-        export with: sevctl export --full ~/.cache/amd-sev/chain"#,
+        r"could not find certificate chain
+        export with: sevctl export --full ~/.cache/amd-sev/chain",
     );
 
     let policy = Policy::default();
@@ -100,7 +100,7 @@ fn sev() {
     vcpu.set_regs(&regs).unwrap();
 
     match vcpu.run().unwrap() {
-        VcpuExit::Hlt => return,
+        VcpuExit::Hlt => (),
         exit_reason => panic!("unexpected exit reason: {:?}", exit_reason),
     }
 }

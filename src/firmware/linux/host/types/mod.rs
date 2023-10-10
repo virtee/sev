@@ -13,10 +13,12 @@ pub use self::sev::*;
 pub use self::snp::*;
 
 #[cfg(any(feature = "sev", feature = "snp"))]
+#[cfg(target_os = "linux")]
 use std::marker::PhantomData;
 
 /// Get the CPU's unique ID that can be used for getting
 /// a certificate for the CEK public key.
+#[cfg(target_os = "linux")]
 #[cfg(any(feature = "sev", feature = "snp"))]
 #[repr(C, packed)]
 pub struct GetId<'a> {
@@ -26,6 +28,7 @@ pub struct GetId<'a> {
 }
 
 #[cfg(any(feature = "sev", feature = "snp"))]
+#[cfg(target_os = "linux")]
 impl<'a> GetId<'a> {
     pub fn new(id: &'a mut [u8; 64]) -> Self {
         Self {
@@ -46,4 +49,5 @@ impl<'a> GetId<'a> {
 ///
 /// (Chapter 5.5)
 #[cfg(feature = "sev")]
+#[cfg(target_os = "linux")]
 pub struct PlatformReset;
