@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use bincode;
 use std::{
+    array::TryFromSliceError,
     convert::From,
     error,
     fmt::{Debug, Display},
@@ -593,5 +595,234 @@ impl From<Indeterminate<Error>> for c_int {
                 Error::InvalidKey => 0x27,
             },
         }
+    }
+}
+
+#[derive(Debug)]
+/// Errors which may be encountered when building custom guest context.
+pub enum GCTXError {
+    /// Malformed guest context page.
+    InvalidPageSize(usize, usize),
+
+    /// Block size data was the incorrect size
+    InvalidBlockSize,
+
+    /// Unknown Error.
+    UnknownError,
+}
+
+impl std::fmt::Display for GCTXError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            GCTXError::InvalidPageSize(actual, expected) => write!(
+                f,
+                "Page information was not the correct length ({actual} vs {expected})"
+            ),
+            GCTXError::InvalidBlockSize => {
+                write!(f, "Provided data does not conform to a 4096 block size")
+            }
+            GCTXError::UnknownError => write!(f, "An unknown Guest Context error encountered"),
+        }
+    }
+}
+
+impl std::error::Error for GCTXError {}
+
+#[derive(Debug)]
+/// Errors which may be encountered when handling OVMF data
+pub enum OVMFError {
+    /// An invalid section type was provided for OVMF METADATA
+    InvalidSectionType,
+
+    /// Part of the SEV METADATA failed verification
+    SEVMetadataVerification(String),
+
+    /// Desired entry is missing from table
+    EntryMissingInTable(String),
+
+    /// Invalid Entry Size was provided
+    InvalidSize(String, usize, usize),
+
+    /// GUID doesn't match expected GUID
+    MismatchingGUID(),
+
+    /// Unknown Error.
+    UnknownError,
+}
+
+impl std::fmt::Display for OVMFError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            OVMFError::InvalidSectionType => write!(f, "An invalid section type was found"),
+            OVMFError::SEVMetadataVerification(section) => {
+                write!(f, "Wrong SEV metadata {section}")
+            }
+            OVMFError::EntryMissingInTable(entry) => {
+                write!(f, "Can't find {entry} entry in OVMF table")
+            }
+            OVMFError::InvalidSize(entry, actual, expected) => {
+                write!(f, "Invalid size of {entry}: {actual} < {expected}")
+            }
+            OVMFError::MismatchingGUID() => {
+                write!(f, "OVMF table footer GUID does not match expected GUID")
+            }
+            OVMFError::UnknownError => write!(f, "An unknown Guest Context error encountered"),
+        }
+    }
+}
+
+impl std::error::Error for OVMFError {}
+
+#[derive(Debug)]
+/// Errors which may be encountered when building SEV hashes.
+pub enum SevHashError {
+    /// Provided page has invalid size
+    InvalidSize(usize, usize),
+
+    /// Provided page has invalid offset
+    InvalidOffset(usize, usize),
+
+    /// Unknown Error.
+    UnknownError,
+}
+
+impl std::fmt::Display for SevHashError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            SevHashError::InvalidOffset(actual, expected) => {
+                write!(f, "Invalid page Offset: {actual} vs {expected}")
+            }
+            SevHashError::InvalidSize(actual, expected) => {
+                write!(f, "Invalid page Size: {actual} vs {expected}")
+            }
+            SevHashError::UnknownError => write!(f, "An unknown Guest Context error encountered"),
+        }
+    }
+}
+
+impl std::error::Error for SevHashError {}
+
+#[derive(Debug)]
+/// Errors which may be encountered when calculating the guest measurement.
+pub enum MeasurementError {
+    /// TryFrom Slice Error handling
+    FromSliceError(TryFromSliceError),
+
+    /// UUID Error handling
+    UUIDError(uuid::Error),
+
+    /// Bincode Error Handling
+    BincodeError(bincode::ErrorKind),
+
+    /// File Error Handling
+    FileError(std::io::Error),
+
+    /// Vec from hex Error Handling
+    FromHexError(hex::FromHexError),
+
+    /// Guest Context Error Handling
+    GCTXError(GCTXError),
+
+    /// OVMF Error Handling
+    OVMFError(OVMFError),
+
+    /// SEV Hash Error Handling
+    SevHashError(SevHashError),
+
+    /// Invalid VCPU provided
+    InvalidVcpuTypeError(String),
+
+    /// Invalid VMM Provided
+    InvalidVmmError(String),
+
+    /// Invalid SEV Mode provided
+    InvalidSevModeError(String),
+
+    /// Kernel specified for wrong OVMF
+    KernelSpecifiedError,
+
+    /// OVMF is missing required section with kernel specified
+    MissingSection(String),
+}
+
+impl std::fmt::Display for MeasurementError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            MeasurementError::FromSliceError(e) => write!(f, "Error converting slice: {e}"),
+            MeasurementError::UUIDError(e) => write!(f, "UUID Error encountered: {e}"),
+            MeasurementError::BincodeError(e) => write!(f, "Bincode error encountered: {e}"),
+            MeasurementError::FileError(e) => write!(f, "Failed handling file: {e}"),
+            MeasurementError::FromHexError(e) => write!(f, "Converting hex to vector error: {e}"),
+            MeasurementError::GCTXError(e) => write!(f, "GCTX Error Encountered: {e}"),
+            MeasurementError::OVMFError(e) => write!(f, "OVMF Error Encountered: {e}"),
+            MeasurementError::SevHashError(e) => write!(f, "Sev hash Error Encountered: {e}"),
+            MeasurementError::InvalidVcpuTypeError(value) => {
+                write!(f, "Invalid VCPU type value provided: {value}")
+            }
+            MeasurementError::InvalidVmmError(value) => {
+                write!(f, "Invalid VMM type provided: {value}")
+            }
+            MeasurementError::InvalidSevModeError(value) => {
+                write!(f, "Invalid SEV mode provided: {value}")
+            }
+            MeasurementError::KernelSpecifiedError => write!(
+                f,
+                "Kernel specified but OVMF doesn't support kernel/initrd/cmdline measurement"
+            ),
+            MeasurementError::MissingSection(section) => write!(
+                f,
+                "Kernel specified but OVMF metadata doesn't include {section} section"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for MeasurementError {}
+
+impl std::convert::From<TryFromSliceError> for MeasurementError {
+    fn from(value: TryFromSliceError) -> Self {
+        Self::FromSliceError(value)
+    }
+}
+
+impl std::convert::From<uuid::Error> for MeasurementError {
+    fn from(value: uuid::Error) -> Self {
+        Self::UUIDError(value)
+    }
+}
+
+impl std::convert::From<bincode::ErrorKind> for MeasurementError {
+    fn from(value: bincode::ErrorKind) -> Self {
+        Self::BincodeError(value)
+    }
+}
+
+impl std::convert::From<std::io::Error> for MeasurementError {
+    fn from(value: std::io::Error) -> Self {
+        Self::FileError(value)
+    }
+}
+
+impl std::convert::From<hex::FromHexError> for MeasurementError {
+    fn from(value: hex::FromHexError) -> Self {
+        Self::FromHexError(value)
+    }
+}
+
+impl std::convert::From<GCTXError> for MeasurementError {
+    fn from(value: GCTXError) -> Self {
+        Self::GCTXError(value)
+    }
+}
+
+impl std::convert::From<OVMFError> for MeasurementError {
+    fn from(value: OVMFError) -> Self {
+        Self::OVMFError(value)
+    }
+}
+
+impl std::convert::From<SevHashError> for MeasurementError {
+    fn from(value: SevHashError) -> Self {
+        Self::SevHashError(value)
     }
 }
