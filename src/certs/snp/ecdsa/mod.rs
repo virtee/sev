@@ -32,6 +32,18 @@ pub struct Signature {
     _reserved: [u8; 512 - R_S_SIZE],
 }
 
+impl Signature {
+    /// Returns the signatures `r` component
+    pub fn r(&self) -> &[u8; 72] {
+        &self.r
+    }
+
+    /// Returns the signatures `s` component
+    pub fn s(&self) -> &[u8; 72] {
+        &self.s
+    }
+}
+
 impl std::fmt::Debug for Signature {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
