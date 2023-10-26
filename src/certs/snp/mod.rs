@@ -3,39 +3,40 @@
 /// ECDSA signatures.
 pub mod ecdsa;
 
-#[cfg(feature = "openssl")]
+#[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
 /// Certificate Authority (CA) certificates.
 pub mod ca;
 
-#[cfg(feature = "openssl")]
+#[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
 /// Built-in certificates for Milan and Genoa machines.
 pub mod builtin;
 
 #[cfg(feature = "openssl")]
 mod cert;
+#[cfg(feature = "crypto_nossl")]
+mod cert_nossl;
 
-#[cfg(feature = "openssl")]
+#[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
 mod chain;
 
 #[cfg(feature = "openssl")]
 pub use cert::Certificate;
+#[cfg(feature = "crypto_nossl")]
+pub use cert_nossl::Certificate;
 
-#[cfg(feature = "openssl")]
+#[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
 pub use chain::Chain;
 
 use std::io::Result;
 
-#[cfg(feature = "openssl")]
+#[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
 use std::io::{Error, ErrorKind};
-
-#[cfg(feature = "openssl")]
-use openssl::x509::X509;
 
 #[cfg(feature = "openssl")]
 #[allow(dead_code)]
 struct Body;
 
-#[cfg(feature = "openssl")]
+#[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
 /// An interface for types that may contain entities such as
 /// signatures that must be verified.
 pub trait Verifiable {

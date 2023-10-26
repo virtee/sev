@@ -2,12 +2,12 @@
 
 use crate::{certs::snp::ecdsa::Signature, firmware::host::TcbVersion, util::hexdump};
 
-#[cfg(feature = "openssl")]
+#[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
 use crate::certs::snp::{Chain, Verifiable};
 
 use std::fmt::Display;
 
-#[cfg(feature = "openssl")]
+#[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
 use std::{
     convert::TryFrom,
     io::{self, Error, ErrorKind},
@@ -345,6 +345,48 @@ impl Verifiable for (&Chain, &AttestationReport) {
                 "VCEK does not sign the attestation report",
             )),
         }
+    }
+}
+
+#[cfg(feature = "crypto_nossl")]
+impl Verifiable for (&Chain, &AttestationReport) {
+    type Output = ();
+
+    fn verify(self) -> io::Result<Self::Output> {
+        // According to Chapter 3 of the [Versioned Chip Endorsement Key (VCEK) Certificate and
+        // KDS Interface Specification][spec], the VCEK certificate certifies an ECDSA public key on curve P-384,
+        // and the signature hash algorithm is sha384.
+        // [spec]: https://www.amd.com/content/dam/amd/en/documents/epyc-technical-docs/specifications/57230.pdf
+
+        let vcek = self.0.verify()?;
+
+        let sig = p384::ecdsa::Signature::try_from(&self.1.signature)?;
+
+        let measurable_bytes: &[u8] = &bincode::serialize(self.1).map_err(|e| {
+            Error::new(
+                ErrorKind::Other,
+                format!("Unable to serialize bytes: {}", e),
+            )
+        })?[..0x2a0];
+
+        use sha2::Digest;
+        let base_digest = sha2::Sha384::new_with_prefix(measurable_bytes);
+
+        let verifying_key = p384::ecdsa::VerifyingKey::from_sec1_bytes(vcek.public_key_sec1())
+            .map_err(|e| {
+                io::Error::new(
+                    ErrorKind::Other,
+                    format!("failed to deserialize public key from sec1 bytes: {e:?}"),
+                )
+            })?;
+
+        use p384::ecdsa::signature::DigestVerifier;
+        verifying_key.verify_digest(base_digest, &sig).map_err(|e| {
+            io::Error::new(
+                ErrorKind::Other,
+                format!("VCEK does not sign the attestation report: {e:?}"),
+            )
+        })
     }
 }
 

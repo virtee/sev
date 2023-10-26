@@ -24,6 +24,16 @@ Refer to the [`firmware`] module for more information.
 
 Refer to the [`launch`] module for more information.
 
+### Cryptographic Verification
+
+To enable the cryptographic verification of certificate chains and
+attestation reports, either the `openssl` or `crypto_nossl` feature
+has to be enabled manually. With `openssl`, OpenSSL is used for the
+verification. With `crypto_nossl`, OpenSSL is _not_ used for the
+verification and instead pure-Rust libraries (e.g., `p384`, `rsa`,
+etc.) are used. `openssl` and `crypto_nossl` are mutually exclusive,
+and enabling both at the same time leads to a compiler error.
+
 ### Remarks
 
 Note that the Linux kernel provides access to these APIs through a set

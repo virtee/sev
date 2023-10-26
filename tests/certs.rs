@@ -22,18 +22,14 @@ mod sev {
     }
 }
 
-#[cfg(feature = "snp")]
+#[cfg(all(feature = "snp", any(feature = "openssl", feature = "crypto_nossl")))]
 mod snp {
-    #[cfg(feature = "openssl")]
     use sev::certs::snp::{builtin::milan, ca, Certificate, Chain, Verifiable};
 
-    #[cfg(feature = "openssl")]
     const TEST_MILAN_VCEK_DER: &[u8] = include_bytes!("certs_data/vcek_milan.der");
 
-    #[cfg(feature = "openssl")]
     const TEST_MILAN_ATTESTATION_REPORT: &[u8] = include_bytes!("certs_data/report_milan.hex");
 
-    #[cfg(feature = "openssl")]
     #[test]
     fn milan_chain() {
         let ark = milan::ark().unwrap();
@@ -42,12 +38,31 @@ mod snp {
 
         let ca = ca::Chain { ark, ask };
 
-        let chain = Chain { ca, vcek };
+        let chain = Chain {
+            ca,
+            vcek: vcek.clone(),
+        };
 
-        chain.verify().unwrap();
+        assert_eq!(chain.verify().ok(), Some(&vcek));
     }
 
-    #[cfg(feature = "openssl")]
+    #[test]
+    fn milan_chain_invalid() {
+        let ark = milan::ark().unwrap();
+        let ask = milan::ask().unwrap();
+        let vcek = {
+            let mut buf = TEST_MILAN_VCEK_DER.to_vec();
+            buf[40] ^= 0xff;
+            Certificate::from_der(&buf).unwrap()
+        };
+
+        let ca = ca::Chain { ark, ask };
+
+        let chain = Chain { ca, vcek };
+
+        assert_eq!(chain.verify().ok(), None);
+    }
+
     #[test]
     fn milan_report() {
         use sev::firmware::guest::AttestationReport;
@@ -64,6 +79,26 @@ mod snp {
         let report: AttestationReport =
             unsafe { std::ptr::read(report_bytes.as_ptr() as *const _) };
 
-        (&chain, &report).verify().unwrap();
+        assert_eq!((&chain, &report).verify().ok(), Some(()));
+    }
+
+    #[test]
+    fn milan_report_invalid() {
+        use sev::firmware::guest::AttestationReport;
+
+        let ark = milan::ark().unwrap();
+        let ask = milan::ask().unwrap();
+        let vcek = Certificate::from_der(TEST_MILAN_VCEK_DER).unwrap();
+
+        let ca = ca::Chain { ark, ask };
+
+        let chain = Chain { ca, vcek };
+
+        let mut report_bytes = hex::decode(TEST_MILAN_ATTESTATION_REPORT).unwrap();
+        report_bytes[0] ^= 0x80;
+        let report: AttestationReport =
+            unsafe { std::ptr::read(report_bytes.as_ptr() as *const _) };
+
+        assert_eq!((&chain, &report).verify().ok(), None);
     }
 }
