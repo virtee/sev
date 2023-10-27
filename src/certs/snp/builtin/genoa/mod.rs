@@ -10,12 +10,12 @@ pub const ASK: &[u8] = include_bytes!("ask.pem");
 
 /// Get the Genoa ARK Certificate.
 pub fn ark() -> Result<Certificate> {
-    Ok(Certificate::from(X509::from_pem(ARK)?))
+    Certificate::from_pem(ARK)
 }
 
 /// Get the Genoa ASK Certificate.
 pub fn ask() -> Result<Certificate> {
-    Ok(Certificate::from(X509::from_pem(ASK)?))
+    Certificate::from_pem(ASK)
 }
 
 mod tests {

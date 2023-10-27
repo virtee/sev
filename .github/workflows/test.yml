@@ -1,8 +1,8 @@
 on: [push, pull_request]
 name: test
 jobs:
-  sw:
-    name: sw ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
+  sw-openssl:
+    name: sw openssl ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -27,3 +27,30 @@ jobs:
             flag: --release
         features:
           - openssl
+
+  sw-crypto_nossl:
+    name: sw crypto_nossl ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: ${{ matrix.profile.flag }} --features=${{ matrix.features }}
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain:
+          - nightly
+          - beta
+          - stable
+        profile:
+          - name: debug
+          - name: release
+            flag: --release
+        features:
+          - crypto_nossl
