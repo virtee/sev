@@ -56,6 +56,15 @@ impl TryFrom<u8> for SectionType {
         }
     }
 }
+/// Creating strucutre from bytes
+pub trait TryFromBytes {
+    /// Error when attempting to deserialize from_bytes
+    type Error;
+    /// Creating structure from bytes function
+    fn try_from_bytes(value: &[u8], offset: usize) -> Result<Self, Self::Error>
+    where
+        Self: std::marker::Sized;
+}
 
 /// OVMF SEV Metadata Section Description
 #[repr(C)]
@@ -69,9 +78,9 @@ pub struct OvmfSevMetadataSectionDesc {
     pub section_type: SectionType,
 }
 
-impl OvmfSevMetadataSectionDesc {
-    /// Generate Description from bytes
-    fn from_bytes(value: &[u8], offset: usize) -> Result<Self, MeasurementError> {
+impl TryFromBytes for OvmfSevMetadataSectionDesc {
+    type Error = MeasurementError;
+    fn try_from_bytes(value: &[u8], offset: usize) -> Result<Self, Self::Error> {
         let value = &value[offset..offset + std::mem::size_of::<OvmfSevMetadataSectionDesc>()];
         bincode::deserialize(value).map_err(|e| MeasurementError::BincodeError(*e))
     }
@@ -91,13 +100,15 @@ struct OvmfSevMetadataHeader {
     num_items: u32,
 }
 
-impl OvmfSevMetadataHeader {
-    /// Generate Header from bytes
-    fn from_bytes(value: &[u8], offset: usize) -> Result<Self, MeasurementError> {
+impl TryFromBytes for OvmfSevMetadataHeader {
+    type Error = MeasurementError;
+    fn try_from_bytes(value: &[u8], offset: usize) -> Result<Self, Self::Error> {
         let value = &value[offset..offset + std::mem::size_of::<OvmfSevMetadataHeader>()];
         bincode::deserialize(value).map_err(|e| MeasurementError::BincodeError(*e))
     }
+}
 
+impl OvmfSevMetadataHeader {
     /// Verify Header Signature
     fn verify(&self) -> Result<(), OVMFError> {
         let expected_signature: &[u8] = b"ASEV";
@@ -251,15 +262,16 @@ impl OVMF {
         let expected_footer_guid = guid_le_to_slice(OVMF_TABLE_FOOTER_GUID.to_string().as_str())?;
 
         if !footer.guid.eq(&expected_footer_guid) {
-            return Err(MeasurementError::OVMFError(OVMFError::MismatchingGUID()));
+            return Err(OVMFError::MismatchingGUID.into());
         }
 
         if (footer.size as usize) < ENTRY_HEADER_SIZE {
-            return Err(MeasurementError::OVMFError(OVMFError::InvalidSize(
+            return Err(OVMFError::InvalidSize(
                 "OVMF Table Footer".to_string(),
                 footer.size as usize,
                 ENTRY_HEADER_SIZE,
-            )));
+            )
+            .into());
         }
 
         let table_size = footer.size as usize - ENTRY_HEADER_SIZE;
@@ -271,11 +283,12 @@ impl OVMF {
             let entry =
                 OvmfFooterTableEntry::try_from(&table_bytes[offset - ENTRY_HEADER_SIZE..offset])?;
             if entry.size < ENTRY_HEADER_SIZE as u16 {
-                return Err(MeasurementError::OVMFError(OVMFError::InvalidSize(
+                return Err(OVMFError::InvalidSize(
                     "OVMF Table Entry".to_string(),
                     entry.size as usize,
                     ENTRY_HEADER_SIZE,
-                )));
+                )
+                .into());
             }
             let entry_guid = Uuid::from_slice_le(&entry.guid)?;
 
@@ -297,21 +310,22 @@ impl OVMF {
             Some(entry) => {
                 let offset_from_end = i32::from_le_bytes(entry[..4].try_into()?);
                 let header_start = self.data.len() - (offset_from_end as usize);
-                let header = OvmfSevMetadataHeader::from_bytes(self.data.as_slice(), header_start)?;
+                let header =
+                    OvmfSevMetadataHeader::try_from_bytes(self.data.as_slice(), header_start)?;
                 header.verify()?;
                 let items = &self.data[header_start + std::mem::size_of::<OvmfSevMetadataHeader>()
                     ..header_start + header.size as usize];
                 for i in 0..header.num_items {
                     let offset = (i as usize) * std::mem::size_of::<OvmfSevMetadataSectionDesc>();
-                    let item = OvmfSevMetadataSectionDesc::from_bytes(items, offset)?;
+                    let item = OvmfSevMetadataSectionDesc::try_from_bytes(items, offset)?;
                     self.metadata_items.push(item.to_owned());
                 }
             }
 
             None => {
-                return Err(MeasurementError::OVMFError(OVMFError::EntryMissingInTable(
-                    "OVMF_SEV_METADATA_GUID".to_string(),
-                )));
+                return Err(
+                    OVMFError::EntryMissingInTable("OVMF_SEV_METADATA_GUID".to_string()).into(),
+                );
             }
         }
 

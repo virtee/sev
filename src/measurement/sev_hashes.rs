@@ -24,9 +24,11 @@ struct GuidLe {
     _data: [u8; 16],
 }
 
-impl GuidLe {
-    fn from_uuid(guid: &Uuid) -> Result<Self, MeasurementError> {
-        let guid = guid.to_bytes_le();
+impl TryFrom<&Uuid> for GuidLe {
+    type Error = MeasurementError;
+
+    fn try_from(value: &Uuid) -> Result<Self, Self::Error> {
+        let guid = value.to_bytes_le();
         let guid = guid.as_slice();
         Ok(Self {
             _data: guid.try_into()?,
@@ -62,7 +64,7 @@ struct SevHashTableEntry {
 impl SevHashTableEntry {
     fn new(guid: &Uuid, hash: Sha256Hash) -> Result<Self, MeasurementError> {
         Ok(Self {
-            guid: GuidLe::from_uuid(guid)?,
+            guid: GuidLe::try_from(guid)?,
             length: std::mem::size_of::<SevHashTableEntry>() as u16,
             hash,
         })
@@ -149,7 +151,6 @@ impl SevHashes {
         kernel_file.read_to_end(&mut kernel_data)?;
 
         let kernel_hash = sha256(&kernel_data);
-
         let initrd_data = match initrd {
             Some(path) => {
                 let mut initrd_file = File::open(path)?;
@@ -197,9 +198,7 @@ impl SevHashes {
     /// Construct an SEV Hash page using hash table.
     pub fn construct_page(&self, offset: usize) -> Result<Vec<u8>, MeasurementError> {
         if offset >= 4096 {
-            return Err(MeasurementError::SevHashError(SevHashError::InvalidOffset(
-                offset, 4096,
-            )));
+            return Err(SevHashError::InvalidOffset(offset, 4096).into());
         }
 
         let hashes_table = self.construct_table()?;
@@ -208,10 +207,7 @@ impl SevHashes {
         page.extend_from_slice(&hashes_table[..]);
         page.resize(4096, 0);
         if page.len() != 4096 {
-            return Err(MeasurementError::SevHashError(SevHashError::InvalidSize(
-                page.len(),
-                4096,
-            )));
+            return Err(SevHashError::InvalidSize(page.len(), 4096).into());
         }
         Ok(page)
     }

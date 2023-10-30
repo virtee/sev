@@ -607,6 +607,12 @@ pub enum GCTXError {
     /// Block size data was the incorrect size
     InvalidBlockSize,
 
+    /// Missing data to do page update
+    MissingData,
+
+    /// Missing block size
+    MissingBlockSize,
+
     /// Unknown Error.
     UnknownError,
 }
@@ -620,6 +626,12 @@ impl std::fmt::Display for GCTXError {
             ),
             GCTXError::InvalidBlockSize => {
                 write!(f, "Provided data does not conform to a 4096 block size")
+            }
+            GCTXError::MissingData => {
+                write!(f, "Did not provide data to perform page update")
+            }
+            GCTXError::MissingBlockSize => {
+                write!(f, "Did not provide block size to perform page update")
             }
             GCTXError::UnknownError => write!(f, "An unknown Guest Context error encountered"),
         }
@@ -644,7 +656,7 @@ pub enum OVMFError {
     InvalidSize(String, usize, usize),
 
     /// GUID doesn't match expected GUID
-    MismatchingGUID(),
+    MismatchingGUID,
 
     /// Unknown Error.
     UnknownError,
@@ -663,18 +675,18 @@ impl std::fmt::Display for OVMFError {
             OVMFError::InvalidSize(entry, actual, expected) => {
                 write!(f, "Invalid size of {entry}: {actual} < {expected}")
             }
-            OVMFError::MismatchingGUID() => {
+            OVMFError::MismatchingGUID => {
                 write!(f, "OVMF table footer GUID does not match expected GUID")
             }
-            OVMFError::UnknownError => write!(f, "An unknown Guest Context error encountered"),
+            OVMFError::UnknownError => write!(f, "An unknown OVMF error encountered"),
         }
     }
 }
 
 impl std::error::Error for OVMFError {}
 
-#[derive(Debug)]
 /// Errors which may be encountered when building SEV hashes.
+#[derive(Debug)]
 pub enum SevHashError {
     /// Provided page has invalid size
     InvalidSize(usize, usize),
@@ -695,15 +707,15 @@ impl std::fmt::Display for SevHashError {
             SevHashError::InvalidSize(actual, expected) => {
                 write!(f, "Invalid page Size: {actual} vs {expected}")
             }
-            SevHashError::UnknownError => write!(f, "An unknown Guest Context error encountered"),
+            SevHashError::UnknownError => write!(f, "An unknown SEV Hashing error encountered"),
         }
     }
 }
 
 impl std::error::Error for SevHashError {}
 
-#[derive(Debug)]
 /// Errors which may be encountered when calculating the guest measurement.
+#[derive(Debug)]
 pub enum MeasurementError {
     /// TryFrom Slice Error handling
     FromSliceError(TryFromSliceError),
@@ -738,8 +750,8 @@ pub enum MeasurementError {
     /// Invalid SEV Mode provided
     InvalidSevModeError(String),
 
-    /// Kernel specified for wrong OVMF
-    KernelSpecifiedError,
+    /// OVMF doesn't support kernel measurement
+    InvalidOvmfKernelError,
 
     /// OVMF is missing required section with kernel specified
     MissingSection(String),
@@ -765,7 +777,7 @@ impl std::fmt::Display for MeasurementError {
             MeasurementError::InvalidSevModeError(value) => {
                 write!(f, "Invalid SEV mode provided: {value}")
             }
-            MeasurementError::KernelSpecifiedError => write!(
+            MeasurementError::InvalidOvmfKernelError => write!(
                 f,
                 "Kernel specified but OVMF doesn't support kernel/initrd/cmdline measurement"
             ),
