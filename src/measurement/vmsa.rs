@@ -70,7 +70,7 @@ impl fmt::Debug for VMMType {
 /// The layout of a VMCB struct is documented in Table B-1 of the
 /// AMD64 Architecture Programmer’s Manual, Volume 2: System Programming
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Serialize, Default)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 struct VmcbSeg {
     /// Segment selector: documented in Figure 4-3 of the
     /// AMD64 Architecture Programmer’s Manual, Volume 2: System Programming
@@ -119,7 +119,7 @@ where
 /// https://github.com/AMDESE/linux/blob/sev-snp-v12/arch/x86/include/asm/svm.h#L318
 /// (following the definitions in AMD APM Vol 2 Table B-4)
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Serialize, Default)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 struct SevEsSaveArea {
     es: VmcbSeg,
     cs: VmcbSeg,

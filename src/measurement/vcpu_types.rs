@@ -9,35 +9,35 @@ use crate::error::MeasurementError;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CpuType {
     /// EPYC
-    Epyc = 0,
+    Epyc,
     /// EPYC V1
-    EpycV1 = 1,
+    EpycV1,
     /// EPYC V2
-    EpycV2 = 2,
+    EpycV2,
     /// EPYC Indirect Branch Predictor Barrier
-    EpycIBPB = 3,
+    EpycIBPB,
     /// EPYC V3
-    EpycV3 = 4,
+    EpycV3,
     /// EPYC V4
-    EpycV4 = 5,
+    EpycV4,
     /// EPYC ROME
-    EpycRome = 6,
+    EpycRome,
     /// EPYC ROME V1
-    EpycRomeV1 = 7,
+    EpycRomeV1,
     ///EPYC ROME V2
-    EpycRomeV2 = 8,
+    EpycRomeV2,
     /// EPYC ROME V3
-    EpycRomeV3 = 9,
+    EpycRomeV3,
     /// EPYC MILAN
-    EpycMilan = 10,
+    EpycMilan,
     /// EPYC MILAN V1
-    EpycMilanV1 = 11,
+    EpycMilanV1,
     /// EPYC MILAN V2
-    EpycMilanV2 = 12,
+    EpycMilanV2,
     /// EPYC GENOA
-    EpycGenoa = 13,
+    EpycGenoa,
     /// EPYC GENOA V1
-    EpycGenoaV1 = 14,
+    EpycGenoaV1,
 }
 
 impl TryFrom<u8> for CpuType {

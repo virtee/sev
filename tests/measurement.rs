@@ -4,23 +4,24 @@
 
 #[cfg(feature = "snp")]
 mod snp_tests {
-    use sev::measurement::{measurement_functions::*, vmsa::VMMType};
+    use sev::measurement::{snp::*, vmsa::VMMType};
     // Test of we can generate a good OVMF hash
     #[test]
     fn test_snp_ovmf_hash_gen() {
         let ovmf_hash = "cab7e085874b3acfdbe2d96dcaa3125111f00c35c6fc9708464c2ae74bfdb048a198cb9a9ccae0b3e5e1a33f5f249819";
 
-        let ld = snp_calc_launch_digest(
-            1,
-            "EPYC-v4".into(),
-            "./tests/measurement/ovmf_AmdSev_suffix.bin".into(),
-            Some("/dev/null".into()),
-            Some("/dev/null".into()),
-            None,
-            Some(ovmf_hash),
-            Some(VMMType::QEMU),
-        )
-        .unwrap();
+        let arguments = SnpMeasurementArgs {
+            vcpus: 1,
+            vcpu_type: "EPYC-v4".into(),
+            ovmf_file: "./tests/measurement/ovmf_AmdSev_suffix.bin".into(),
+            kernel_file: Some("/dev/null".into()),
+            initrd_file: Some("/dev/null".into()),
+            append: None,
+            ovmf_hash_str: Some(ovmf_hash),
+            vmm_type: Some(VMMType::QEMU),
+        };
+
+        let ld = snp_calc_launch_digest(arguments).unwrap();
 
         let ld_hex = hex::encode(ld);
 
@@ -40,17 +41,18 @@ mod snp_tests {
 
         assert_eq!(ovmf_hash.as_str(), exp_hash);
 
-        let ld = snp_calc_launch_digest(
-            1,
-            "EPYC-v4".into(),
-            "./tests/measurement/ovmf_AmdSev_suffix.bin".into(),
-            Some("/dev/null".into()),
-            Some("/dev/null".into()),
-            Some("console=ttyS0 loglevel=7"),
-            Some(ovmf_hash.as_str()),
-            None,
-        )
-        .unwrap();
+        let arguments = SnpMeasurementArgs {
+            vcpus: 1,
+            vcpu_type: "EPYC-v4".into(),
+            ovmf_file: "./tests/measurement/ovmf_AmdSev_suffix.bin".into(),
+            kernel_file: Some("/dev/null".into()),
+            initrd_file: Some("/dev/null".into()),
+            append: Some("console=ttyS0 loglevel=7"),
+            ovmf_hash_str: Some(ovmf_hash.as_str()),
+            vmm_type: None,
+        };
+
+        let ld = snp_calc_launch_digest(arguments).unwrap();
 
         let ld_hex = hex::encode(ld);
 
@@ -62,17 +64,18 @@ mod snp_tests {
     // Test EC2 vmm type
     #[test]
     fn test_snp_ec2() {
-        let ld = snp_calc_launch_digest(
-            1,
-            "EPYC-v4".into(),
-            "./tests/measurement/ovmf_AmdSev_suffix.bin".into(),
-            Some("/dev/null".into()),
-            Some("/dev/null".into()),
-            None,
-            None,
-            Some(VMMType::EC2),
-        )
-        .unwrap();
+        let arguments = SnpMeasurementArgs {
+            vcpus: 1,
+            vcpu_type: "EPYC-v4".into(),
+            ovmf_file: "./tests/measurement/ovmf_AmdSev_suffix.bin".into(),
+            kernel_file: Some("/dev/null".into()),
+            initrd_file: Some("/dev/null".into()),
+            append: None,
+            ovmf_hash_str: None,
+            vmm_type: Some(VMMType::EC2),
+        };
+
+        let ld = snp_calc_launch_digest(arguments).unwrap();
 
         let ld_hex = hex::encode(ld);
 
@@ -84,17 +87,18 @@ mod snp_tests {
     // Test a regular snp type
     #[test]
     fn test_snp() {
-        let ld = snp_calc_launch_digest(
-            1,
-            "EPYC-v4".into(),
-            "./tests/measurement/ovmf_AmdSev_suffix.bin".into(),
-            Some("/dev/null".into()),
-            Some("/dev/null".into()),
-            Some("console=ttyS0 loglevel=7"),
-            None,
-            None,
-        )
-        .unwrap();
+        let arguments = SnpMeasurementArgs {
+            vcpus: 1,
+            vcpu_type: "EPYC-v4".into(),
+            ovmf_file: "./tests/measurement/ovmf_AmdSev_suffix.bin".into(),
+            kernel_file: Some("/dev/null".into()),
+            initrd_file: Some("/dev/null".into()),
+            append: Some("console=ttyS0 loglevel=7"),
+            ovmf_hash_str: None,
+            vmm_type: None,
+        };
+
+        let ld = snp_calc_launch_digest(arguments).unwrap();
 
         let ld_hex = hex::encode(ld);
 
@@ -106,17 +110,18 @@ mod snp_tests {
     // Test a regular snp without specified kernel
     #[test]
     fn test_snp_without_kernel() {
-        let ld = snp_calc_launch_digest(
-            1,
-            "EPYC-v4".into(),
-            "./tests/measurement/ovmf_AmdSev_suffix.bin".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+        let arguments = SnpMeasurementArgs {
+            vcpus: 1,
+            vcpu_type: "EPYC-v4".into(),
+            ovmf_file: "./tests/measurement/ovmf_AmdSev_suffix.bin".into(),
+            kernel_file: None,
+            initrd_file: None,
+            append: None,
+            ovmf_hash_str: None,
+            vmm_type: None,
+        };
+
+        let ld = snp_calc_launch_digest(arguments).unwrap();
 
         let ld_hex = hex::encode(ld);
 
@@ -128,17 +133,18 @@ mod snp_tests {
     // Test snp with multiple cpus
     #[test]
     fn test_snp_with_multiple_vcpus() {
-        let ld = snp_calc_launch_digest(
-            4,
-            "EPYC-v4".into(),
-            "./tests/measurement/ovmf_AmdSev_suffix.bin".into(),
-            Some("/dev/null".into()),
-            Some("/dev/null".into()),
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+        let arguments = SnpMeasurementArgs {
+            vcpus: 4,
+            vcpu_type: "EPYC-v4".into(),
+            ovmf_file: "./tests/measurement/ovmf_AmdSev_suffix.bin".into(),
+            kernel_file: Some("/dev/null".into()),
+            initrd_file: Some("/dev/null".into()),
+            append: None,
+            ovmf_hash_str: None,
+            vmm_type: None,
+        };
+
+        let ld = snp_calc_launch_digest(arguments).unwrap();
 
         let ld_hex = hex::encode(ld);
 
@@ -150,17 +156,18 @@ mod snp_tests {
     // Test snp with with ovmf64 and no kernel
     #[test]
     fn test_snp_with_ovmfx64_without_kernel() {
-        let ld = snp_calc_launch_digest(
-            1,
-            "EPYC-v4".into(),
-            "./tests/measurement/ovmf_OvmfX64_suffix.bin".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+        let arguments = SnpMeasurementArgs {
+            vcpus: 1,
+            vcpu_type: "EPYC-v4".into(),
+            ovmf_file: "./tests/measurement/ovmf_OvmfX64_suffix.bin".into(),
+            kernel_file: None,
+            initrd_file: None,
+            append: None,
+            ovmf_hash_str: None,
+            vmm_type: None,
+        };
+
+        let ld = snp_calc_launch_digest(arguments).unwrap();
 
         let ld_hex = hex::encode(ld);
 
@@ -175,40 +182,41 @@ mod snp_tests {
         expected = "Kernel specified but OVMF metadata doesn't include SNP_KERNEL_HASHES section"
     )]
     fn test_snp_with_ovmfx64_and_kernel_should_fail() {
+        let arguments = SnpMeasurementArgs {
+            vcpus: 1,
+            vcpu_type: "EPYC-v4".into(),
+            ovmf_file: "./tests/measurement/ovmf_OvmfX64_suffix.bin".into(),
+            kernel_file: Some("/dev/null".into()),
+            initrd_file: Some("/dev/null".into()),
+            append: None,
+            ovmf_hash_str: None,
+            vmm_type: None,
+        };
+
         panic!(
             "{}",
-            snp_calc_launch_digest(
-                1,
-                "EPYC-v4".into(),
-                "./tests/measurement/ovmf_OvmfX64_suffix.bin".into(),
-                Some("/dev/null".into()),
-                Some("/dev/null".into()),
-                None,
-                None,
-                None
-            )
-            .unwrap_err()
-            .to_string()
+            snp_calc_launch_digest(arguments).unwrap_err().to_string()
         );
     }
 }
 
 #[cfg(feature = "sev")]
 mod sev_tests {
-    use sev::measurement::measurement_functions::*;
+    use sev::measurement::sev::*;
     // test regular sev-es
     #[test]
     fn test_seves() {
-        let ld = seves_calc_launch_digest(
-            1,
-            "EPYC-v4".into(),
-            "./tests/measurement/ovmf_AmdSev_suffix.bin".into(),
-            Some("/dev/null".into()),
-            Some("/dev/null".into()),
-            None,
-            None,
-        )
-        .unwrap();
+        let arguments = SevEsMeasurementArgs {
+            vcpus: 1,
+            vcpu_type: "EPYC-v4".into(),
+            ovmf_file: "./tests/measurement/ovmf_AmdSev_suffix.bin".into(),
+            kernel_file: Some("/dev/null".into()),
+            initrd_file: Some("/dev/null".into()),
+            append: None,
+            vmm_type: None,
+        };
+
+        let ld = seves_calc_launch_digest(arguments).unwrap();
 
         let ld_hex = hex::encode(ld);
 
@@ -220,16 +228,17 @@ mod sev_tests {
     // test sev-es with multiple vcpus
     #[test]
     fn test_seves_with_multiple_vcpus() {
-        let ld = seves_calc_launch_digest(
-            4,
-            "EPYC-v4".into(),
-            "./tests/measurement/ovmf_AmdSev_suffix.bin".into(),
-            Some("/dev/null".into()),
-            Some("/dev/null".into()),
-            None,
-            None,
-        )
-        .unwrap();
+        let arguments = SevEsMeasurementArgs {
+            vcpus: 4,
+            vcpu_type: "EPYC-v4".into(),
+            ovmf_file: "./tests/measurement/ovmf_AmdSev_suffix.bin".into(),
+            kernel_file: Some("/dev/null".into()),
+            initrd_file: Some("/dev/null".into()),
+            append: None,
+            vmm_type: None,
+        };
+
+        let ld = seves_calc_launch_digest(arguments).unwrap();
 
         let ld_hex = hex::encode(ld);
 
@@ -244,32 +253,33 @@ mod sev_tests {
         expected = "Kernel specified but OVMF doesn't support kernel/initrd/cmdline measurement"
     )]
     fn test_seves_with_ovmfx64_and_kernel_should_fail() {
+        let arguments = SevEsMeasurementArgs {
+            vcpus: 1,
+            vcpu_type: "EPYC-v4".into(),
+            ovmf_file: "./tests/measurement/ovmf_OvmfX64_suffix.bin".into(),
+            kernel_file: Some("/dev/null".into()),
+            initrd_file: Some("/dev/null".into()),
+            append: None,
+            vmm_type: None,
+        };
+
         panic!(
             "{}",
-            seves_calc_launch_digest(
-                1,
-                "EPYC-v4".into(),
-                "./tests/measurement/ovmf_OvmfX64_suffix.bin".into(),
-                Some("/dev/null".into()),
-                Some("/dev/null".into()),
-                None,
-                None
-            )
-            .unwrap_err()
-            .to_string()
+            seves_calc_launch_digest(arguments).unwrap_err().to_string()
         );
     }
 
     // test regular sev
     #[test]
     fn test_sev() {
-        let ld = sev_calc_launch_digest(
-            "./tests/measurement/ovmf_AmdSev_suffix.bin".into(),
-            Some("/dev/null".into()),
-            Some("/dev/null".into()),
-            Some("console=ttyS0 loglevel=7"),
-        )
-        .unwrap();
+        let arguments = SevMeasurementArgs {
+            ovmf_file: "./tests/measurement/ovmf_AmdSev_suffix.bin".into(),
+            kernel_file: Some("/dev/null".into()),
+            initrd_file: Some("/dev/null".into()),
+            append: Some("console=ttyS0 loglevel=7"),
+        };
+
+        let ld = sev_calc_launch_digest(arguments).unwrap();
 
         let ld_hex = hex::encode(ld);
 
@@ -281,13 +291,14 @@ mod sev_tests {
     // test sev kernel with no initrd or append
     #[test]
     fn test_sev_with_kernel_without_initrd_and_append() {
-        let ld = sev_calc_launch_digest(
-            "./tests/measurement/ovmf_AmdSev_suffix.bin".into(),
-            Some("/dev/null".into()),
-            None,
-            None,
-        )
-        .unwrap();
+        let arguments = SevMeasurementArgs {
+            ovmf_file: "./tests/measurement/ovmf_AmdSev_suffix.bin".into(),
+            kernel_file: Some("/dev/null".into()),
+            initrd_file: None,
+            append: None,
+        };
+
+        let ld = sev_calc_launch_digest(arguments).unwrap();
 
         let ld_hex = hex::encode(ld);
 
@@ -299,13 +310,14 @@ mod sev_tests {
     // test sev with ovmfx64
     #[test]
     fn test_sev_with_ovmfx64_without_kernel() {
-        let ld = sev_calc_launch_digest(
-            "./tests/measurement/ovmf_OvmfX64_suffix.bin".into(),
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+        let arguments = SevMeasurementArgs {
+            ovmf_file: "./tests/measurement/ovmf_OvmfX64_suffix.bin".into(),
+            kernel_file: None,
+            initrd_file: None,
+            append: None,
+        };
+
+        let ld = sev_calc_launch_digest(arguments).unwrap();
 
         let ld_hex = hex::encode(ld);
 
@@ -320,16 +332,16 @@ mod sev_tests {
         expected = "Kernel specified but OVMF doesn't support kernel/initrd/cmdline measurement"
     )]
     fn test_sev_with_ovmfx64_and_kernel_should_fail() {
+        let arguments = SevMeasurementArgs {
+            ovmf_file: "./tests/measurement/ovmf_OvmfX64_suffix.bin".into(),
+            kernel_file: Some("/dev/null".into()),
+            initrd_file: Some("/dev/null".into()),
+            append: None,
+        };
+
         panic!(
             "{}",
-            sev_calc_launch_digest(
-                "./tests/measurement/ovmf_OvmfX64_suffix.bin".into(),
-                Some("/dev/null".into()),
-                Some("/dev/null".into()),
-                None
-            )
-            .unwrap_err()
-            .to_string()
+            sev_calc_launch_digest(arguments).unwrap_err().to_string()
         );
     }
 }
