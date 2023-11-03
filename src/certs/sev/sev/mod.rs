@@ -5,6 +5,7 @@
 pub(crate) mod cert;
 mod chain;
 
+pub use cert::v1::sig::ecdsa::Signature as EcdsaSignature;
 pub use cert::Certificate;
 pub use chain::Chain;
 
