@@ -53,11 +53,11 @@ impl FromStr for GuidLe {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Serialize, Default)]
 struct SevHashTableEntry {
-    /// Entry GUID
+    /// GUID of the SEV hash
     guid: GuidLe,
-    /// Length
+    /// Length of the hash
     length: u16,
-    /// Hash
+    /// SEV HASH
     hash: Sha256Hash,
 }
 
@@ -75,9 +75,9 @@ impl SevHashTableEntry {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Serialize, Default)]
 struct SevHashTable {
-    /// GUID
+    /// GUID of the SEV hash table entry
     guid: GuidLe,
-    /// Length
+    /// Length of the SEV Has table entry
     length: u16,
     /// Cmd line append table entry
     cmdline: SevHashTableEntry,
@@ -180,8 +180,8 @@ impl SevHashes {
         })
     }
 
-    ///Generate the SEV hashes area - this must be *identical* to the way QEMU
-    ///generates this info in order for the measurement to match.
+    /// Generate the SEV hashes area - this must be *identical* to the way QEMU
+    /// generates this info in order for the measurement to match.
     pub fn construct_table(&self) -> Result<Vec<u8>, MeasurementError> {
         let sev_hash_table = SevHashTable::new(
             SEV_HASH_TABLE_HEADER_GUID.to_string().as_str(),

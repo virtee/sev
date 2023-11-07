@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
-//! Enum of different exisitng AMD EPYC VCPUs
+//! Exisiting AMD EPYC vCPUs
 use std::{convert::TryFrom, fmt, str::FromStr};
 
 use crate::error::MeasurementError;
 
-/// All currently available QEMU VCPU types
+/// All currently available QEMU vCPU types
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CpuType {
     /// EPYC
@@ -24,7 +24,7 @@ pub enum CpuType {
     EpycRome,
     /// EPYC ROME V1
     EpycRomeV1,
-    ///EPYC ROME V2
+    /// EPYC ROME V2
     EpycRomeV2,
     /// EPYC ROME V3
     EpycRomeV3,

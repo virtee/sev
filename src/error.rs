@@ -652,6 +652,9 @@ pub enum OVMFError {
     /// Desired entry is missing from table
     EntryMissingInTable(String),
 
+    /// Failed to get item from table
+    GetTableItemError,
+
     /// Invalid Entry Size was provided
     InvalidSize(String, usize, usize),
 
@@ -671,6 +674,9 @@ impl std::fmt::Display for OVMFError {
             }
             OVMFError::EntryMissingInTable(entry) => {
                 write!(f, "Can't find {entry} entry in OVMF table")
+            }
+            OVMFError::GetTableItemError => {
+                write!(f, "OVMF table failed to return item")
             }
             OVMFError::InvalidSize(entry, actual, expected) => {
                 write!(f, "Invalid size of {entry}: {actual} < {expected}")

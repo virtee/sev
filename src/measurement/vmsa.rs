@@ -2,7 +2,6 @@
 
 //! Operations to build and interact with an SEV-ES VMSA
 use crate::error::MeasurementError;
-// use crate::measurement::{measurement_functions::SevMode, vcpu_types::CpuType};
 use crate::measurement::vcpu_types::CpuType;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
@@ -32,7 +31,7 @@ impl FromStr for SevMode {
     }
 }
 
-/// VmmTypes
+/// Supported Virtual Machine Monitors
 #[derive(Clone, Copy, PartialEq)]
 pub enum VMMType {
     /// QEMU

@@ -5,7 +5,7 @@
 #[cfg(feature = "snp")]
 mod snp_tests {
     use sev::measurement::{snp::*, vmsa::VMMType};
-    // Test of we can generate a good OVMF hash
+    // Testing if we can generate a good OVMF hash
     #[test]
     fn test_snp_ovmf_hash_gen() {
         let ovmf_hash = "cab7e085874b3acfdbe2d96dcaa3125111f00c35c6fc9708464c2ae74bfdb048a198cb9a9ccae0b3e5e1a33f5f249819";
@@ -30,7 +30,7 @@ mod snp_tests {
         assert_eq!(ld_hex.as_str(), exp_result);
     }
 
-    // Test of we can a full LD from the OVMF hash
+    // Test if we can compute a full LD from the OVMF hash
     #[test]
     fn test_snp_ovmf_hash_full() {
         let ovmf_hash = hex::encode(

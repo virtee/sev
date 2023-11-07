@@ -56,9 +56,9 @@ impl TryFrom<u8> for SectionType {
         }
     }
 }
-/// Creating strucutre from bytes
+/// Creating structure from bytes
 pub trait TryFromBytes {
-    /// Error when attempting to deserialize from_bytes
+    /// Error when attempting to deserialize from bytes
     type Error;
     /// Creating structure from bytes function
     fn try_from_bytes(value: &[u8], offset: usize) -> Result<Self, Self::Error>
@@ -137,7 +137,7 @@ struct OvmfFooterTableEntry {
 impl TryFrom<&[u8]> for OvmfFooterTableEntry {
     type Error = MeasurementError;
 
-    /// Grenerate footer from data
+    /// Generate footer from data
     fn try_from(value: &[u8]) -> Result<OvmfFooterTableEntry, MeasurementError> {
         // Bytes 2-17 are the GUID
         let guid: [u8; 16] = value[2..18].try_into()?;
@@ -158,14 +158,14 @@ const OVMF_SEV_META_DATA_GUID: Uuid = uuid!("dc886566-984a-4798-a75e-5585a7bf67c
 pub struct OVMF {
     /// OVMF data
     data: Vec<u8>,
-    /// Table matching GUID to it's data
+    /// Table matching GUID to its data
     table: HashMap<Uuid, Vec<u8>>,
     /// Metadata item description
     metadata_items: Vec<OvmfSevMetadataSectionDesc>,
 }
 
 impl OVMF {
-    /// Generate new OVMF structure by parsing the foorter table and SEV metadata
+    /// Generate new OVMF structure by parsing the footer table and SEV metadata
     pub fn new(ovmf_file: PathBuf) -> Result<Self, MeasurementError> {
         let mut data = Vec::new();
         let mut file = match File::open(ovmf_file) {
@@ -222,31 +222,40 @@ impl OVMF {
 
     /// Get the SEV HASHES GPA
     pub fn sev_hashes_table_gpa(&self) -> Result<u64, OVMFError> {
-        if !(self.table.contains_key(&SEV_HASH_TABLE_RV_GUID)) {
+        if !self.table.contains_key(&SEV_HASH_TABLE_RV_GUID) {
             return Err(OVMFError::EntryMissingInTable(
                 "SEV_HASH_TABLE_RV_GUID".to_string(),
             ));
         }
-        Ok(self
+
+        if let Some(gpa) = self
             .table_item(&SEV_HASH_TABLE_RV_GUID)
             .and_then(|entry| entry.get(..4))
             .map(|bytes| LittleEndian::read_u32(bytes) as u64)
-            .unwrap())
+        {
+            Ok(gpa)
+        } else {
+            Err(OVMFError::GetTableItemError)
+        }
     }
 
     /// Get the SEV-ES EIP
     pub fn sev_es_reset_eip(&self) -> Result<u32, OVMFError> {
-        if !(self.table.contains_key(&SEV_ES_RESET_BLOCK_GUID)) {
+        if !self.table.contains_key(&SEV_ES_RESET_BLOCK_GUID) {
             return Err(OVMFError::EntryMissingInTable(
                 "SEV_ES_RESET_BLOCK_GUID".to_string(),
             ));
         }
 
-        Ok(self
+        if let Some(eip) = self
             .table_item(&SEV_ES_RESET_BLOCK_GUID)
             .and_then(|entry| entry.get(..4))
             .map(LittleEndian::read_u32)
-            .unwrap())
+        {
+            Ok(eip)
+        } else {
+            Err(OVMFError::GetTableItemError)
+        }
     }
 
     /// Parse footer table data
