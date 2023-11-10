@@ -240,6 +240,7 @@ impl codicon::Encoder<()> for Build {
 /// }
 /// # }
 /// ```
+#[derive(Copy, Clone)]
 pub enum Generation {
     /// First generation EPYC (SEV).
     #[cfg(feature = "sev")]
