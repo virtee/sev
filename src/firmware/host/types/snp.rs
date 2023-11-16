@@ -257,11 +257,11 @@ impl TryFrom<ExtConfig> for FFI::types::SnpGetExtConfig {
         let mut certs_address: u64 = 0u64;
         let certs_len: u32 = value.certs_len;
 
-        if let Some(config) = value.config {
-            config_address = &config as *const Config as u64;
+        if let Some(ref config) = value.config {
+            config_address = config as *const Config as u64;
         }
 
-        if let Some(certs) = value.certs {
+        if let Some(ref certs) = value.certs {
             certs_address = certs.as_ptr() as u64;
         }
 
@@ -281,11 +281,11 @@ impl TryFrom<ExtConfig> for FFI::types::SnpSetExtConfig {
         let mut certs_address: u64 = 0u64;
         let certs_len: u32 = value.certs_len;
 
-        if let Some(config) = value.config {
-            config_address = &config as *const Config as u64;
+        if let Some(ref config) = value.config {
+            config_address = config as *const Config as u64;
         }
 
-        if let Some(certs) = value.certs {
+        if let Some(ref certs) = value.certs {
             certs_address = certs.as_ptr() as u64;
         }
 
