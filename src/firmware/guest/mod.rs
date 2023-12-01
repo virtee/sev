@@ -122,7 +122,7 @@ impl Firmware {
         message_version: Option<u8>,
         data: Option<[u8; 64]>,
         vmpl: Option<u32>,
-    ) -> Result<(AttestationReport, Vec<CertTableEntry>), UserApiError> {
+    ) -> Result<(AttestationReport, Option<Vec<CertTableEntry>>), UserApiError> {
         let report_request = ReportReq::new(data, vmpl)?;
 
         let mut report_response = ReportRsp::default();
@@ -181,6 +181,10 @@ impl Firmware {
             return Err(UserApiError::FirmwareError(Error::InvalidConfig));
         }
 
+        if ext_report_request.certs_len == 0 {
+            return Ok((report_response.report, None));
+        }
+
         let certificates: Vec<CertTableEntry>;
 
         unsafe {
@@ -191,7 +195,7 @@ impl Firmware {
         }
 
         // Return both the Attestation Report, as well as the Cert Table.
-        Ok((report_response.report, certificates))
+        Ok((report_response.report, Some(certificates)))
     }
 
     /// Fetches a derived key from the AMD Secure Processor. The `message_version` will default to `1` if `None` is specified.
