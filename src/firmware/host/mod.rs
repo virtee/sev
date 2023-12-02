@@ -278,14 +278,17 @@ impl Firmware {
     /// ```
     #[cfg(feature = "snp")]
     pub fn snp_set_ext_config(&mut self, mut new_config: ExtConfig) -> Result<(), UserApiError> {
-        let mut bytes: Vec<u8> = vec![];
+        let mut opt_bytes: Option<Vec<u8>> = None;
 
         if let Some(ref mut certificates) = new_config.certs {
-            bytes = FFI::types::CertTableEntry::uapi_to_vec_bytes(certificates)?;
+            opt_bytes = Some(FFI::types::CertTableEntry::uapi_to_vec_bytes(certificates)?);
         }
 
         let mut new_ext_config: FFI::types::SnpSetExtConfig = new_config.try_into()?;
-        new_ext_config.certs_address = bytes.as_mut_ptr() as u64;
+
+        if let Some(ref mut bytes) = opt_bytes {
+            new_ext_config.certs_address = bytes.as_mut_ptr() as u64;
+        }
 
         SNP_SET_EXT_CONFIG.ioctl(&mut self.0, &mut Command::from_mut(&mut new_ext_config))?;
 
