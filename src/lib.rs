@@ -112,13 +112,19 @@ use certs::sev::sev;
 #[cfg(all(feature = "sev", feature = "openssl"))]
 use certs::sev::ca::{Certificate, Chain as CertSevCaChain};
 
+#[cfg(all(not(feature = "sev"), feature = "snp", feature = "openssl"))]
+use certs::snp::ca::Chain as CertSnpCaChain;
+
 #[cfg(all(feature = "sev", feature = "openssl"))]
 use certs::sev::builtin as SevBuiltin;
+
+#[cfg(all(not(feature = "sev"), feature = "snp", feature = "openssl"))]
+use certs::snp::builtin as SnpBuiltin;
 
 #[cfg(feature = "sev")]
 use crate::{certs::sev::sev::Certificate as SevCertificate, error::Indeterminate, launch::sev::*};
 
-#[cfg(any(feature = "sev", feature = "openssl", feature = "snp"))]
+#[cfg(any(feature = "sev", feature = "snp"))]
 use std::convert::TryFrom;
 
 use std::io::{Read, Write};
@@ -279,6 +285,24 @@ impl From<Generation> for CertSevCaChain {
             ask: Certificate::decode(&mut &*ask, ()).unwrap(),
             ark: Certificate::decode(&mut &*ark, ()).unwrap(),
         }
+    }
+}
+
+#[cfg(all(not(feature = "sev"), feature = "snp", feature = "openssl"))]
+impl From<Generation> for CertSnpCaChain {
+    fn from(gen: Generation) -> CertSnpCaChain {
+        let (ark, ask) = match gen {
+            Generation::Milan => (
+                SnpBuiltin::milan::ark().unwrap(),
+                SnpBuiltin::milan::ask().unwrap(),
+            ),
+            Generation::Genoa => (
+                SnpBuiltin::genoa::ark().unwrap(),
+                SnpBuiltin::genoa::ask().unwrap(),
+            ),
+        };
+
+        CertSnpCaChain { ark, ask }
     }
 }
 
