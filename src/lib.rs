@@ -320,13 +320,33 @@ impl TryFrom<String> for Generation {
             #[cfg(feature = "sev")]
             "rome" => Ok(Self::Rome),
 
-            #[cfg(feature = "snp")]
+            #[cfg(any(feature = "sev", feature = "snp"))]
             "milan" => Ok(Self::Milan),
 
-            #[cfg(feature = "snp")]
+            #[cfg(any(feature = "sev", feature = "snp"))]
             "genoa" => Ok(Self::Genoa),
 
             _ => Err(()),
+        }
+    }
+}
+
+#[cfg(any(feature = "sev", feature = "snp"))]
+impl Generation {
+    /// Create a title-cased string identifying the SEV generation.
+    pub fn titlecase(&self) -> String {
+        match self {
+            #[cfg(feature = "sev")]
+            Self::Naples => "Naples".to_string(),
+
+            #[cfg(feature = "sev")]
+            Self::Rome => "Rome".to_string(),
+
+            #[cfg(any(feature = "sev", feature = "snp"))]
+            Self::Milan => "Milan".to_string(),
+
+            #[cfg(any(feature = "sev", feature = "snp"))]
+            Self::Genoa => "Genoa".to_string(),
         }
     }
 }
