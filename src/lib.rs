@@ -118,7 +118,7 @@ use certs::sev::builtin as SevBuiltin;
 #[cfg(feature = "sev")]
 use crate::{certs::sev::sev::Certificate as SevCertificate, error::Indeterminate, launch::sev::*};
 
-#[cfg(all(feature = "sev", feature = "openssl"))]
+#[cfg(any(feature = "sev", feature = "openssl", feature = "snp"))]
 use std::convert::TryFrom;
 
 use std::io::{Read, Write};
@@ -305,6 +305,29 @@ impl TryFrom<&sev::Chain> for Generation {
         } else {
             return Err(());
         })
+    }
+}
+
+#[cfg(any(feature = "sev", feature = "snp"))]
+impl TryFrom<String> for Generation {
+    type Error = ();
+
+    fn try_from(val: String) -> Result<Self, Self::Error> {
+        match &val.to_lowercase()[..] {
+            #[cfg(feature = "sev")]
+            "naples" => Ok(Self::Naples),
+
+            #[cfg(feature = "sev")]
+            "rome" => Ok(Self::Rome),
+
+            #[cfg(feature = "snp")]
+            "milan" => Ok(Self::Milan),
+
+            #[cfg(feature = "snp")]
+            "genoa" => Ok(Self::Genoa),
+
+            _ => Err(()),
+        }
     }
 }
 
