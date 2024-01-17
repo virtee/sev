@@ -23,3 +23,9 @@ pub mod snp;
 
 #[cfg(all(feature = "sev", feature = "openssl"))]
 pub mod sev;
+
+#[cfg(all(feature = "snp", feature = "openssl"))]
+pub mod idblock;
+
+#[cfg(all(feature = "snp", feature = "openssl"))]
+pub mod idblock_types;
