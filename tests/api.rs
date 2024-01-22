@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#[cfg(feature = "sev")]
+#[cfg(all(feature = "snp", target_os = "linux"))]
 mod sev {
     use sev::cached_chain;
     use sev::{certs::sev::sev::Usage, firmware::host::Firmware, Build, Version};
@@ -119,7 +119,7 @@ mod sev {
     }
 }
 
-#[cfg(feature = "snp")]
+#[cfg(all(feature = "snp", target_os = "linux"))]
 mod snp {
     use sev::firmware::host::{Config, Firmware, MaskId, SnpPlatformStatus, TcbVersion};
 

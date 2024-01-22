@@ -69,7 +69,9 @@ x509-cert = { version = "0.2.5", optional = true }
 byteorder = "1.4.3"
 base64 = "0.22.0"
 
-[dev-dependencies]
+[target.'cfg(target_os = "linux")'.dev-dependencies]
 kvm-ioctls = ">=0.12"
+
+[dev-dependencies]
 kvm-bindings = ">=0.6"
 serial_test = "3.0"

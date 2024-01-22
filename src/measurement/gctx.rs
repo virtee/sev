@@ -4,7 +4,10 @@ use std::convert::TryInto;
 
 use openssl::sha::sha384;
 
-use crate::{error::*, launch::snp::PageType};
+use crate::error::*;
+
+#[cfg(target_os = "linux")]
+use crate::launch::snp::PageType;
 
 // Launch digest size in bytes
 pub(crate) const LD_SIZE: usize = 384 / 8;
@@ -89,6 +92,7 @@ impl Gctx<Updating> {
 
     /// Update Lanunch digest type accprding to page type and guest physical address.
     /// Some Page types don't require data. Some page types just require size of the page.
+    #[cfg(target_os = "linux")]
     pub fn update_page(
         &mut self,
         page_type: PageType,

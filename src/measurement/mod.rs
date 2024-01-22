@@ -3,7 +3,7 @@
 //! Everything one needs to calculate a launch measurement for a SEV encrypted confidential guest.
 //! This includes, GCTX, SEV-HASHES, VMSA and OVMF pages.
 
-#[cfg(all(feature = "snp", feature = "openssl"))]
+#[cfg(all(target_os = "linux", feature = "snp", feature = "openssl"))]
 pub mod gctx;
 
 #[cfg(any(feature = "sev", feature = "snp"))]

@@ -11,7 +11,7 @@ Firmware (SNP)] (https://www.amd.com/content/dam/amd/en/documents/epyc-technical
 
 ### SEV APIs
 
-The Linux kernel exposes two technically distinct AMD SEV APIs:
+The linux kernel exposes two technically distinct AMD SEV APIs:
 
 1. An API for managing the SEV platform itself
 2. An API for managing SEV-enabled KVM virtual machines
@@ -21,7 +21,7 @@ code through a flexible and type-safe high-level interface.
 
 ### SNP ABIs
 
-Like SEV, the Linux kernel exposes another two different AMD SEV-SNP ABIs:
+Like SEV, the linux kernel exposes another two different AMD SEV-SNP ABIs:
 
 1. An ABI for managing the SEV-SNP platform itself
 2. An ABI for managing SEV-SNP enabled KVM virtual machines
@@ -62,7 +62,7 @@ and enabling both at the same time leads to a compiler error.
 
 ### Remarks
 
-Note that the Linux kernel provides access to these APIs through a set
+Note that the linux kernel provides access to these APIs through a set
 of `ioctl`s that are meant to be called on device nodes (`/dev/kvm` and
 `/dev/sev`, to be specific). As a result, these `ioctl`s form the substrate
 of the `sev` crate. Binaries that result from consumers of this crate are

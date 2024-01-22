@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#![cfg(feature = "openssl")]
+#![cfg(all(feature = "openssl", target_os = "linux"))]
 
 use std::{
     convert::{TryFrom, TryInto},

@@ -1,27 +1,27 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#[cfg(feature = "snp")]
+#[cfg(all(feature = "snp", target_os = "linux"))]
 use std::slice::from_raw_parts_mut;
 
-#[cfg(feature = "snp")]
+#[cfg(all(feature = "snp", target_os = "linux"))]
 use sev::firmware::host::Firmware;
 
-#[cfg(feature = "snp")]
+#[cfg(all(feature = "snp", target_os = "linux"))]
 use sev::launch::snp::*;
 
-#[cfg(feature = "snp")]
+#[cfg(all(feature = "snp", target_os = "linux"))]
 use kvm_bindings::kvm_userspace_memory_region;
 
-#[cfg(feature = "snp")]
+#[cfg(all(feature = "snp", target_os = "linux"))]
 use kvm_ioctls::{Kvm, VcpuExit};
 
 // one page of `hlt`
-#[cfg(feature = "snp")]
+#[cfg(all(feature = "snp", target_os = "linux"))]
 const CODE: &[u8; 4096] = &[
     0xf4; 4096 // hlt
 ];
 
-#[cfg(feature = "snp")]
+#[cfg(all(feature = "snp", target_os = "linux"))]
 #[cfg_attr(not(has_sev), ignore)]
 #[test]
 fn snp() {

@@ -2,8 +2,8 @@ on: [push, pull_request]
 name: test
 jobs:
   sw-openssl:
-    name: sw openssl ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
-    runs-on: ubuntu-latest
+    name: sw openssl ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -14,6 +14,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        runner:
+          - ubuntu-latest
+          - macos-12
         toolchain:
           - 1.70.0
           - stable
@@ -25,8 +28,8 @@ jobs:
           - openssl
 
   sw-crypto_nossl:
-    name: sw crypto_nossl ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
-    runs-on: ubuntu-latest
+    name: sw crypto_nossl ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -36,6 +39,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        runner:
+          - ubuntu-latest
+          - macos-12
+          - windows-latest
         toolchain:
           - 1.70.0
           - stable
