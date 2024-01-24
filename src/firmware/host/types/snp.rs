@@ -3,7 +3,7 @@
 /// A representation of the type of data provided to [`parse_table`](crate::firmware::host::parse_table)
 pub use crate::firmware::linux::host::types::RawData;
 
-pub(crate) use crate::firmware::linux::{host as FFI, _4K_PAGE};
+pub(crate) use crate::firmware::linux::host as FFI;
 
 use crate::Version;
 
@@ -15,6 +15,8 @@ use std::{
 use bitflags;
 
 use serde::{Deserialize, Serialize};
+
+use self::FFI::types::SnpSetConfig;
 
 bitflags::bitflags! {
     /// The platform's status flags.
@@ -176,175 +178,6 @@ pub struct SnpPlatformStatus {
     pub reported_tcb_version: TcbVersion,
 }
 
-/// Rust-friendly instance of the SNP Extended Configuration.
-/// It may be used either to fetch or set the configuration.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct ExtConfig {
-    /// SET:
-    ///     Address of the Config or 0 when reported_tcb does not need
-    ///     to be updated.
-    ///
-    /// GET:
-    ///     Address of the Config or 0 when reported_tcb should not be
-    ///     fetched.
-    pub config: Option<Config>,
-
-    /// SET:
-    ///     Address of extended guest request certificate chain or None when
-    ///     previous certificate should be removed on SNP_SET_EXT_CONFIG.
-    ///
-    /// GET:
-    ///     Address of extended guest request certificate chain or None when
-    ///     certificate should not be fetched.
-    pub certs: Option<Vec<CertTableEntry>>,
-
-    /// SET:
-    ///     Length of the certificates.
-    ///
-    /// GET:
-    ///     Length of the buffer which will hold the fetched certificates.
-    pub certs_len: u32,
-}
-
-/// Used to round certificate buffers to 4K page alignment.
-fn round_to_whole_pages(size: usize) -> usize {
-    match size % _4K_PAGE {
-        0 => size,
-        rem => size + (_4K_PAGE - rem),
-    }
-}
-
-impl ExtConfig {
-    /// Used to only update the AMD Secure Processor certificates with the certificates provided.
-    pub fn new_certs_only(certificates: Vec<CertTableEntry>) -> Self {
-        let certs_length: usize = certificates.iter().map(|entry| entry.data().len()).sum();
-        let certs_len: u32 = round_to_whole_pages(certs_length) as u32;
-
-        Self {
-            config: None,
-            certs: Some(certificates),
-            certs_len,
-        }
-    }
-
-    /// Used to only update the AMD Secure Processor configuration with the configuration provided.
-    pub fn new_config_only(config: Config) -> Self {
-        Self {
-            config: Some(config),
-            certs: None,
-            certs_len: 0,
-        }
-    }
-
-    /// Creates a new instance of an ExtConfig.
-    pub fn new(config: Config, certificates: Vec<CertTableEntry>) -> Self {
-        let certs_length: usize = certificates.iter().map(|entry| entry.data().len()).sum();
-        let certs_len: u32 = round_to_whole_pages(certs_length) as u32;
-
-        Self {
-            config: Some(config),
-            certs: Some(certificates),
-            certs_len,
-        }
-    }
-}
-
-impl TryFrom<ExtConfig> for FFI::types::SnpGetExtConfig {
-    type Error = uuid::Error;
-
-    fn try_from(value: ExtConfig) -> Result<Self, Self::Error> {
-        let mut config_address: u64 = 0u64;
-        let mut certs_address: u64 = 0u64;
-        let certs_len: u32 = value.certs_len;
-
-        if let Some(ref config) = value.config {
-            config_address = config as *const Config as u64;
-        }
-
-        if let Some(ref certs) = value.certs {
-            certs_address = certs.as_ptr() as u64;
-        }
-
-        Ok(Self {
-            config_address,
-            certs_address,
-            certs_len,
-        })
-    }
-}
-
-impl TryFrom<ExtConfig> for FFI::types::SnpSetExtConfig {
-    type Error = uuid::Error;
-
-    fn try_from(value: ExtConfig) -> Result<Self, Self::Error> {
-        let mut config_address: u64 = 0u64;
-        let mut certs_address: u64 = 0u64;
-        let certs_len: u32 = value.certs_len;
-
-        if let Some(ref config) = value.config {
-            config_address = config as *const Config as u64;
-        }
-
-        if let Some(ref certs) = value.certs {
-            certs_address = certs.as_ptr() as u64;
-        }
-
-        Ok(Self {
-            config_address,
-            certs_address,
-            certs_len,
-        })
-    }
-}
-
-impl TryFrom<FFI::types::SnpGetExtConfig> for ExtConfig {
-    type Error = uuid::Error;
-
-    fn try_from(value: FFI::types::SnpGetExtConfig) -> Result<Self, Self::Error> {
-        let mut config: Option<Config> = None;
-        let mut certs: Option<Vec<CertTableEntry>> = None;
-        if let Some(config_ref) = unsafe { (value.config_address as *mut Config).as_mut() } {
-            config = Some(*config_ref);
-        }
-
-        if let Some(certificates) =
-            unsafe { (value.certs_address as *mut FFI::types::CertTableEntry).as_mut() }
-        {
-            certs = Some(unsafe { FFI::types::CertTableEntry::parse_table(certificates)? })
-        }
-
-        Ok(Self {
-            config,
-            certs,
-            certs_len: value.certs_len,
-        })
-    }
-}
-
-impl TryFrom<FFI::types::SnpSetExtConfig> for ExtConfig {
-    type Error = uuid::Error;
-
-    fn try_from(value: FFI::types::SnpSetExtConfig) -> Result<Self, Self::Error> {
-        let mut config: Option<Config> = None;
-        let mut certs: Option<Vec<CertTableEntry>> = None;
-        if let Some(config_ref) = unsafe { (value.config_address as *mut Config).as_mut() } {
-            config = Some(*config_ref);
-        }
-
-        if let Some(certificates) =
-            unsafe { (value.certs_address as *mut FFI::types::CertTableEntry).as_mut() }
-        {
-            certs = Some(unsafe { FFI::types::CertTableEntry::parse_table(certificates)? })
-        }
-
-        Ok(Self {
-            config,
-            certs,
-            certs_len: value.certs_len,
-        })
-    }
-}
-
 /// Sets the system wide configuration values for SNP.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(C, packed)]
@@ -354,7 +187,7 @@ pub struct Config {
 
     /// Indicates that the CHIP_ID field in the attestation report will always
     /// be zero.
-    pub mask_chip_id: u32,
+    pub mask_id: u32,
 
     /// Reserved. Must be zero.
     reserved: [u8; 52],
@@ -364,7 +197,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             reported_tcb: Default::default(),
-            mask_chip_id: Default::default(),
+            mask_id: Default::default(),
             reserved: [0; 52],
         }
     }
@@ -372,13 +205,40 @@ impl Default for Config {
 
 impl Config {
     /// Used to create a new Config
-    pub fn new(reported_tcb: TcbVersion, mask_chip_id: u32) -> Self {
+    pub fn new(reported_tcb: TcbVersion, mask_id: u32) -> Self {
         Self {
             reported_tcb,
-            mask_chip_id,
+            mask_id,
             reserved: [0; 52],
         }
     }
+}
+
+#[cfg(feature = "snp")]
+impl TryFrom<Config> for FFI::types::SnpSetConfig {
+    type Error = uuid::Error;
+
+    fn try_from(value: Config) -> Result<Self, Self::Error> {
+        let mut snp_config: SnpSetConfig = Default::default();
+
+        snp_config.reported_tcb = value.reported_tcb;
+        snp_config.mask_id = value.mask_id;
+        
+        Ok(snp_config)
+    }
+}
+
+#[cfg(feature = "snp")]
+impl TryFrom<FFI::types::SnpSetConfig> for Config {
+    type Error = uuid::Error;
+
+    fn try_from(value: FFI::types::SnpSetConfig) -> Result<Self, Self::Error> {
+
+        Ok(Self {
+            reported_tcb: value.reported_tcb,
+            mask_id: value.mask_id,
+            ..Default::default() })
+}
 }
 
 /// TcbVersion represents the version of the firmware.
@@ -427,5 +287,67 @@ impl TcbVersion {
             microcode,
             _reserved: Default::default(),
         }
+    }
+}
+
+/// Rust-friendly instance of the SNP_config_transaction
+/// Can be used to start a config or end it.
+#[cfg(feature = "snp")]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ConfigTransaction {
+    /// START:
+    ///     The ID of the transaction started by a call to SNP_SET_CONFIG_START.
+    ///
+    /// END:
+    ///     The ID of the transaction ended by a call SNP_SET_CONFIG_END.
+    pub id: u64
+}
+
+#[cfg(feature = "snp")]
+impl TryFrom<ConfigTransaction> for FFI::types::SnpSetConfigStart {
+    type Error = uuid::Error;
+
+    fn try_from(value: ConfigTransaction) -> Result<Self, Self::Error> {
+
+
+        Ok(Self {
+            id: value.id
+        })
+    }
+}
+
+#[cfg(feature = "snp")]
+impl TryFrom<ConfigTransaction> for FFI::types::SnpSetConfigEnd {
+    type Error = uuid::Error;
+
+    fn try_from(value: ConfigTransaction) -> Result<Self, Self::Error> {
+
+        Ok(Self {
+            id: value.id
+        })
+    }
+}
+
+#[cfg(feature = "snp")]
+impl TryFrom<FFI::types::SnpSetConfigStart> for ConfigTransaction {
+    type Error = uuid::Error;
+
+    fn try_from(value: FFI::types::SnpSetConfigStart) -> Result<Self, Self::Error> {
+
+        Ok(Self {
+            id: value.id
+        })
+    }
+}
+
+#[cfg(feature = "snp")]
+impl TryFrom<FFI::types::SnpSetConfigEnd> for ConfigTransaction {
+    type Error = uuid::Error;
+
+    fn try_from(value: FFI::types::SnpSetConfigEnd) -> Result<Self, Self::Error> {
+        
+        Ok(Self {
+            id: value.id
+        })
     }
 }
