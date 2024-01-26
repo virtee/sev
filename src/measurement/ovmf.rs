@@ -126,7 +126,7 @@ impl OvmfSevMetadataHeader {
 
 /// OVMF Footer
 #[repr(C, packed)]
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct OvmfFooterTableEntry {
     /// Size
     size: u16,
