@@ -399,15 +399,20 @@ bitfield! {
     /// the policy to the guest. The policy cannot be changed throughout the lifetime of the guest. The
     /// policy is also migrated with the guest and enforced by the destination platform firmware.
     ///
-    /// | Bit(s) | Name          | Description                                                                                       >
-    /// |--------|---------------|--------------------------------------------------------------------------------------------------->
-    /// | 7:0    | ABI_MINOR     | The minimum ABI minor version required for this guest to run.                                     >
-    /// | 15:8   | ABI_MAJOR     | The minimum ABI major version required for this guest to run.                                     >
-    /// | 16     | SMT           | 0: Host SMT usage is disallowed.<br>1: Host SMT usage is allowed.                                 >
-    /// | 17     | -             | Reserved. Must be one.                                                                            >
-    /// | 18     | MIGRATE_MA    | 0: Association with a migration agent is disallowed.<br>1: Association with a migration agent is a>
-    /// | 19     | DEBUG         | 0: Debugging is disallowed.<br>1: Debugging is allowed.                                           >
-    /// | 20     | SINGLE_SOCKET | 0: Guest can be activated on multiple sockets.<br>1: Guest can only be activated on one socket.   >
+    /// | Bit(s) | Name              | Description                                                                                                        >
+    /// |--------|-------------------|-------------------------------------------------------------------------------------------------------------------->
+    /// | 7:0    | ABI_MINOR         | The minimum ABI minor version required for this guest to run.                                                      >
+    /// | 15:8   | ABI_MAJOR         | The minimum ABI major version required for this guest to run.                                                      >
+    /// | 16     | SMT               | 0: Host SMT usage is disallowed.<br>1: Host SMT usage is allowed.                                                  >
+    /// | 17     | -                 | Reserved. Must be one.                                                                                             >
+    /// | 18     | MIGRATE_MA        | 0: Association with a migration agent is disallowed.<br>1: Association with a migration agent is allowed           >
+    /// | 19     | DEBUG             | 0: Debugging is disallowed.<br>1: Debugging is allowed.                                                            >
+    /// | 20     | SINGLE_SOCKET     | 0: Guest can be activated on multiple sockets.<br>1: Guest can only be activated on one socket.                    >
+    /// | 21     | CXL_ALLOW         | 0: CXL cannot be populated with devices or memory.<br>1: CXL can be populated with devices or memory.              >
+    /// | 22     | MEM_AES_256_XTS   | 0: Allow either AES 128 XEX or AES 256 XTS for memory encryption.<br>1: Require AES 256 XTS for memory encryption. >
+    /// | 23     | RAPL_DIS          | 0: Allow Running Average Power Limit (RAPL).<br>1: RAPL must be disabled.                                          >
+    /// | 24     | CIPHERTEXT_HIDING | 0: Ciphertext hiding may be enabled or disabled.<br>1: Ciphertext hiding must be enabled.                          >
+    /// | 63:25  | -                 | Reserved. MBZ.                                                                                                     >
     ///
     #[derive(Default, Clone, Copy)]
     #[derive(Deserialize, Serialize)]
