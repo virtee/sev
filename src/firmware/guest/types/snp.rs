@@ -427,6 +427,14 @@ bitfield! {
     pub debug_allowed, _: 19, 19;
     /// SINGLE_SOCKET_REQUIRED field: Indicates the if a single socket is required.
     pub single_socket_required, _: 20, 20;
+    /// CXL_ALLOW field: (1) can populate CXL devices/memory, (0) cannot populate CXL devices/memory
+    pub cxl_allowed, _: 21, 21;
+    /// MEM_AES_256_XTS field: (1) require AES 256 XTS encryption, (0) allows either AES 128 XEX or AES 256 XTS encryption
+    pub mem_aes_256_xts, _: 22, 22;
+    /// RAPL_DIS field: (1) RAPL must be disabled, (0) allow RAPL
+    pub rapl_dis, _: 23, 23;
+    /// CIPHERTEXT_HIDING field: (1) ciphertext hiding must be enabled, (0) ciphertext hiding may be enabled/disabled
+    pub ciphertext_hiding, _: 24, 24;
 }
 
 impl Display for GuestPolicy {
