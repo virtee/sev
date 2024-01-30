@@ -121,9 +121,7 @@ mod sev {
 
 #[cfg(feature = "snp")]
 mod snp {
-    use sev::firmware::host::{
-        Config, Firmware, SnpPlatformStatus, TcbVersion,
-    };
+    use sev::firmware::host::{Config, Firmware, SnpPlatformStatus, TcbVersion};
 
     use serial_test::serial;
 

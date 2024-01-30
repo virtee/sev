@@ -211,14 +211,12 @@ impl CertTableEntry {
     }
 }
 
-/// SNP_COMMIT structure
+/// SNP_COMMIT structure  
+/// - length: length of the command buffer read by the PSP  
 #[cfg(feature = "snp")]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
-#[repr(C,packed)]
-pub struct SnpCommit{
-    /// len of the command buffer read by the PSP
-    length: u32
-}
+#[repr(C, packed)]
+pub struct SnpCommit(u32);
 
 /// Sets the system wide configuration values for SNP.
 #[cfg(feature = "snp")]
@@ -228,8 +226,8 @@ pub struct SnpSetConfig {
     /// The TCB_VERSION to report in guest attestation reports.
     pub reported_tcb: UAPI::TcbVersion,
 
-    /// mask_chip_id [0] : whether chip id is present in attestation reports or not
-    /// mask_chip_key [1]: whether attestation reports are signed or not
+    /// mask_id [0] : whether chip id is present in attestation reports or not  
+    /// mask_id [1]: whether attestation reports are signed or not
     /// rsvd [2:31]: reserved
     pub mask_id: u32,
 
@@ -246,25 +244,6 @@ impl Default for SnpSetConfig {
         }
     }
 }
-
-/// Metadata for config transactions.
-#[cfg(feature = "snp")]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
-#[repr(C, packed)]
-pub struct SnpSetConfigStart {
-    /// The ID of the transaction started by a call to SNP_SET_CONFIG_START.
-    pub id: u64
-}
-
-/// Metadata for config transactions.
-#[cfg(feature = "snp")]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
-#[repr(C, packed)]
-pub struct SnpSetConfigEnd {
-    /// The ID of the transaction ended by a call SNP_SET_CONFIG_END.
-    pub id: u64
-}
-
 
 #[cfg(test)]
 mod test {

@@ -5,7 +5,7 @@ pub use crate::firmware::linux::host::types::RawData;
 
 pub(crate) use crate::firmware::linux::host as FFI;
 
-use crate::Version;
+use crate::{firmware::host::CertError, Version};
 
 use std::{
     convert::{TryFrom, TryInto},
@@ -124,6 +124,11 @@ impl CertTableEntry {
     pub fn new(cert_type: CertType, data: Vec<u8>) -> Self {
         Self { cert_type, data }
     }
+
+    /// Builds a Kernel formatted CertTable for sending the certificate content to the PSP.
+    pub fn cert_table_to_vec_bytes(table: &Vec<Self>) -> Result<Vec<u8>, CertError> {
+        FFI::types::CertTableEntry::uapi_to_vec_bytes(table)
+    }
 }
 
 /// Information regarding the SEV-SNP platform's TCB version.
@@ -223,7 +228,7 @@ impl TryFrom<Config> for FFI::types::SnpSetConfig {
 
         snp_config.reported_tcb = value.reported_tcb;
         snp_config.mask_id = value.mask_id;
-        
+
         Ok(snp_config)
     }
 }
@@ -233,12 +238,12 @@ impl TryFrom<FFI::types::SnpSetConfig> for Config {
     type Error = uuid::Error;
 
     fn try_from(value: FFI::types::SnpSetConfig) -> Result<Self, Self::Error> {
-
         Ok(Self {
             reported_tcb: value.reported_tcb,
             mask_id: value.mask_id,
-            ..Default::default() })
-}
+            ..Default::default()
+        })
+    }
 }
 
 /// TcbVersion represents the version of the firmware.
@@ -287,67 +292,5 @@ impl TcbVersion {
             microcode,
             _reserved: Default::default(),
         }
-    }
-}
-
-/// Rust-friendly instance of the SNP_config_transaction
-/// Can be used to start a config or end it.
-#[cfg(feature = "snp")]
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct ConfigTransaction {
-    /// START:
-    ///     The ID of the transaction started by a call to SNP_SET_CONFIG_START.
-    ///
-    /// END:
-    ///     The ID of the transaction ended by a call SNP_SET_CONFIG_END.
-    pub id: u64
-}
-
-#[cfg(feature = "snp")]
-impl TryFrom<ConfigTransaction> for FFI::types::SnpSetConfigStart {
-    type Error = uuid::Error;
-
-    fn try_from(value: ConfigTransaction) -> Result<Self, Self::Error> {
-
-
-        Ok(Self {
-            id: value.id
-        })
-    }
-}
-
-#[cfg(feature = "snp")]
-impl TryFrom<ConfigTransaction> for FFI::types::SnpSetConfigEnd {
-    type Error = uuid::Error;
-
-    fn try_from(value: ConfigTransaction) -> Result<Self, Self::Error> {
-
-        Ok(Self {
-            id: value.id
-        })
-    }
-}
-
-#[cfg(feature = "snp")]
-impl TryFrom<FFI::types::SnpSetConfigStart> for ConfigTransaction {
-    type Error = uuid::Error;
-
-    fn try_from(value: FFI::types::SnpSetConfigStart) -> Result<Self, Self::Error> {
-
-        Ok(Self {
-            id: value.id
-        })
-    }
-}
-
-#[cfg(feature = "snp")]
-impl TryFrom<FFI::types::SnpSetConfigEnd> for ConfigTransaction {
-    type Error = uuid::Error;
-
-    fn try_from(value: FFI::types::SnpSetConfigEnd) -> Result<Self, Self::Error> {
-        
-        Ok(Self {
-            id: value.id
-        })
     }
 }

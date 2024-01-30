@@ -196,7 +196,11 @@ impl Firmware {
         Ok(platform_status)
     }
 
-    /// Commit the current SNP firmware
+    /// The firmware will perform the following actions:  
+    /// - Set the CommittedTCB to the CurrentTCB of the current firmware.  
+    /// - Set the CommittedVersion to the FirmwareVersion of the current firmware.  
+    /// - Sets the ReportedTCB to the CurrentTCB.  
+    /// - Deletes the VLEK hashstick if the ReportedTCB changed.
     ///
     /// # Example:
     /// ```ignore
@@ -222,57 +226,16 @@ impl Firmware {
     /// );
     /// let mut firmware: Firmware = Firmware::open().unwrap();
     ///
-    /// let status: bool = firmware.set_ext_config(configuration).unwrap();
+    /// let status: bool = firmware.snp_set_config(configuration).unwrap();
     /// ```
     #[cfg(feature = "snp")]
     pub fn snp_set_config(&mut self, new_config: Config) -> Result<(), UserApiError> {
-
-        SNP_SET_CONFIG.ioctl(&mut self.0, &mut Command::from_mut(&mut new_config.try_into()?))?;
+        SNP_SET_CONFIG.ioctl(
+            &mut self.0,
+            &mut Command::from_mut(&mut new_config.try_into()?),
+        )?;
 
         Ok(())
-    }
-
-    /// Start SNP configuration process
-    ///
-    /// # Example:
-    /// ```ignore
-    /// let mut firmware: Firmware = Firmware::open().unwrap();
-    ///
-    /// let config_id: configTransaction = firmware.snp_set_config_start().unwrap();
-    /// ```
-    #[cfg(feature = "snp")]
-    pub fn snp_set_config_start(&mut self) -> Result<ConfigTransaction, UserApiError> {
-
-        let mut config_start: FFI::types::SnpSetConfigStart = Default::default();
-
-        SNP_SET_CONFIG_START.ioctl(&mut self.0, &mut Command::from_mut(&mut config_start))?;
-
-        Ok(config_start.try_into()?)
-    }
-
-    /// End SNP configuration process
-    ///
-    /// # Example:
-    /// ```ignore
-    /// let mut firmware: Firmware = Firmware::open().unwrap();
-    ///
-    /// let start_config_id: configTransaction = firmware.snp_set_config_start().unwrap();
-    /// 
-    /// let end_config_id: configTransaction = firmware.snp_set_config_end().unwrap();
-    /// 
-    /// // if start and end error id's don't match, assume something process failed and start again. 
-    /// if start_config_id != end_config_id {
-    ///     Err(eprintln!("start id and end id don't match!""))
-    /// }
-    /// ```
-    #[cfg(feature = "snp")]
-    pub fn snp_set_config_end(&mut self) -> Result<ConfigTransaction, UserApiError> {
-        
-        let mut config_end: FFI::types::SnpSetConfigEnd = Default::default();
-
-        SNP_SET_CONFIG_END.ioctl(&mut self.0, &mut Command::from_mut(&mut config_end))?;
-
-        Ok(config_end.try_into()?)
     }
 }
 

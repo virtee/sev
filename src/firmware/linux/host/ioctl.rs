@@ -14,7 +14,6 @@ use std::marker::PhantomData;
 
 use iocuddle::*;
 
-
 // These enum ordinal values are defined in the Linux kernel
 // source code: include/uapi/linux/psp-sev.h
 #[cfg(all(feature = "sev", feature = "snp"))]
@@ -33,8 +32,6 @@ impl_const_id! {
     SnpPlatformStatus = 0x9,
     SnpCommit = 0xA,
     SnpSetConfig = 0xB,
-    SnpSetConfigStart = 0xC,
-    SnpSetConfigEnd = 0xD
 }
 
 #[cfg(all(feature = "sev", not(feature = "snp")))]
@@ -59,9 +56,6 @@ impl_const_id! {
     SnpPlatformStatus = 0x9,
     SnpCommit = 0xA,
     SnpSetConfig = 0xB,
-    SnpSetConfigStart = 0xC,
-    SnpSetConfigEnd = 0xD
-    
 }
 
 const SEV: Group = Group::new(b'S');
@@ -106,29 +100,19 @@ pub const GET_ID: Ioctl<WriteRead, &Command<GetId<'_>>> = unsafe { SEV.write_rea
 pub const SNP_PLATFORM_STATUS: Ioctl<WriteRead, &Command<SnpPlatformStatus>> =
     unsafe { SEV.write_read(0) };
 
-/// Commit the currently installed firmware.
+/// The firmware will perform the following actions:
+/// - Set the CommittedTCB to the CurrentTCB of the current firmware.
+/// - Set the CommittedVersion to the FirmwareVersion of the current firmware.
+/// - Sets the ReportedTCB to the CurrentTCB.
+/// - Deletes the VLEK hashstick if the ReportedTCB changed.
 /// C IOCTL calls -> sev_ioctl_do_snp_commit
 #[cfg(feature = "snp")]
-pub const SNP_COMMIT: Ioctl<WriteRead, &Command<SnpCommit>> =
-    unsafe {SEV.write_read(0)};
+pub const SNP_COMMIT: Ioctl<WriteRead, &Command<SnpCommit>> = unsafe { SEV.write_read(0) };
 
 /// Set the system-wide configuration such as reported TCB version in the attestation report
 /// C IOCTL calls -> sev_ioctl_do_snp_set_config
 #[cfg(feature = "snp")]
-pub const SNP_SET_CONFIG: Ioctl<WriteRead, &Command<SnpSetConfig>> =
-    unsafe {SEV.write_read(0)};
-
-/// Issued prior to performing any updates to the reported TCB or certificate data.
-/// C IOCTL calls -> sev_ioctl_do_snp_set_config_start
-#[cfg(feature = "snp")]
-pub const SNP_SET_CONFIG_START: Ioctl<WriteRead, &Command<SnpSetConfigStart>> =
-    unsafe {SEV.write_read(0)};
-
-/// Issued to resume normal servicing of extended guest requests.
-/// C IOCTL calls -> sev_ioctl_do_snp_set_config_end
-#[cfg(feature = "snp")]
-pub const SNP_SET_CONFIG_END: Ioctl<WriteRead, &Command<SnpSetConfigEnd>> =
-    unsafe {SEV.write_read(0)};
+pub const SNP_SET_CONFIG: Ioctl<WriteRead, &Command<SnpSetConfig>> = unsafe { SEV.write_read(0) };
 
 /// The Rust-flavored, FFI-friendly version of `struct sev_issue_cmd` which is
 /// used to pass arguments to the SEV ioctl implementation.
