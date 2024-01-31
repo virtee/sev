@@ -126,8 +126,16 @@ impl CertTableEntry {
     }
 
     /// Builds a Kernel formatted CertTable for sending the certificate content to the PSP.
-    pub fn cert_table_to_vec_bytes(table: &Vec<Self>) -> Result<Vec<u8>, CertError> {
-        FFI::types::CertTableEntry::uapi_to_vec_bytes(table)
+    pub fn cert_table_to_vec_bytes(table: &[Self]) -> Result<Vec<u8>, CertError> {
+        FFI::types::CertTableEntry::uapi_to_vec_bytes(&table.to_vec())
+    }
+
+    /// Takes in bytes in kernel CertTable format and returns in user API CertTable format.
+    pub fn vec_bytes_to_cert_table(mut bytes: Vec<u8>) -> Result<Vec<Self>, CertError> {
+        let cert_bytes_ptr: *mut FFI::types::CertTableEntry =
+            bytes.as_mut_ptr() as *mut FFI::types::CertTableEntry;
+
+        Ok(unsafe { FFI::types::CertTableEntry::parse_table(cert_bytes_ptr).unwrap() })
     }
 }
 
