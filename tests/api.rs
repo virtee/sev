@@ -121,7 +121,7 @@ mod sev {
 
 #[cfg(feature = "snp")]
 mod snp {
-    use sev::firmware::host::{Config, Firmware, SnpPlatformStatus, TcbVersion};
+    use sev::firmware::host::{Config, Firmware, MaskId, SnpPlatformStatus, TcbVersion};
 
     use serial_test::serial;
 
@@ -182,7 +182,7 @@ mod snp {
     #[serial]
     fn set_config() {
         let mut fw: Firmware = Firmware::open().unwrap();
-        let new_config = Config::new(TcbVersion::new(1, 0, 1, 1), 31);
+        let new_config = Config::new(TcbVersion::new(1, 0, 1, 1), MaskId(31));
         fw.snp_set_config(new_config).unwrap();
     }
 }

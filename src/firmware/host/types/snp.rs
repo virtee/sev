@@ -12,6 +12,8 @@ use std::{
     fmt::Display,
 };
 
+use bitfield::bitfield;
+
 use bitflags;
 
 use serde::{Deserialize, Serialize};
@@ -127,11 +129,11 @@ impl CertTableEntry {
 
     /// Builds a Kernel formatted CertTable for sending the certificate content to the PSP.
     pub fn cert_table_to_vec_bytes(table: &[Self]) -> Result<Vec<u8>, CertError> {
-        FFI::types::CertTableEntry::uapi_to_vec_bytes(&table.to_vec())
+        FFI::types::CertTableEntry::uapi_to_vec_bytes(table)
     }
 
     /// Takes in bytes in kernel CertTable format and returns in user API CertTable format.
-    pub fn vec_bytes_to_cert_table(mut bytes: Vec<u8>) -> Result<Vec<Self>, CertError> {
+    pub fn vec_bytes_to_cert_table(bytes: &mut [u8]) -> Result<Vec<Self>, CertError> {
         let cert_bytes_ptr: *mut FFI::types::CertTableEntry =
             bytes.as_mut_ptr() as *mut FFI::types::CertTableEntry;
 
@@ -200,7 +202,7 @@ pub struct Config {
 
     /// Indicates that the CHIP_ID field in the attestation report will always
     /// be zero.
-    pub mask_id: u32,
+    pub mask_id: MaskId,
 
     /// Reserved. Must be zero.
     reserved: [u8; 52],
@@ -218,7 +220,7 @@ impl Default for Config {
 
 impl Config {
     /// Used to create a new Config
-    pub fn new(reported_tcb: TcbVersion, mask_id: u32) -> Self {
+    pub fn new(reported_tcb: TcbVersion, mask_id: MaskId) -> Self {
         Self {
             reported_tcb,
             mask_id,
@@ -300,5 +302,37 @@ impl TcbVersion {
             microcode,
             _reserved: Default::default(),
         }
+    }
+}
+
+bitfield! {
+    /// Mask ID values that would go into an SNP CONFIG
+    ///
+    /// | Bit(s) | Name | Description |
+    /// |--------|------|-------------|
+    /// |0|MASK_CHIP_ID|Indicates that the CHIP_ID field in the attestation report will alwaysbe zero.|
+    /// |1|MASK_CHIP_KEY|Indicates that the VCEK is not used in attestation and guest key derivation.|
+    #[repr(C)]
+    #[derive(Default, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    pub struct MaskId(u32);
+    impl Debug;
+    /// Indicates that the CHIP_ID field in the attestation report will alwaysbe zero.
+    pub mask_chip_id, _: 0, 0;
+    /// Indicates that the VCEK is not used in attestation and guest key derivation.
+    pub mask_chip_key, _: 1, 1;
+}
+
+impl Display for MaskId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            r#"
+    MaskID ({}):
+    Mask Chip ID: {}
+    ABI Chip Key: {}"#,
+            self.0,
+            self.mask_chip_id(),
+            self.mask_chip_key(),
+        )
     }
 }

@@ -108,7 +108,7 @@ impl CertTableEntry {
     /// ```
     ///
     #[cfg(target_os = "linux")]
-    pub fn uapi_to_vec_bytes(table: &Vec<UAPI::CertTableEntry>) -> Result<Vec<u8>, CertError> {
+    pub fn uapi_to_vec_bytes(table: &[UAPI::CertTableEntry]) -> Result<Vec<u8>, CertError> {
         // Create the vector to return for later.
         let mut bytes: Vec<u8> = vec![];
 
@@ -216,7 +216,9 @@ impl CertTableEntry {
 #[cfg(feature = "snp")]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 #[repr(C, packed)]
-pub struct SnpCommit(u32);
+pub struct SnpCommit {
+    pub buffer: u32,
+}
 
 /// Sets the system wide configuration values for SNP.
 #[cfg(feature = "snp")]
@@ -229,7 +231,7 @@ pub struct SnpSetConfig {
     /// mask_id [0] : whether chip id is present in attestation reports or not  
     /// mask_id [1]: whether attestation reports are signed or not
     /// rsvd [2:31]: reserved
-    pub mask_id: u32,
+    pub mask_id: UAPI::MaskId,
 
     /// Reserved. Must be zero.
     reserved: [u8; 52],
