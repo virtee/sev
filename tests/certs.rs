@@ -40,7 +40,7 @@ mod snp {
 
         let chain = Chain {
             ca,
-            vcek: vcek.clone(),
+            vek: vcek.clone(),
         };
 
         assert_eq!(chain.verify().ok(), Some(&vcek));
@@ -58,7 +58,7 @@ mod snp {
 
         let ca = ca::Chain { ark, ask };
 
-        let chain = Chain { ca, vcek };
+        let chain = Chain { ca, vek: vcek };
 
         assert_eq!(chain.verify().ok(), None);
     }
@@ -73,7 +73,7 @@ mod snp {
 
         let ca = ca::Chain { ark, ask };
 
-        let chain = Chain { ca, vcek };
+        let chain = Chain { ca, vek: vcek };
 
         let report_bytes = hex::decode(TEST_MILAN_ATTESTATION_REPORT).unwrap();
         let report: AttestationReport =
@@ -92,7 +92,7 @@ mod snp {
 
         let ca = ca::Chain { ark, ask };
 
-        let chain = Chain { ca, vcek };
+        let chain = Chain { ca, vek: vcek };
 
         let mut report_bytes = hex::decode(TEST_MILAN_ATTESTATION_REPORT).unwrap();
         report_bytes[0] ^= 0x80;

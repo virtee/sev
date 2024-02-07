@@ -10,8 +10,8 @@ pub struct Chain {
     /// The Certificate Authority (CA) chain.
     pub ca: ca::Chain,
 
-    /// The Versioned Chip Endorsement Key.
-    pub vcek: Certificate,
+    /// The Versioned Chip Endorsement Key or Versioned Loaded Endorsement Key.
+    pub vek: Certificate,
 }
 
 impl<'a> Verifiable for &'a Chain {
@@ -22,9 +22,9 @@ impl<'a> Verifiable for &'a Chain {
         let ask = self.ca.verify()?;
 
         // Verify that ASK signs VCEK.
-        (ask, &self.vcek).verify()?;
+        (ask, &self.vek).verify()?;
 
-        Ok(&self.vcek)
+        Ok(&self.vek)
     }
 }
 
@@ -56,6 +56,7 @@ impl Chain {
         let mut ark: Option<Certificate> = None;
         let mut ask: Option<Certificate> = None;
         let mut vcek: Option<Certificate> = None;
+        let mut vlek: Option<Certificate> = None;
 
         let other = ErrorKind::Other;
 
@@ -88,6 +89,13 @@ impl Chain {
 
                     vcek = Some(cert);
                 }
+                CertType::VLEK => {
+                    if vlek.is_some() {
+                        return Err(Error::new(other, "more than one VLEK certificate found"));
+                    }
+
+                    vlek = Some(cert);
+                }
                 _ => continue,
             }
         }
@@ -97,32 +105,39 @@ impl Chain {
             return Err(Error::new(other, "ARK not found"));
         } else if ask.is_none() {
             return Err(Error::new(other, "ASK not found"));
-        } else if vcek.is_none() {
-            return Err(Error::new(other, "VCEK not found"));
+        } else if vcek.is_none() && vlek.is_none() {
+            return Err(Error::new(other, "VCEK/VLEK not found"));
         }
+
+        // Use the VLEK whenever it is present, but use the VCEK when VLEK is missing.
+        let vek_val = match (vcek, vlek) {
+            (_, Some(vlek)) => vlek,
+            (Some(vcek), None) => vcek,
+            _ => unreachable!(),
+        };
 
         Ok(Self {
             ca: ca::Chain {
                 ark: ark.unwrap(),
                 ask: ask.unwrap(),
             },
-            vcek: vcek.unwrap(),
+            vek: vek_val,
         })
     }
 
-    /// Deserialize a PEM-encoded ARK, ASK, and VCEK to a SEV-SNP chain.
-    pub fn from_pem(ark: &[u8], ask: &[u8], vcek: &[u8]) -> Result<Self> {
+    /// Deserialize a PEM-encoded ARK, ASK, and VEK to a SEV-SNP chain.
+    pub fn from_pem(ark: &[u8], ask: &[u8], vek: &[u8]) -> Result<Self> {
         Ok(Self {
             ca: ca::Chain::from_pem(ark, ask)?,
-            vcek: Certificate::from_pem(vcek)?,
+            vek: Certificate::from_pem(vek)?,
         })
     }
 
-    /// Deserialize a DER-encoded ARK, ASK, and VCEK to a SEV-SNP chain.
-    pub fn from_der(ark: &[u8], ask: &[u8], vcek: &[u8]) -> Result<Self> {
+    /// Deserialize a DER-encoded ARK, ASK, and VEK to a SEV-SNP chain.
+    pub fn from_der(ark: &[u8], ask: &[u8], vek: &[u8]) -> Result<Self> {
         Ok(Self {
             ca: ca::Chain::from_der(ark, ask)?,
-            vcek: Certificate::from_der(vcek)?,
+            vek: Certificate::from_der(vek)?,
         })
     }
 }
