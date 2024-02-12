@@ -38,6 +38,10 @@ use std::mem::MaybeUninit;
 #[cfg(target_os = "linux")]
 use std::convert::TryInto;
 
+#[cfg(feature = "snp")]
+#[cfg(target_os = "linux")]
+use super::linux::host::types::SnpCommit;
+
 /// The CPU-unique identifier for the platform.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Identifier(pub Vec<u8>);
@@ -192,105 +196,44 @@ impl Firmware {
         Ok(platform_status)
     }
 
-    /// Reset the configuration of the AMD secure processor. Useful for resetting the committed_tcb.
+    /// The firmware will perform the following actions:  
+    /// - Set the CommittedTCB to the CurrentTCB of the current firmware.  
+    /// - Set the CommittedVersion to the FirmwareVersion of the current firmware.  
+    /// - Sets the ReportedTCB to the CurrentTCB.  
+    /// - Deletes the VLEK hashstick if the ReportedTCB changed.
+    ///
     /// # Example:
     /// ```ignore
-    /// use snp::firmware::host::*;
-    ///
     /// let mut firmware: Firmware = Firmware::open().unwrap();
     ///
-    /// firmware.reset_config().unwrap();
+    /// let status: bool = firmware.snp_commit().unwrap();
     /// ```
     #[cfg(feature = "snp")]
-    pub fn snp_reset_config(&mut self) -> Result<(), UserApiError> {
-        let config: Config = Config::new(TcbVersion::default(), 0);
-
-        let mut config: FFI::types::SnpSetExtConfig = FFI::types::SnpSetExtConfig {
-            config_address: &config as *const Config as u64,
-            certs_address: 0,
-            certs_len: 0,
-        };
-
-        SNP_SET_EXT_CONFIG.ioctl(&mut self.0, &mut Command::from_mut(&mut config))?;
+    pub fn snp_commit(&mut self) -> Result<(), UserApiError> {
+        let mut buf: SnpCommit = Default::default();
+        SNP_COMMIT.ioctl(&mut self.0, &mut Command::from_mut(&mut buf))?;
 
         Ok(())
     }
-    /// Fetch the SNP Extended Configuration.
+
+    /// Set the SNP Configuration.
     ///
     /// # Example:
     /// ```ignore
-    /// let mut firmware: Firmware = Firmware::open().unwrap();
-    ///
-    /// let status: ExtConfig = firmware.get_ext_config().unwrap();
-    /// ```
-    #[cfg(feature = "snp")]
-    pub fn snp_get_ext_config(&mut self) -> Result<ExtConfig, UserApiError> {
-        let mut raw_buf: Vec<u8> = vec![0; _4K_PAGE];
-        let mut config = FFI::types::SnpGetExtConfig {
-            config_address: 0,
-            certs_address: raw_buf.as_mut_ptr() as *mut CertTableEntry as u64,
-            certs_len: _4K_PAGE as u32,
-        };
-
-        SNP_GET_EXT_CONFIG
-            .ioctl(&mut self.0, &mut Command::from_mut(&mut config))
-            .or_else(|err| {
-                // If the error occurred because the buffer was to small, it will have changed
-                // the buffer. If it has, we will attempt to resize it.
-                if config.certs_len <= _4K_PAGE as u32 {
-                    return Err(err);
-                }
-
-                raw_buf = vec![0; config.certs_len as usize];
-                config.certs_address = raw_buf.as_ptr() as *const CertTableEntry as u64;
-                SNP_GET_EXT_CONFIG.ioctl(&mut self.0, &mut Command::from_mut(&mut config))
-            })?;
-
-        config.try_into().map_err(|op: uuid::Error| op.into())
-    }
-
-    /// Set the SNP Extended Configuration.
-    ///
-    /// # Example:
-    /// ```ignore
-    /// pub const ARK: &[u8] = include_bytes!("../../certs/builtin/milan/ark.pem");
-    /// pub const ASK: &[u8] = include_bytes!("../../certs/builtin/genoa/ask.pem");
-    /// pub const VCEK: &[u8] = include_bytes!("vcek.pem");
-    ///
     /// let configuration = Config::new(
     ///     TcbVersion::new(3, 0, 10, 169),
     ///     0,
     /// );
-    ///
-    /// // Generate a vector of certificates to store in hypervisor memory.
-    /// let certificates = vec![
-    ///     CertTableEntry::new(CertType::ARK, ARK.to_vec()),
-    ///     CertTableEntry::new(CertType::ASK, ASK.to_vec()),
-    ///     CertTableEntry::new(CertType::VCEK, VCEK.to_vec()),
-    /// ];
-    ///
-    /// // Call the `new` constructor to generate the extended configuration.
-    /// let ext_config: ExtConfig = ExtConfig::new(configuration, certificates);
-    ///
     /// let mut firmware: Firmware = Firmware::open().unwrap();
     ///
-    /// let status: bool = firmware.set_ext_config(ext_config).unwrap();
+    /// let status: bool = firmware.snp_set_config(configuration).unwrap();
     /// ```
     #[cfg(feature = "snp")]
-    pub fn snp_set_ext_config(&mut self, mut new_config: ExtConfig) -> Result<(), UserApiError> {
-        let mut opt_bytes: Option<Vec<u8>> = None;
-
-        if let Some(ref mut certificates) = new_config.certs {
-            opt_bytes = Some(FFI::types::CertTableEntry::uapi_to_vec_bytes(certificates)?);
-        }
-
-        let mut new_ext_config: FFI::types::SnpSetExtConfig = new_config.try_into()?;
-
-        if let Some(ref mut bytes) = opt_bytes {
-            new_ext_config.certs_address = bytes.as_mut_ptr() as u64;
-        }
-
-        SNP_SET_EXT_CONFIG.ioctl(&mut self.0, &mut Command::from_mut(&mut new_ext_config))?;
+    pub fn snp_set_config(&mut self, new_config: Config) -> Result<(), UserApiError> {
+        SNP_SET_CONFIG.ioctl(
+            &mut self.0,
+            &mut Command::from_mut(&mut new_config.try_into()?),
+        )?;
 
         Ok(())
     }

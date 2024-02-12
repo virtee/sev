@@ -30,8 +30,8 @@ impl_const_id! {
     GetId<'_> = 0x8, /* GET_ID2 is 0x8, the deprecated GET_ID ioctl is 0x7 */
 
     SnpPlatformStatus = 0x9,
-    SnpSetExtConfig = 0xA,
-    SnpGetExtConfig = 0xB,
+    SnpCommit = 0xA,
+    SnpSetConfig = 0xB,
 }
 
 #[cfg(all(feature = "sev", not(feature = "snp")))]
@@ -54,8 +54,8 @@ impl_const_id! {
 
     GetId<'_> = 0x8, /* GET_ID2 is 0x8, the deprecated GET_ID ioctl is 0x7 */
     SnpPlatformStatus = 0x9,
-    SnpSetExtConfig = 0xA,
-    SnpGetExtConfig = 0xB,
+    SnpCommit = 0xA,
+    SnpSetConfig = 0xB,
 }
 
 const SEV: Group = Group::new(b'S');
@@ -100,16 +100,19 @@ pub const GET_ID: Ioctl<WriteRead, &Command<GetId<'_>>> = unsafe { SEV.write_rea
 pub const SNP_PLATFORM_STATUS: Ioctl<WriteRead, &Command<SnpPlatformStatus>> =
     unsafe { SEV.write_read(0) };
 
-/// Set the SNP Extended Configuration Settings.
-/// C IOCTL calls -> sev_ioctl_snp_set_config
+/// The firmware will perform the following actions:
+/// - Set the CommittedTCB to the CurrentTCB of the current firmware.
+/// - Set the CommittedVersion to the FirmwareVersion of the current firmware.
+/// - Sets the ReportedTCB to the CurrentTCB.
+/// - Deletes the VLEK hashstick if the ReportedTCB changed.
+/// C IOCTL calls -> sev_ioctl_do_snp_commit
 #[cfg(feature = "snp")]
-pub const SNP_SET_EXT_CONFIG: Ioctl<WriteRead, &Command<SnpSetExtConfig>> =
-    unsafe { SEV.write_read(0) };
+pub const SNP_COMMIT: Ioctl<WriteRead, &Command<SnpCommit>> = unsafe { SEV.write_read(0) };
 
-/// Get the SNP Extended Configuration Settings.
+/// Set the system-wide configuration such as reported TCB version in the attestation report
+/// C IOCTL calls -> sev_ioctl_do_snp_set_config
 #[cfg(feature = "snp")]
-pub const SNP_GET_EXT_CONFIG: Ioctl<WriteRead, &Command<SnpGetExtConfig>> =
-    unsafe { SEV.write_read(0) };
+pub const SNP_SET_CONFIG: Ioctl<WriteRead, &Command<SnpSetConfig>> = unsafe { SEV.write_read(0) };
 
 /// The Rust-flavored, FFI-friendly version of `struct sev_issue_cmd` which is
 /// used to pass arguments to the SEV ioctl implementation.

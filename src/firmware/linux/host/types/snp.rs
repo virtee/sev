@@ -108,7 +108,7 @@ impl CertTableEntry {
     /// ```
     ///
     #[cfg(target_os = "linux")]
-    pub fn uapi_to_vec_bytes(table: &Vec<UAPI::CertTableEntry>) -> Result<Vec<u8>, CertError> {
+    pub fn uapi_to_vec_bytes(table: &[UAPI::CertTableEntry]) -> Result<Vec<u8>, CertError> {
         // Create the vector to return for later.
         let mut bytes: Vec<u8> = vec![];
 
@@ -211,32 +211,40 @@ impl CertTableEntry {
     }
 }
 
-#[repr(C)]
-pub struct SnpSetExtConfig {
-    /// Address of the Config or 0 when reported_tcb does not need
-    /// to be updated.
-    pub config_address: u64,
-
-    /// Address of extended guest request [`CertTableEntry`] buffer or 0 when
-    /// previous certificate(s) should be removed via SNP_SET_EXT_CONFIG.
-    pub certs_address: u64,
-
-    /// 4K-page aligned length of the buffer holding certificates to be cached.
-    pub certs_len: u32,
+/// SNP_COMMIT structure  
+/// - length: length of the command buffer read by the PSP  
+#[cfg(feature = "snp")]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
+#[repr(C, packed)]
+pub struct SnpCommit {
+    pub buffer: u32,
 }
 
-#[repr(C)]
-pub struct SnpGetExtConfig {
-    /// Address of the Config or 0 when reported_tcb should not be
-    /// fetched.
-    pub config_address: u64,
+/// Sets the system wide configuration values for SNP.
+#[cfg(feature = "snp")]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[repr(C, packed)]
+pub struct SnpSetConfig {
+    /// The TCB_VERSION to report in guest attestation reports.
+    pub reported_tcb: UAPI::TcbVersion,
 
-    /// Address of extended guest request [`CertTableEntry`] buffer or 0 when
-    /// certificate(s) should not be fetched.
-    pub certs_address: u64,
+    /// mask_id [0] : whether chip id is present in attestation reports or not  
+    /// mask_id [1]: whether attestation reports are signed or not
+    /// rsvd [2:31]: reserved
+    pub mask_id: UAPI::MaskId,
 
-    /// 4K-page aligned length of the buffer which will hold the fetched certificates.
-    pub certs_len: u32,
+    /// Reserved. Must be zero.
+    reserved: [u8; 52],
+}
+
+impl Default for SnpSetConfig {
+    fn default() -> Self {
+        Self {
+            reported_tcb: Default::default(),
+            mask_id: Default::default(),
+            reserved: [0; 52],
+        }
+    }
 }
 
 #[cfg(test)]
