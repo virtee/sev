@@ -36,6 +36,9 @@ bitflags::bitflags! {
 #[repr(C)]
 /// Certificates which are accepted for [`CertTableEntry`](self::CertTableEntry)
 pub enum CertType {
+    /// Empty or closing entry for the CertTable
+    Empty,
+
     /// AMD Root Signing Key (ARK) certificate
     ARK,
 
@@ -45,20 +48,25 @@ pub enum CertType {
     /// Versioned Chip Endorsement Key (VCEK) certificate
     VCEK,
 
+    /// Versioned Loaded Endorsement Key (VLEK) certificate
+    VLEK,
+
+    /// Certificate Revocation List (CRLs) certificate(s)
+    CRL,
+
     /// Other (Specify GUID)
     OTHER(uuid::Uuid),
-
-    /// Empty or closing entry for the CertTable
-    Empty,
 }
 
 impl ToString for CertType {
     fn to_string(&self) -> String {
         match self {
+            CertType::Empty => "00000000-0000-0000-0000-000000000000".to_string(),
             CertType::ARK => "c0b406a4-a803-4952-9743-3fb6014cd0ae".to_string(),
             CertType::ASK => "4ab7b379-bbac-4fe4-a02f-05aef327c782".to_string(),
             CertType::VCEK => "63da758d-e664-4564-adc5-f4b93be8accd".to_string(),
-            CertType::Empty => "00000000-0000-0000-0000-000000000000".to_string(),
+            CertType::VLEK => "a8074bc2-a25a-483e-aae6-39c045a0b8a1".to_string(),
+            CertType::CRL => "92f81bc3-5811-4d3d-97ff-d19f88dc67ea".to_string(),
             CertType::OTHER(guid) => guid.to_string(),
         }
     }
@@ -68,10 +76,12 @@ impl TryFrom<CertType> for uuid::Uuid {
     type Error = uuid::Error;
     fn try_from(value: CertType) -> Result<Self, Self::Error> {
         match value {
+            CertType::Empty => uuid::Uuid::parse_str(&CertType::Empty.to_string()),
             CertType::ARK => uuid::Uuid::parse_str(&CertType::ARK.to_string()),
             CertType::ASK => uuid::Uuid::parse_str(&CertType::ASK.to_string()),
             CertType::VCEK => uuid::Uuid::parse_str(&CertType::VCEK.to_string()),
-            CertType::Empty => uuid::Uuid::parse_str(&CertType::Empty.to_string()),
+            CertType::VLEK => uuid::Uuid::parse_str(&CertType::VLEK.to_string()),
+            CertType::CRL => uuid::Uuid::parse_str(&CertType::CRL.to_string()),
             CertType::OTHER(guid) => Ok(guid),
         }
     }
@@ -82,10 +92,12 @@ impl TryFrom<&uuid::Uuid> for CertType {
 
     fn try_from(value: &uuid::Uuid) -> Result<Self, Self::Error> {
         Ok(match value.to_string().as_str() {
+            "00000000-0000-0000-0000-000000000000" => CertType::Empty,
             "c0b406a4-a803-4952-9743-3fb6014cd0ae" => CertType::ARK,
             "4ab7b379-bbac-4fe4-a02f-05aef327c782" => CertType::ASK,
             "63da758d-e664-4564-adc5-f4b93be8accd" => CertType::VCEK,
-            "00000000-0000-0000-0000-000000000000" => CertType::Empty,
+            "a8074bc2-a25a-483e-aae6-39c045a0b8a1" => CertType::VLEK,
+            "92f81bc3-5811-4d3d-97ff-d19f88dc67ea" => CertType::CRL,
             _ => CertType::OTHER(*value),
         })
     }
