@@ -11,6 +11,24 @@ use std::{
 
 use std::os::raw::c_int;
 
+#[cfg(feature = "openssl")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum CertFormatError {
+    UnknownFormat,
+}
+
+#[cfg(feature = "openssl")]
+impl std::error::Error for CertFormatError {}
+
+#[cfg(feature = "openssl")]
+impl std::fmt::Display for CertFormatError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnknownFormat => write!(f, "Unknown Certificate Format Encountered."),
+        }
+    }
+}
+
 /// An error representingthe upper 32 bits of a SW_EXITINFO2 field set by the VMM.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum VmmError {
