@@ -28,7 +28,7 @@ jobs:
     name: sw crypto_nossl ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ matrix.toolchain }}
