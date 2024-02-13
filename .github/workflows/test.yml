@@ -5,15 +5,12 @@ jobs:
     name: sw openssl ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ matrix.toolchain }}
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: ${{ matrix.profile.flag }} --features=${{ matrix.features }}
+      - run: cargo test ${{ matrix.profile.flag }} --features=${{ matrix.features }}
+
     strategy:
       fail-fast: false
       matrix:
