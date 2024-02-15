@@ -3,6 +3,7 @@
 //! Operations to build and interact with an SEV-ES VMSA
 use crate::error::{LargeArrayError, MeasurementError};
 use crate::measurement::vcpu_types::CpuType;
+use bitfield::bitfield;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 use std::{convert::TryFrom, fmt, str::FromStr};
@@ -178,6 +179,68 @@ where
     }
 }
 
+bitfield! {
+    /// Kernel features that when enabled could affect the VMSA.
+    ///
+    /// | Bit(s) | Name
+    /// |--------|------|
+    /// | 0 | SNPActive |
+    /// | 1 | vTOM |
+    /// | 2 | ReflectVC |
+    /// | 3 | RestrictedInjection |
+    /// | 4 | AlternateInjection |
+    /// | 5 | DebugSwap |
+    /// | 6 | PreventHostIBS |
+    /// | 7 | BTBIsolation |
+    /// | 8 | VmplSSS |
+    /// | 9 | SecureTSC |
+    /// | 10 | VmgexitParameter |
+    /// | 11 | Reserved, SBZ |
+    /// | 12 | IbsVirtualization |
+    /// | 13 | Reserved, SBZ |
+    /// | 14 | VmsaRegProt |
+    /// | 15 | SmtProtection |
+    /// | 63:16 | Reserved, SBZ |
+    #[repr(C)]
+    #[derive(Default, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    pub struct GuestFeatures(u64);
+    impl Debug;
+    /// SNPActive
+    pub snp_active, _: 0, 0;
+    /// vTom
+    pub v_tom, _: 1, 1;
+    /// ReflectVC
+    pub reflect_vc, _: 2, 2;
+    /// RestrictedInjection
+    pub restricted_injection, _: 3,3;
+    /// AlternateInjection
+    pub alternate_injection, _: 4,4;
+    /// DebugSwap
+    pub debug_swap, _: 5,5;
+    /// PreventHostIbs
+    pub prevent_host_ibs, _: 6,6;
+    /// BTBIsolation
+    pub btb_isolation, _: 7,7;
+    /// VmplSSS
+    pub vmpl_sss, _: 8,8;
+    /// SecureTSC
+    pub secure_tsc, _: 9,9;
+    /// VmgExitParameter
+    pub vmg_exit_parameter, _: 10,10;
+    /// Reserved, SBZ
+    reserved_1, _: 11,11;
+    /// IbsVirtualization
+    pub ibs_virtualization, _: 12,12;
+    /// Reserved, SBZ
+    reserved_2, _: 13,13;
+    /// VmsaRegProt
+    pub vmsa_reg_prot, _: 14,14;
+    ///SmtProtection
+    pub smt_protection, _: 15,15;
+    /// Reserved, SBZ
+    reserved_3, sbz: 16, 63;
+}
+
 /// SEV-ES VMSA page
 /// The names of the fields are taken from struct sev_es_work_area in the linux kernel:
 /// https://github.com/AMDESE/linux/blob/sev-snp-v12/arch/x86/include/asm/svm.h#L318
@@ -306,24 +369,19 @@ impl VMSA {
     /// Generate a new SEV-ES VMSA
     /// One Bootstrap and an auxiliary save area if needed
     pub fn new(
-        sev_mode: SevMode,
         ap_eip: u64,
         vcpu_type: CpuType,
         vmm_type: VMMType,
         cpu_num: Option<u64>,
+        guest_features: GuestFeatures,
     ) -> Self {
-        let sev_features: u64 = match sev_mode {
-            SevMode::SevSnp => 0x1,
-            SevMode::Sev | SevMode::SevEs => 0x0,
-        };
-
         let bsp_save_area =
-            Self::build_save_area(BSP_EIP, sev_features, vcpu_type, vmm_type, cpu_num);
+            Self::build_save_area(BSP_EIP, guest_features, vcpu_type, vmm_type, cpu_num);
 
         let ap_save_area = if ap_eip > 0 {
             Some(Self::build_save_area(
                 ap_eip,
-                sev_features,
+                guest_features,
                 vcpu_type,
                 vmm_type,
                 cpu_num,
@@ -341,7 +399,7 @@ impl VMSA {
     /// Generate a save area
     fn build_save_area(
         eip: u64,
-        sev_features: u64,
+        guest_features: GuestFeatures,
         vcpu_type: CpuType,
         vmm_type: VMMType,
         cpu_num: Option<u64>,
@@ -403,7 +461,7 @@ impl VMSA {
         area.rip = eip & 0xffff;
         area.g_pat = 0x7040600070406;
         area.rdx = rdx;
-        area.sev_features = sev_features;
+        area.sev_features = guest_features.0;
         area.xcr0 = 0x1;
 
         area

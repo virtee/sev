@@ -8,7 +8,7 @@ use crate::{
         ovmf::{OvmfSevMetadataSectionDesc, SectionType, OVMF},
         sev_hashes::SevHashes,
         vcpu_types::CpuType,
-        vmsa::{SevMode, VMMType, VMSA},
+        vmsa::{VMMType, VMSA},
     },
 };
 use hex::FromHex;
@@ -17,7 +17,7 @@ use std::str::FromStr;
 
 use crate::error::*;
 
-use super::gctx::LD_SIZE;
+use super::{gctx::LD_SIZE, vmsa::GuestFeatures};
 
 const _PAGE_MASK: u64 = 0xfff;
 
@@ -131,6 +131,8 @@ pub struct SnpMeasurementArgs<'a> {
     pub vcpu_type: String,
     /// Path to OVMF file
     pub ovmf_file: PathBuf,
+    /// Active kernel guest features
+    pub guest_features: GuestFeatures,
     /// Path to kernel file
     pub kernel_file: Option<PathBuf>,
     /// Path to initrd file
@@ -180,11 +182,11 @@ pub fn snp_calc_launch_digest(
     snp_update_metadata_pages(&mut gctx, &ovmf, sev_hashes.as_ref(), official_vmm_type)?;
 
     let vmsa = VMSA::new(
-        SevMode::SevSnp,
         ovmf.sev_es_reset_eip()?.into(),
         CpuType::from_str(snp_measurement.vcpu_type.as_str())?,
         official_vmm_type,
         Some(snp_measurement.vcpus as u64),
+        snp_measurement.guest_features,
     );
 
     for vmsa_page in vmsa.pages(snp_measurement.vcpus as usize)?.iter() {
