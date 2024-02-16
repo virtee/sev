@@ -13,7 +13,7 @@ use base64::{engine::general_purpose, Engine as _};
 use hex::{self, FromHex};
 
 use sev::measurement::{
-    idblock::{load_priv_key_from_pem, snp_calculate_id},
+    idblock::{load_priv_key, snp_calculate_id},
     idblock_types::{IdAuth, IdBlockLaunchDigest, SevEcdsaPubKey, SevEcdsaSig},
 };
 
@@ -127,7 +127,7 @@ fn test_auth_block_generation() {
     let auth_path: PathBuf = "./tests/measurement/test_auth_key.pem".into();
 
     // Get id private test key from pem
-    let id_ec_priv_key = load_priv_key_from_pem(id_path).unwrap();
+    let id_ec_priv_key = load_priv_key(id_path).unwrap();
 
     // Generate id public key, should always be the same
     let id_ec_pub_key = SevEcdsaPubKey::try_from(&id_ec_priv_key).unwrap();
@@ -139,7 +139,7 @@ fn test_auth_block_generation() {
     let id_block_sig: SevEcdsaSig = bincode::deserialize(&id_block_bytes).unwrap();
 
     // Get author private test key from pem
-    let author_ec_priv_key = load_priv_key_from_pem(auth_path).unwrap();
+    let author_ec_priv_key = load_priv_key(auth_path).unwrap();
 
     // Generate author public key, should always be the same
     let author_pub_key = SevEcdsaPubKey::try_from(&author_ec_priv_key).unwrap();

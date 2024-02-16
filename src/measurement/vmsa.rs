@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Operations to build and interact with an SEV-ES VMSA
-use crate::error::{LargeArrayError, MeasurementError};
-use crate::measurement::vcpu_types::CpuType;
+use crate::{
+    error::MeasurementError,
+    measurement::{large_array::LargeArray, vcpu_types::CpuType},
+};
 use bitfield::bitfield;
 use serde::{Deserialize, Serialize};
-use serde_big_array::BigArray;
 use std::{convert::TryFrom, fmt, str::FromStr};
 
 /// Different Possible SEV modes
@@ -95,87 +96,6 @@ impl VmcbSeg {
             limit,
             base,
         }
-    }
-}
-
-/// Large array structure to serialize and default arrays larger than 32 bytes.
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
-#[repr(C)]
-pub struct LargeArray<T, const N: usize>(#[serde(with = "BigArray")] [T; N])
-where
-    T: for<'a> Deserialize<'a> + Serialize;
-
-impl<T, const N: usize> Default for LargeArray<T, N>
-where
-    T: std::marker::Copy + std::default::Default + for<'a> Deserialize<'a> + Serialize,
-{
-    fn default() -> Self {
-        Self([T::default(); N])
-    }
-}
-
-impl<T, const N: usize> TryFrom<Vec<T>> for LargeArray<T, N>
-where
-    T: std::marker::Copy + std::default::Default + for<'a> Deserialize<'a> + Serialize,
-{
-    type Error = LargeArrayError;
-
-    fn try_from(vec: Vec<T>) -> Result<Self, Self::Error> {
-        if vec.len() == N {
-            let mut array = [Default::default(); N];
-            array.copy_from_slice(&vec[..]);
-            Ok(LargeArray(array))
-        } else {
-            Err(LargeArrayError {
-                error_msg: "Incorrect vecotr size for conversion to LargeArray".to_string(),
-            })
-        }
-    }
-}
-
-impl<T, const N: usize> TryFrom<[T; N]> for LargeArray<T, N>
-where
-    T: std::marker::Copy + std::default::Default + for<'a> Deserialize<'a> + Serialize,
-{
-    type Error = LargeArrayError;
-
-    fn try_from(array: [T; N]) -> Result<Self, Self::Error> {
-        Ok(LargeArray(array))
-    }
-}
-
-impl<T, const N: usize> TryFrom<&[u8]> for LargeArray<T, N>
-where
-    T: std::marker::Copy + std::default::Default + for<'a> Deserialize<'a> + Serialize,
-{
-    type Error = LargeArrayError;
-
-    fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
-        if slice.len() == N {
-            let mut array = [Default::default(); N];
-            for (size, i) in array.iter_mut().enumerate().take(N) {
-                let offset = size * std::mem::size_of::<T>();
-                *i = unsafe {
-                    // Safe because we checked that the slice length matches the array size
-                    *(slice.get_unchecked(offset) as *const u8 as *const T)
-                };
-            }
-            Ok(LargeArray(array))
-        } else {
-            Err(LargeArrayError {
-                error_msg: "Incorrect vecotr size for conversion to LargeArray".to_string(),
-            })
-        }
-    }
-}
-
-impl<T, const N: usize> LargeArray<T, N>
-where
-    T: std::marker::Copy + std::default::Default + for<'a> Deserialize<'a> + Serialize,
-{
-    /// Get the large array as a regular array format
-    pub fn as_array(&self) -> [T; N] {
-        self.0
     }
 }
 

@@ -742,17 +742,34 @@ impl std::error::Error for SevHashError {}
 
 /// Possible errors when working with the large array type
 #[derive(Debug)]
-pub struct LargeArrayError {
-    pub(crate) error_msg: String,
+pub enum LargeArrayError {
+    /// Error when trying from slice
+    SliceError(TryFromSliceError),
+
+    /// Error when converting from vector
+    VectorError(String),
 }
 
 impl std::fmt::Display for LargeArrayError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Error when handling large array: {}", self.error_msg)
+        match self {
+            LargeArrayError::SliceError(error) => {
+                write!(f, "Error when trying from slice: {error}")
+            }
+            LargeArrayError::VectorError(error) => {
+                write!(f, "Error when trying from vector: {error}")
+            }
+        }
     }
 }
 
 impl std::error::Error for LargeArrayError {}
+
+impl std::convert::From<TryFromSliceError> for LargeArrayError {
+    fn from(value: TryFromSliceError) -> Self {
+        Self::SliceError(value)
+    }
+}
 
 /// Errors when calculating the ID BLOCK
 #[derive(Debug)]

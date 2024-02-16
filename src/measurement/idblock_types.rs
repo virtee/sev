@@ -14,7 +14,7 @@ use openssl::{
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 
-use crate::{error::IdBlockError, measurement::vmsa::LargeArray};
+use crate::{error::IdBlockError, measurement::large_array::LargeArray};
 
 pub(crate) const DEFAULT_ID_VERSION: u32 = 1;
 pub(crate) const DEFAULT_ID_POLICY: u64 = 0x300000;

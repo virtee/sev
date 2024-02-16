@@ -25,7 +25,7 @@ pub fn gen_id_auth_block(
     id_key_file: PathBuf,
     author_key_file: PathBuf,
 ) -> Result<IdAuth, IdBlockError> {
-    let id_ec_priv_key = load_priv_key_from_pem(id_key_file)?;
+    let id_ec_priv_key = load_priv_key(id_key_file)?;
     let id_ec_pub_key = SevEcdsaPubKey::try_from(&id_ec_priv_key)?;
     let id_sig = SevEcdsaSig::try_from((
         id_ec_priv_key,
@@ -34,7 +34,7 @@ pub fn gen_id_auth_block(
             .as_slice(),
     ))?;
 
-    let author_ec_priv_key = load_priv_key_from_pem(author_key_file)?;
+    let author_ec_priv_key = load_priv_key(author_key_file)?;
     let author_pub_key = SevEcdsaPubKey::try_from(&author_ec_priv_key)?;
     let author_sig = SevEcdsaSig::try_from((
         author_ec_priv_key,
@@ -53,19 +53,40 @@ pub fn gen_id_auth_block(
     ))
 }
 
-///Read a pem key file and return a private EcKey.
+enum KeyFormat {
+    Pem,
+    Der,
+}
+
+/// Identifies the format of a key based upon the first twenty-seven
+/// bytes of a byte stream. A non-PEM format assumes DER format.
+fn identify_priv_key_format(bytes: &[u8]) -> KeyFormat {
+    const PEM_START: &[u8] = b"-----BEGIN PRIVATE KEY-----";
+    match &bytes[0..27] {
+        PEM_START => KeyFormat::Pem,
+        _ => KeyFormat::Der,
+    }
+}
+///Read a key file and return a private EcKey.
 /// Key has to be an EC P-384 key.
-pub fn load_priv_key_from_pem(path: PathBuf) -> Result<EcKey<Private>, IdBlockError> {
-    let mut pem_data = Vec::new();
+pub fn load_priv_key(path: PathBuf) -> Result<EcKey<Private>, IdBlockError> {
+    let mut key_data = Vec::new();
     let mut file = match File::open(path) {
         Ok(file) => file,
         Err(e) => return Err(IdBlockError::FileError(e)),
     };
 
-    file.read_to_end(&mut pem_data)
+    file.read_to_end(&mut key_data)
         .map_err(IdBlockError::FileError)?;
 
-    let pkey = EcKey::private_key_from_pem(&pem_data).map_err(IdBlockError::CryptoErrorStack)?;
+    let pkey = match identify_priv_key_format(&key_data) {
+        KeyFormat::Pem => {
+            EcKey::private_key_from_pem(&key_data).map_err(IdBlockError::CryptoErrorStack)?
+        }
+        KeyFormat::Der => {
+            EcKey::private_key_from_der(&key_data).map_err(IdBlockError::CryptoErrorStack)?
+        }
+    };
 
     pkey.check_key().map_err(IdBlockError::CryptoErrorStack)?;
 
@@ -80,7 +101,7 @@ pub fn load_priv_key_from_pem(path: PathBuf) -> Result<EcKey<Private>, IdBlockEr
 
 /// Generate the sha384 digest of the provided pem key
 pub fn generate_key_digest(key_path: PathBuf) -> Result<IdBlockLaunchDigest, IdBlockError> {
-    let ec_key = load_priv_key_from_pem(key_path)?;
+    let ec_key = load_priv_key(key_path)?;
 
     let pub_key = SevEcdsaPubKey::try_from(&ec_key)?;
 
