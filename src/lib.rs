@@ -350,6 +350,12 @@ impl TryFrom<String> for Generation {
             #[cfg(any(feature = "sev", feature = "snp"))]
             "genoa" => Ok(Self::Genoa),
 
+            #[cfg(any(feature = "sev", feature = "snp"))]
+            "bergamo" => Ok(Self::Genoa),
+
+            #[cfg(any(feature = "sev", feature = "snp"))]
+            "siena" => Ok(Self::Genoa),
+
             _ => Err(()),
         }
     }
