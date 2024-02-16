@@ -107,11 +107,11 @@ impl Certificate {
         Ok(self.0.public_key()?)
     }
 
-    /// Identifies the format of a certificate based upon the first twenty-eight
+    /// Identifies the format of a certificate based upon the first twenty-seven
     /// bytes of a byte stream. A non-PEM format assumes DER format.
     fn identify_format(bytes: &[u8]) -> CertFormat {
         const PEM_START: &[u8] = b"-----BEGIN CERTIFICATE-----";
-        match bytes {
+        match &bytes[0..27] {
             PEM_START => CertFormat::Pem,
             _ => CertFormat::Der,
         }
