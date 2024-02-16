@@ -13,7 +13,9 @@ use std::os::raw::c_int;
 
 #[cfg(feature = "openssl")]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum CertFormatError {
+/// Used for representing known errors when handling snp::Certificates.
+pub enum CertFormatError {
+    /// Unknown certificate format identified.
     UnknownFormat,
 }
 
