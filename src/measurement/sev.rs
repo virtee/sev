@@ -5,7 +5,7 @@ use crate::measurement::{
     ovmf::OVMF,
     sev_hashes::SevHashes,
     vcpu_types::CpuType,
-    vmsa::{SevMode, VMMType, VMSA},
+    vmsa::{GuestFeatures, VMMType, VMSA},
 };
 
 use std::path::PathBuf;
@@ -67,11 +67,11 @@ pub fn seves_calc_launch_digest(
     };
 
     let vmsa = VMSA::new(
-        SevMode::SevEs,
         ovmf.sev_es_reset_eip()?.into(),
         CpuType::from_str(sev_es_measurement.vcpu_type.as_str())?,
         official_vmm_type,
         Some(sev_es_measurement.vcpus as u64),
+        GuestFeatures(0x0),
     );
 
     for vmsa_page in vmsa.pages(sev_es_measurement.vcpus as usize)?.iter() {

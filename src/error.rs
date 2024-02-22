@@ -740,6 +740,104 @@ impl std::fmt::Display for SevHashError {
 
 impl std::error::Error for SevHashError {}
 
+/// Possible errors when working with the large array type
+#[derive(Debug)]
+pub enum LargeArrayError {
+    /// Error when trying from slice
+    SliceError(TryFromSliceError),
+
+    /// Error when converting from vector
+    VectorError(String),
+}
+
+impl std::fmt::Display for LargeArrayError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            LargeArrayError::SliceError(error) => {
+                write!(f, "Error when trying from slice: {error}")
+            }
+            LargeArrayError::VectorError(error) => {
+                write!(f, "Error when trying from vector: {error}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for LargeArrayError {}
+
+impl std::convert::From<TryFromSliceError> for LargeArrayError {
+    fn from(value: TryFromSliceError) -> Self {
+        Self::SliceError(value)
+    }
+}
+
+/// Errors when calculating the ID BLOCK
+#[derive(Debug)]
+pub enum IdBlockError {
+    #[cfg(all(feature = "snp", feature = "openssl"))]
+    /// TryFrom Slice Error handling
+    CryptoErrorStack(openssl::error::ErrorStack),
+
+    /// Large Array Error handling
+    LargeArrayError(LargeArrayError),
+
+    /// File Error Handling
+    FileError(std::io::Error),
+
+    /// Bincode Error Handling
+    BincodeError(bincode::ErrorKind),
+
+    /// Error from when handling SEV Curve algorithm
+    SevCurveError(),
+
+    /// Error when handling SEV ECDSA Signature
+    SevEcsdsaSigError(String),
+}
+
+impl std::fmt::Display for IdBlockError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            #[cfg(all(feature = "snp", feature = "openssl"))]
+            IdBlockError::CryptoErrorStack(e) => write!(f, "Error when with OPENSSL: {e}"),
+            IdBlockError::LargeArrayError(e) => write!(f, "{e}"),
+            IdBlockError::FileError(e) => write!(f, "Failed handling file: {e}"),
+            IdBlockError::BincodeError(e) => write!(f, "Bincode error encountered: {e}"),
+            IdBlockError::SevCurveError() => {
+                write!(f, "Wrong curve used in the provided private key")
+            }
+            IdBlockError::SevEcsdsaSigError(msg) => {
+                write!(f, "Error validation SEV signature: {msg}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for IdBlockError {}
+
+#[cfg(all(feature = "snp", feature = "openssl"))]
+impl std::convert::From<openssl::error::ErrorStack> for IdBlockError {
+    fn from(value: openssl::error::ErrorStack) -> Self {
+        Self::CryptoErrorStack(value)
+    }
+}
+
+impl std::convert::From<LargeArrayError> for IdBlockError {
+    fn from(value: LargeArrayError) -> Self {
+        Self::LargeArrayError(value)
+    }
+}
+
+impl std::convert::From<std::io::Error> for IdBlockError {
+    fn from(value: std::io::Error) -> Self {
+        Self::FileError(value)
+    }
+}
+impl std::convert::From<bincode::ErrorKind> for IdBlockError {
+    fn from(value: bincode::ErrorKind) -> Self {
+        Self::BincodeError(value)
+    }
+}
+
 /// Errors which may be encountered when calculating the guest measurement.
 #[derive(Debug)]
 pub enum MeasurementError {
@@ -766,6 +864,9 @@ pub enum MeasurementError {
 
     /// SEV Hash Error Handling
     SevHashError(SevHashError),
+
+    /// Id Block Error Handling
+    IdBlockError(IdBlockError),
 
     /// Invalid VCPU provided
     InvalidVcpuTypeError(String),
@@ -794,6 +895,7 @@ impl std::fmt::Display for MeasurementError {
             MeasurementError::GCTXError(e) => write!(f, "GCTX Error Encountered: {e}"),
             MeasurementError::OVMFError(e) => write!(f, "OVMF Error Encountered: {e}"),
             MeasurementError::SevHashError(e) => write!(f, "Sev hash Error Encountered: {e}"),
+            MeasurementError::IdBlockError(e) => write!(f, "Id Block Error Encountered: {e}"),
             MeasurementError::InvalidVcpuTypeError(value) => {
                 write!(f, "Invalid VCPU type value provided: {value}")
             }
