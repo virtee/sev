@@ -5,60 +5,43 @@ jobs:
     name: cargo fmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
           toolchain: 1.70.0
-          profile: minimal
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+      - run: cargo fmt --all -- --check
 
   clippy-openssl:
     name: cargo clippy openssl
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
           toolchain: 1.70.0
-          profile: minimal
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --features=openssl,hw_tests,dangerous_hw_tests --all-targets -- -D clippy::all -D unused_imports -Dwarnings
+      - run: cargo clippy --features=openssl,hw_tests,dangerous_hw_tests --all-targets -- -D clippy::all -D unused_imports -D warnings
 
   clippy-crypto_nossl:
     name: cargo clippy crypto_nossl
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
           toolchain: 1.70.0
-          profile: minimal
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --features=crypto_nossl,hw_tests,dangerous_hw_tests --all-targets -- -D clippy::all -D unused_imports -Dwarnings
+      - run: cargo clippy --features=crypto_nossl,hw_tests,dangerous_hw_tests --all-targets -- -D clippy::all -D unused_imports -D warnings
 
   readme:
     name: cargo readme
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: nightly
-          profile: minimal
-          override: true
       - run: cargo install cargo-readme
       - run: cargo readme > README.md && git diff --exit-code
 
@@ -66,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - uses: enarx/spdx@master
         with:
           licenses: Apache-2.0
