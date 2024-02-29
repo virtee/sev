@@ -185,13 +185,14 @@ impl Firmware {
             return Ok((report_response.report, None));
         }
 
-        let certificates: Vec<CertTableEntry>;
+        let mut certificates: Vec<CertTableEntry>;
 
         unsafe {
             let entries = (ext_report_request.certs_address as *mut HostFFI::types::CertTableEntry)
                 .as_mut()
                 .ok_or(CertError::EmptyCertBuffer)?;
             certificates = HostFFI::types::CertTableEntry::parse_table(entries)?;
+            certificates.sort();
         }
 
         // Return both the Attestation Report, as well as the Cert Table.
