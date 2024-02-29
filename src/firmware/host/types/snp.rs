@@ -103,6 +103,38 @@ impl TryFrom<&uuid::Uuid> for CertType {
     }
 }
 
+impl Ord for CertType {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (Self::ARK, Self::ARK)
+            | (Self::ASK, Self::ASK)
+            | (Self::VCEK, Self::VCEK)
+            | (Self::VLEK, Self::VLEK)
+            | (Self::CRL, Self::CRL)
+            | (Self::Empty, Self::Empty) => std::cmp::Ordering::Equal,
+            (Self::OTHER(left), Self::OTHER(right)) => left.cmp(right),
+            (Self::Empty, _) => std::cmp::Ordering::Greater,
+            (_, Self::Empty) => std::cmp::Ordering::Less,
+            (Self::OTHER(_), _) => std::cmp::Ordering::Greater,
+            (_, Self::OTHER(_)) => std::cmp::Ordering::Less,
+            (Self::CRL, _) => std::cmp::Ordering::Greater,
+            (_, Self::CRL) => std::cmp::Ordering::Less,
+            (Self::ASK, _) => std::cmp::Ordering::Greater,
+            (_, Self::ASK) => std::cmp::Ordering::Less,
+            (Self::VLEK, _) => std::cmp::Ordering::Greater,
+            (_, Self::VLEK) => std::cmp::Ordering::Less,
+            (Self::VCEK, _) => std::cmp::Ordering::Greater,
+            (_, Self::VCEK) => std::cmp::Ordering::Less,
+        }
+    }
+}
+
+impl PartialOrd for CertType {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[repr(C)]
 /// An entry with information regarding a specific certificate.
@@ -150,6 +182,18 @@ impl CertTableEntry {
             bytes.as_mut_ptr() as *mut FFI::types::CertTableEntry;
 
         Ok(unsafe { FFI::types::CertTableEntry::parse_table(cert_bytes_ptr).unwrap() })
+    }
+}
+
+impl Ord for CertTableEntry {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.cert_type.cmp(&other.cert_type)
+    }
+}
+
+impl PartialOrd for CertTableEntry {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cert_type.cmp(&other.cert_type))
     }
 }
 
@@ -346,5 +390,65 @@ impl Display for MaskId {
             self.mask_chip_id(),
             self.mask_chip_key(),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CertType;
+    use uuid::Uuid;
+
+    #[test]
+    fn test_cert_type_sort_vcek() {
+        let mut certs: Vec<CertType> = vec![
+            CertType::Empty,
+            CertType::CRL,
+            CertType::OTHER(Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap()),
+            CertType::OTHER(Uuid::parse_str("33333333-3333-3333-3333-333333333333").unwrap()),
+            CertType::OTHER(Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap()),
+            CertType::ARK,
+            CertType::ASK,
+            CertType::VCEK,
+        ];
+
+        let sorted_certs: Vec<CertType> = vec![
+            CertType::ARK,
+            CertType::VCEK,
+            CertType::ASK,
+            CertType::CRL,
+            CertType::OTHER(Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap()),
+            CertType::OTHER(Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap()),
+            CertType::OTHER(Uuid::parse_str("33333333-3333-3333-3333-333333333333").unwrap()),
+            CertType::Empty,
+        ];
+        certs.sort();
+        assert_eq!(certs, sorted_certs);
+    }
+
+    #[test]
+    fn test_cert_type_sort_vlek() {
+        let mut certs: Vec<CertType> = vec![
+            CertType::Empty,
+            CertType::CRL,
+            CertType::OTHER(Uuid::parse_str("33333333-3333-3333-3333-333333333333").unwrap()),
+            CertType::OTHER(Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap()),
+            CertType::OTHER(Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap()),
+            CertType::ARK,
+            CertType::ASK,
+            CertType::VLEK,
+        ];
+
+        let sorted_certs: Vec<CertType> = vec![
+            CertType::ARK,
+            CertType::VLEK,
+            CertType::ASK,
+            CertType::CRL,
+            CertType::OTHER(Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap()),
+            CertType::OTHER(Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap()),
+            CertType::OTHER(Uuid::parse_str("33333333-3333-3333-3333-333333333333").unwrap()),
+            CertType::Empty,
+        ];
+        certs.sort();
+        assert_eq!(certs, sorted_certs);
     }
 }
