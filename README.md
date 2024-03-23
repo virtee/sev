@@ -6,8 +6,11 @@
 # sev
 
 The `sev` crate provides an implementation of the [AMD Secure Encrypted
-Virtualization (SEV)](https://www.amd.com/content/dam/amd/en/documents/epyc-technical-docs/programmer-references/55766_SEV-KM_API_Specification.pdf) APIs and the [SEV Secure Nested Paging
-Firmware (SNP)] (https://www.amd.com/content/dam/amd/en/documents/epyc-technical-docs/specifications/56860.pdf) ABIs.
+Virtualization (SEV)][SEV] APIs and the [SEV Secure Nested Paging
+Firmware (SNP)][SNP] ABIs.
+
+[SEV]: https://www.amd.com/content/dam/amd/en/documents/epyc-technical-docs/programmer-references/55766_SEV-KM_API_Specification.pdf
+[SNP]: https://www.amd.com/content/dam/amd/en/documents/epyc-technical-docs/specifications/56860.pdf
 
 ### SEV APIs
 
