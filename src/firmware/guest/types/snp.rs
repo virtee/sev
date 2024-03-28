@@ -467,18 +467,29 @@ impl Display for GuestPolicy {
 
 bitfield! {
     /// A structure with a bit-field unsigned 64 bit integer:
-    /// Bit 0 representing the status of TSME enablement.
-    /// Bit 1 representing the status of SMT enablement.
-    /// Bits 2-63 are reserved.
+    /// Bit 0 representing the status of SMT enablement.
+    /// Bit 1 representing the status of TSME enablement.
+    /// Bit 2 indicates if ECC memory is used.
+    /// Bit 3 indicates if RAPL is disabled.
+    /// Bit 4 indicates if ciphertext hiding is enabled
+    /// Bits 5-63 are reserved.
     #[derive(Default, Clone, Copy)]
     #[derive(Deserialize, Serialize)]
     #[repr(C)]
     pub struct PlatformInfo(u64);
     impl Debug;
-    /// Returns the bit state of TSME.
-    pub tsme_enabled, _: 0, 0;
     /// Returns the bit state of SMT
-    pub smt_enabled, _: 1, 1;
+    pub smt_enabled, _: 0, 0;
+    /// Returns the bit state of TSME.
+    pub tsme_enabled, _: 1, 1;
+    /// Indicates that the platform is currently using ECC memory
+    pub ecc_enabled, _: 2, 2;
+    /// Indicates that the RAPL feature is disabled
+    pub rapl_disabled, _: 3, 3;
+    /// Indicates that ciphertext hiding is enabled
+    pub ciphertext_hiding_enabled, _: 4, 4;
+    /// reserved
+    reserved, _: 5, 63;
 }
 
 impl Display for PlatformInfo {
@@ -487,12 +498,18 @@ impl Display for PlatformInfo {
             f,
             r#"
 Platform Info ({}):
-  TSME Enabled: {}
-  SMT Enabled:  {}
+  SMT Enabled:               {}
+  TSME Enabled:              {}
+  ECC Enabled:               {}
+  RAPL Disabled:             {}
+  Ciphertext Hiding Enabled: {}
 "#,
             self.0,
+            self.smt_enabled(),
             self.tsme_enabled(),
-            self.smt_enabled()
+            self.ecc_enabled(),
+            self.rapl_disabled(),
+            self.ciphertext_hiding_enabled(),
         )
     }
 }
