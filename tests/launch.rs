@@ -2,31 +2,31 @@
 
 #![cfg(feature = "openssl")]
 
-#[cfg(feature = "sev")]
+#[cfg(all(target_os = "linux", feature = "sev"))]
 use std::slice::from_raw_parts;
 
-#[cfg(feature = "sev")]
+#[cfg(all(target_os = "linux", feature = "sev"))]
 use std::{convert::TryFrom, os::unix::io::AsRawFd};
 
-#[cfg(feature = "sev")]
+#[cfg(all(target_os = "linux", feature = "sev"))]
 use sev::{cached_chain, firmware::host::Firmware, launch::sev::*, session::Session};
 
-#[cfg(feature = "sev")]
+#[cfg(all(target_os = "linux", feature = "sev"))]
 use kvm_bindings::kvm_userspace_memory_region;
 
-#[cfg(feature = "sev")]
+#[cfg(all(target_os = "linux", feature = "sev"))]
 use kvm_ioctls::{Kvm, VcpuExit};
 
-#[cfg(feature = "sev")]
+#[cfg(all(target_os = "linux", feature = "sev"))]
 use serial_test::serial;
 
 // has to be a multiple of 16
-#[cfg(feature = "sev")]
+#[cfg(all(target_os = "linux", feature = "sev"))]
 const CODE: &[u8; 16] = &[
     0xf4; 16 // hlt
 ];
 
-#[cfg(feature = "sev")]
+#[cfg(all(target_os = "linux", feature = "sev"))]
 #[cfg_attr(not(has_sev), ignore)]
 #[test]
 #[serial]
