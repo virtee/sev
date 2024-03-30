@@ -47,11 +47,11 @@ To include the SEV-SNP APIs only:
 
 ### Platform Management
 
-Refer to the [`firmware`] module for more information.
+Refer to the [firmware] module for more information.
 
 ### Guest Management
 
-Refer to the [`launch`] module for more information.
+Refer to the [launch] module for more information.
 
 ### Cryptographic Verification
 
@@ -74,7 +74,7 @@ with the device nodes.
 
 ### Using the C API
 
-Projects in C can take advantage of the C API for the SEV [`launch`] ioctls.
+Projects in C can take advantage of the C API for the SEV [launch] ioctls.
 To install the C API, users can use `cargo-c` with the features they would
 like to produce and install a `pkg-config` file, a static library, a dynamic
 library, and a C header:
