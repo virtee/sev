@@ -25,6 +25,8 @@ const CODE: &[u8; 4096] = &[
 #[cfg_attr(not(has_sev), ignore)]
 #[test]
 fn snp() {
+    use sev::firmware::guest::GuestPolicy;
+
     let kvm_fd = Kvm::new().unwrap();
     let vm_fd = kvm_fd.create_vm().unwrap();
 
@@ -59,15 +61,9 @@ fn snp() {
     let sev = Firmware::open().unwrap();
     let launcher = Launcher::new(vm_fd, sev).unwrap();
 
-    let start = Start::new(
-        None,
-        Policy {
-            flags: PolicyFlags::SMT,
-            ..Default::default()
-        },
-        false,
-        [0; 16],
-    );
+    let mut policy = GuestPolicy(0);
+    policy.set_smt_allowed(1);
+    let start = Start::new(None, policy, false, [0; 16]);
 
     let mut launcher = launcher.start(start).unwrap();
 
