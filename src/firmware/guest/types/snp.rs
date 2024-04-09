@@ -414,32 +414,32 @@ bitfield! {
     /// | 24     | CIPHERTEXT_HIDING | 0: Ciphertext hiding may be enabled or disabled.<br>1: Ciphertext hiding must be enabled.                          >
     /// | 63:25  | -                 | Reserved. MBZ.                                                                                                     >
     ///
-    #[derive(Default, Clone, Copy)]
+    #[derive(Default, Clone, Copy,Eq, PartialEq)]
     #[derive(Deserialize, Serialize)]
     #[repr(C)]
     pub struct GuestPolicy(u64);
     impl Debug;
     /// ABI_MINOR field: Indicates the minor API version.
-    pub abi_minor, _: 7, 0;
+    pub abi_minor, set_abi_minor: 7, 0;
     /// ABI_MAJOR field: Indicates the minor API version.
-    pub abi_major, _: 15, 8;
+    pub abi_major, set_abi_major: 15, 8;
     /// SMT_ALLOWED field: Indicates the if SMT should be permitted.
-    pub smt_allowed, _: 16, 16;
+    pub smt_allowed, set_smt_allowed: 16, 16;
     /// MIGRATE_MA_ALLOWED field: Indicates the if migration is permitted with
     /// the migration agent.
-    pub migrate_ma_allowed, _: 18, 18;
+    pub migrate_ma_allowed, set_migrate_ma_allowed: 18, 18;
     /// DEBUG_ALLOWED field: Indicates the if debugging should is permitted.
-    pub debug_allowed, _: 19, 19;
+    pub debug_allowed, set_debug_allowed: 19, 19;
     /// SINGLE_SOCKET_REQUIRED field: Indicates the if a single socket is required.
-    pub single_socket_required, _: 20, 20;
+    pub single_socket_required, set_single_socket_required: 20, 20;
     /// CXL_ALLOW field: (1) can populate CXL devices/memory, (0) cannot populate CXL devices/memory
-    pub cxl_allowed, _: 21, 21;
+    pub cxl_allowed, set_cxl_allowed: 21, 21;
     /// MEM_AES_256_XTS field: (1) require AES 256 XTS encryption, (0) allows either AES 128 XEX or AES 256 XTS encryption
-    pub mem_aes_256_xts, _: 22, 22;
+    pub mem_aes_256_xts, set_mem_aes_256_xts: 22, 22;
     /// RAPL_DIS field: (1) RAPL must be disabled, (0) allow RAPL
-    pub rapl_dis, _: 23, 23;
+    pub rapl_dis, set_rapl_dis: 23, 23;
     /// CIPHERTEXT_HIDING field: (1) ciphertext hiding must be enabled, (0) ciphertext hiding may be enabled/disabled
-    pub ciphertext_hiding, _: 24, 24;
+    pub ciphertext_hiding, set_ciphertext_hiding: 24, 24;
 }
 
 impl Display for GuestPolicy {
@@ -462,6 +462,12 @@ impl Display for GuestPolicy {
             self.debug_allowed(),
             self.single_socket_required()
         )
+    }
+}
+
+impl From<GuestPolicy> for u64 {
+    fn from(value: GuestPolicy) -> Self {
+        value.0
     }
 }
 
