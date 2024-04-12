@@ -59,7 +59,7 @@ pub enum VmmError {
 impl error::Error for VmmError {}
 
 impl From<u32> for VmmError {
-    /// Takes a raw u32 and translates it into the correlated [`VmmError`]
+    /// Takes a raw u32 and translates it into the correlated [VmmError](self::VmmError)
     /// type.
     ///
     /// * value - The raw u32 value which we would like to interpret.
@@ -82,7 +82,7 @@ impl From<u32> for VmmError {
 }
 
 impl From<u64> for VmmError {
-    /// Takes a raw u64 and translates it into the correlated [`VmmError`]
+    /// Takes a raw u64 and translates it into the correlated [VmmError](self::VmmError)
     /// type.
     ///
     /// * value - The raw u64 value which we would like to interpret.

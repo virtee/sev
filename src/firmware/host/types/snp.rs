@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// A representation of the type of data provided to [`parse_table`](crate::firmware::host::parse_table)
+/// A representation of the type of data provided to [parse_table](crate::firmware::host::parse_table)
 pub use crate::firmware::linux::host::types::RawData;
 
 pub(crate) use crate::firmware::linux::host as FFI;
@@ -37,7 +37,7 @@ bitflags::bitflags! {
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[repr(C)]
-/// Certificates which are accepted for [`CertTableEntry`](self::CertTableEntry)
+/// Certificates which are accepted for [CertTableEntry](self::CertTableEntry)
 pub enum CertType {
     /// Empty or closing entry for the CertTable
     Empty,

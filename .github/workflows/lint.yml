@@ -35,15 +35,16 @@ jobs:
       - run: cargo clippy --features=crypto_nossl,hw_tests,dangerous_hw_tests --all-targets -- -D clippy::all -D unused_imports -D warnings
 
   readme:
-    name: cargo readme
+    name: cargo rdme
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: nightly
-      - run: cargo install cargo-readme
-      - run: cargo readme > README.md && git diff --exit-code
+      - run: |
+          cargo install cargo-rdme
+          cargo rdme --check
 
   check-spdx-headers:
     runs-on: ubuntu-latest

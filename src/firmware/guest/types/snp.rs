@@ -144,7 +144,7 @@ pub struct AttestationReport {
     /// Information about the platform. See PlatformInfo
     pub plat_info: PlatformInfo,
     /// Private variable as only the first bit is important.
-    /// See [`AttestationReport::_author_key_en`].
+    /// See [author_key_en()](self::AttestationReport::author_key_en).
     _author_key_en: u32,
     _reserved_0: u32,
     #[serde(with = "BigArray")]

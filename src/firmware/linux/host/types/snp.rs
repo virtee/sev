@@ -84,7 +84,7 @@ pub struct CertTableEntry {
 impl CertTableEntry {
     /// Builds a Kernel formatted CertTable for sending the certificate content to the PSP.
     ///
-    /// Users should pass the rust-friendly vector of [`UAPI::CertTableEntry`], and this function
+    /// Users should pass the rust-friendly vector of [UAPI::CertTableEntry](crate::firmware::host::types::snp::CertTableEntry), and this function
     /// will handle adding the last entry and the structuring of the buffer sent to the hypervisor.
     ///
     /// The contiguous memory layout should look similar to this:
