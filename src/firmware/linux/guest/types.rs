@@ -71,7 +71,7 @@ pub struct DerivedKeyRsp {
 
     reserved_0: [u8; 28],
 
-    /// The requested derived key if [`DerivedKeyRsp::status`] is 0h.
+    /// The requested derived key if [DerivedKeyRsp::status](self::DerivedKeyRsp::status) is 0h.
     pub key: [u8; 32],
 }
 
@@ -82,7 +82,7 @@ pub struct DerivedKeyRsp {
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub struct ExtReportReq {
-    /// Address of the [`ReportReq`].
+    /// The [ReportReq](self::ReportReq).
     pub data: ReportReq,
 
     /// Starting address of the certificate data buffer.
@@ -131,7 +131,7 @@ impl Default for ReportReq {
 }
 
 impl ReportReq {
-    /// Instantiates a new [`ReportReq`] for fetching an [`AttestationReport`] from the PSP.
+    /// Instantiates a new [ReportReq](self::ReportReq) for fetching an [AttestationReport](crate::firmware::guest::types::snp::AttestationReport) from the PSP.
     ///
     /// # Arguments
     ///

@@ -27,7 +27,7 @@ use std::fs::{File, OpenOptions};
 
 // Disabled until upstream Linux kernel is patched.
 //
-// /// Checks the `fw_err` field on the [`GuestRequest`] structure
+// /// Checks the `fw_err` field on the [GuestRequest](crate::firmware::linux::guest::ioctl::GuestRequest) structure
 // /// to make sure that no errors were encountered by the VMM or the AMD
 // /// Secure Processor.
 // fn check_fw_err(raw_error: RawFwError) -> Result<(), UserApiError> {
@@ -116,7 +116,7 @@ impl Firmware {
     /// Request an extended attestation report from the AMD Secure Processor.
     /// The `message_version` will default to `1` if `None` is specified.
     ///
-    /// Behaves the same as [`get_report`](crate::firmware::guest::Firmware::get_report).
+    /// Behaves the same as [get_report](crate::firmware::guest::Firmware::get_report).
     pub fn get_ext_report(
         &mut self,
         message_version: Option<u8>,
@@ -137,7 +137,7 @@ impl Firmware {
 
         // Construct the object needed to perform the IOCTL request.
         // *NOTE:* This is __important__ because a fw_err value which matches
-        // [`INVALID_CERT_BUFFER`] will indicate the buffer was not large
+        // [InvalidCertificatePageLength](crate::error::VmmError::InvalidCertificatePageLength) will indicate the buffer was not large
         // enough.
         let mut guest_request: GuestRequest<ExtReportReq, ReportRsp> = GuestRequest::new(
             message_version,

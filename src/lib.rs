@@ -42,11 +42,11 @@
 //!
 //! ## Platform Management
 //!
-//! Refer to the [`firmware`] module for more information.
+//! Refer to the [firmware](crate::firmware) module for more information.
 //!
 //! ## Guest Management
 //!
-//! Refer to the [`launch`] module for more information.
+//! Refer to the [launch](crate::launch) module for more information.
 //!
 //! ## Cryptographic Verification
 //!
@@ -69,15 +69,15 @@
 //!
 //! ## Using the C API
 //!
-//! Projects in C can take advantage of the C API for the SEV [`launch`] ioctls.
+//! Projects in C can take advantage of the C API for the SEV [launch] ioctls.
 //! To install the C API, users can use `cargo-c` with the features they would
 //! like to produce and install a `pkg-config` file, a static library, a dynamic
 //! library, and a C header:
 //!
 //! `cargo cinstall --prefix=/usr --libdir=/usr/lib64`
 //!
-//! [`firmware`]: ./src/firmware/
-//! [`launch`]: ./src/launch/
+//! [firmware]: ./src/firmware/
+//! [launch]: ./src/launch/
 
 #![deny(clippy::all)]
 #![deny(missing_docs)]
