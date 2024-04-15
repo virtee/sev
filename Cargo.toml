@@ -70,8 +70,8 @@ byteorder = "1.4.3"
 base64 = "0.22.0"
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
-kvm-ioctls = ">=0.12"
+kvm-ioctls = ">=0.16"
 
 [dev-dependencies]
-kvm-bindings = ">=0.6"
+kvm-bindings = ">=0.7"
 serial_test = "3.0"
