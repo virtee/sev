@@ -174,6 +174,9 @@ pub enum UserApiError {
     /// Uuid parsing errors.
     UuidError(uuid::Error),
 
+    /// VLEK Hashstick errors.
+    HashstickError(HashstickError),
+
     /// Invalid VMPL.
     VmplError,
 
@@ -188,6 +191,7 @@ impl error::Error for UserApiError {
             Self::FirmwareError(firmware_error) => Some(firmware_error),
             Self::UuidError(uuid_error) => Some(uuid_error),
             Self::VmmError(vmm_error) => Some(vmm_error),
+            Self::HashstickError(hashstick_error) => Some(hashstick_error),
             Self::VmplError => None,
             Self::Unknown => None,
         }
@@ -201,10 +205,17 @@ impl std::fmt::Display for UserApiError {
             Self::ApiError(error) => format!("Certificate Error Encountered: {error}"),
             Self::UuidError(error) => format!("UUID Error Encountered: {error}"),
             Self::VmmError(error) => format!("VMM Error Encountered: {error}"),
+            Self::HashstickError(error) => format!("VLEK Hashstick Error Encountered: {error}"),
             Self::VmplError => "Invalid VM Permission Level (VMPL)".to_string(),
             Self::Unknown => "Unknown Error Encountered!".to_string(),
         };
         write!(f, "{err_msg}")
+    }
+}
+
+impl std::convert::From<HashstickError> for UserApiError {
+    fn from(value: HashstickError) -> Self {
+        Self::HashstickError(value)
     }
 }
 
@@ -235,6 +246,42 @@ impl std::convert::From<std::io::Error> for UserApiError {
 impl std::convert::From<CertError> for UserApiError {
     fn from(cert_error: CertError) -> Self {
         Self::ApiError(cert_error)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+/// Errors which may be encountered when handling Version Loaded Endorsement Keys
+/// (VLEK) Hashsticks.
+pub enum HashstickError {
+    /// Hashstick length does not match what was specified in the buffer.
+    InvalidLength,
+
+    /// No hashstick was provided
+    EmptyHashstickBuffer,
+
+    /// Unknown Error.
+    UnknownError,
+}
+
+impl std::error::Error for HashstickError {}
+
+impl std::fmt::Display for HashstickError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HashstickError::InvalidLength => {
+                write!(
+                    f,
+                    "VLEK hashstick is an invalid length. Should be 432 bytes in size."
+                )
+            }
+            HashstickError::EmptyHashstickBuffer => write!(f, "Hashstick buffer is empty."),
+            HashstickError::UnknownError => {
+                write!(
+                    f,
+                    "Unknown error encountered when handling the VLEK Hashstick."
+                )
+            }
+        }
     }
 }
 

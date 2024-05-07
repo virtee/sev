@@ -32,6 +32,7 @@ impl_const_id! {
     SnpPlatformStatus = 0x9,
     SnpCommit = 0xA,
     SnpSetConfig = 0xB,
+    SnpVlekLoad = 0xC,
 }
 
 #[cfg(all(feature = "sev", not(feature = "snp")))]
@@ -56,6 +57,7 @@ impl_const_id! {
     SnpPlatformStatus = 0x9,
     SnpCommit = 0xA,
     SnpSetConfig = 0xB,
+    SnpVlekLoad = 0xC,
 }
 
 const SEV: Group = Group::new(b'S');
@@ -113,6 +115,10 @@ pub const SNP_COMMIT: Ioctl<WriteRead, &Command<SnpCommit>> = unsafe { SEV.write
 /// C IOCTL calls -> sev_ioctl_do_snp_set_config
 #[cfg(feature = "snp")]
 pub const SNP_SET_CONFIG: Ioctl<WriteRead, &Command<SnpSetConfig>> = unsafe { SEV.write_read(0) };
+
+#[cfg(feature = "snp")]
+/// Load a specified VLEK hashstick into the AMD Secure Processor to be used in place of VCEK.
+pub const SNP_VLEK_LOAD: Ioctl<WriteRead, &Command<SnpVlekLoad>> = unsafe { SEV.write_read(0) };
 
 /// The Rust-flavored, FFI-friendly version of `struct sev_issue_cmd` which is
 /// used to pass arguments to the SEV ioctl implementation.
