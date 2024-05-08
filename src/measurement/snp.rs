@@ -13,7 +13,6 @@ use crate::{
 };
 use hex::FromHex;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 use crate::error::*;
 
@@ -128,7 +127,7 @@ pub struct SnpMeasurementArgs<'a> {
     /// Number of vcpus
     pub vcpus: u32,
     /// vcpu type
-    pub vcpu_type: String,
+    pub vcpu_type: CpuType,
     /// Path to OVMF file
     pub ovmf_file: PathBuf,
     /// Active kernel guest features
@@ -183,7 +182,7 @@ pub fn snp_calc_launch_digest(
 
     let vmsa = VMSA::new(
         ovmf.sev_es_reset_eip()?.into(),
-        CpuType::from_str(snp_measurement.vcpu_type.as_str())?,
+        snp_measurement.vcpu_type,
         official_vmm_type,
         Some(snp_measurement.vcpus as u64),
         snp_measurement.guest_features,

@@ -183,12 +183,12 @@ struct SevEsSaveArea {
     vmpl2_ssp: u64,
     vmpl3_ssp: u64,
     u_cet: u64,
-    reserved_1: [u8; 2],
+    reserved_0xc8: [u8; 2],
     vmpl: u8,
     cpl: u8,
-    reserved_2: [u8; 4],
+    reserved_0xcc: [u8; 4],
     efer: u64,
-    reserved_3: LargeArray<u8, 104>,
+    reserved_0xd8: LargeArray<u8, 104>,
     xss: u64,
     cr4: u64,
     cr3: u64,
@@ -205,7 +205,7 @@ struct SevEsSaveArea {
     dr1_addr_mask: u64,
     dr2_addr_mask: u64,
     dr3_addr_mask: u64,
-    reserved_4: [u8; 24],
+    reserved_0x1c0: [u8; 24],
     rsp: u64,
     s_cet: u64,
     ssp: u64,
@@ -220,21 +220,21 @@ struct SevEsSaveArea {
     sysenter_esp: u64,
     sysenter_eip: u64,
     cr2: u64,
-    reserved_5: [u8; 32],
+    reserved_0x248: [u8; 32],
     g_pat: u64,
     dbgctrl: u64,
     br_from: u64,
     br_to: u64,
     last_excp_from: u64,
     last_excp_to: u64,
-    reserved_7: LargeArray<u8, 80>,
+    reserved_0x298: LargeArray<u8, 80>,
     pkru: u32,
-    reserved_8: [u8; 20],
-    reserved_9: u64,
+    tsc_aux: u32,
+    reserved_0x2f0: [u8; 24],
     rcx: u64,
     rdx: u64,
     rbx: u64,
-    reserved_10: u64,
+    reserved_0x320: u64,
     rbp: u64,
     rsi: u64,
     rdi: u64,
@@ -246,7 +246,7 @@ struct SevEsSaveArea {
     r13: u64,
     r14: u64,
     r15: u64,
-    reserved_11: [u8; 16],
+    reserved_0x380: [u8; 16],
     guest_exit_info_1: u64,
     guest_exit_info_2: u64,
     guest_exit_int_info: u64,
@@ -259,7 +259,9 @@ struct SevEsSaveArea {
     pcpu_id: u64,
     event_inj: u64,
     xcr0: u64,
-    reserved_12: [u8; 16],
+    reserved_0x3f0: [u8; 16],
+
+    /* Floating Point Area */
     x87_dp: u64,
     mxcsr: u32,
     x87_ftw: u16,
@@ -272,7 +274,7 @@ struct SevEsSaveArea {
     fpreg_x87: LargeArray<u8, 80>,
     fpreg_xmm: LargeArray<u8, 256>,
     fpreg_ymm: LargeArray<u8, 256>,
-    unused: LargeArray<u8, 2448>,
+    manual_padding: LargeArray<u8, 2448>,
 }
 
 const BSP_EIP: u64 = 0xffff_fff0;
@@ -326,13 +328,13 @@ impl VMSA {
     ) -> SevEsSaveArea {
         let mut area = SevEsSaveArea::default();
 
-        let (cs_flags, ss_flags, tr_flags, rdx) = match vmm_type {
-            VMMType::QEMU => (0x9b, 0x93, 0x8b, vcpu_type.sig() as u64),
+        let (cs_flags, ss_flags, tr_flags, rdx, mxcsr, fcw) = match vmm_type {
+            VMMType::QEMU => (0x9b, 0x93, 0x8b, vcpu_type.sig() as u64, 0x1f80, 0x37f),
             VMMType::EC2 => {
                 if eip == 0xfffffff0 {
-                    (0x9a, 0x92, 0x83, 0)
+                    (0x9a, 0x92, 0x83, 0, 0, 0)
                 } else {
-                    (0x9b, 0x92, 0x83, 0)
+                    (0x9b, 0x92, 0x83, 0, 0, 0)
                 }
             }
             VMMType::KRUN => {
@@ -358,7 +360,7 @@ impl VMSA {
                         area.rsp = 0x8ff0;
                     }
                 };
-                (0x9a, 0x92, 0x83, 0)
+                (0x9a, 0x92, 0x83, 0, 0, 0)
             }
         };
 
@@ -383,6 +385,8 @@ impl VMSA {
         area.rdx = rdx;
         area.sev_features = guest_features.0;
         area.xcr0 = 0x1;
+        area.mxcsr = mxcsr;
+        area.x87_fcw = fcw;
 
         area
     }

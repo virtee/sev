@@ -88,7 +88,7 @@ fn sev() {
 
     let _handle = launcher.finish().unwrap();
 
-    let vcpu = vm.create_vcpu(0).unwrap();
+    let mut vcpu = vm.create_vcpu(0).unwrap();
     let mut sregs = vcpu.get_sregs().unwrap();
     sregs.cs.base = 0;
     sregs.cs.selector = 0;

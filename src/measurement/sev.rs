@@ -9,7 +9,6 @@ use crate::measurement::{
 };
 
 use std::path::PathBuf;
-use std::str::FromStr;
 
 use crate::error::*;
 
@@ -27,7 +26,7 @@ pub struct SevEsMeasurementArgs<'a> {
     /// Number of vcpus
     pub vcpus: u32,
     /// vcpu type
-    pub vcpu_type: String,
+    pub vcpu_type: CpuType,
     /// Path to OVMF file
     pub ovmf_file: PathBuf,
     /// Path to kernel file
@@ -68,7 +67,7 @@ pub fn seves_calc_launch_digest(
 
     let vmsa = VMSA::new(
         ovmf.sev_es_reset_eip()?.into(),
-        CpuType::from_str(sev_es_measurement.vcpu_type.as_str())?,
+        sev_es_measurement.vcpu_type,
         official_vmm_type,
         Some(sev_es_measurement.vcpus as u64),
         GuestFeatures(0x0),
