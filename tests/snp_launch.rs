@@ -82,7 +82,7 @@ fn snp() {
 
     let finish = Finish::new(None, None, [0u8; 32]);
 
-    let vcpu_fd = launcher.as_mut().create_vcpu(0).unwrap();
+    let mut vcpu_fd = launcher.as_mut().create_vcpu(0).unwrap();
 
     let mut regs = vcpu_fd.get_regs().unwrap();
     regs.rip = MEM_ADDR;

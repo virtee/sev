@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Exisiting AMD EPYC vCPUs
-use std::{convert::TryFrom, fmt, str::FromStr};
+use std::{convert::TryFrom, fmt};
 
 use crate::error::MeasurementError;
 
@@ -109,11 +109,11 @@ impl fmt::Display for CpuType {
     }
 }
 
-impl FromStr for CpuType {
-    type Err = MeasurementError;
+impl TryFrom<&str> for CpuType {
+    type Error = MeasurementError;
 
-    fn from_str(s: &str) -> Result<Self, MeasurementError> {
-        match s.to_lowercase().as_str() {
+    fn try_from(value: &str) -> Result<Self, MeasurementError> {
+        match value.to_lowercase().as_str() {
             "epyc" => Ok(CpuType::Epyc),
             "epyc-v1" => Ok(CpuType::EpycV1),
             "epyc-v2" => Ok(CpuType::EpycV2),
@@ -129,7 +129,7 @@ impl FromStr for CpuType {
             "epyc-milan-v2" => Ok(CpuType::EpycMilanV2),
             "epyc-genoa" => Ok(CpuType::EpycGenoa),
             "epyc-genoa-v1" => Ok(CpuType::EpycGenoaV1),
-            _ => Err(MeasurementError::InvalidVcpuTypeError(s.to_string())),
+            _ => Err(MeasurementError::InvalidVcpuTypeError(value.to_string())),
         }
     }
 }
