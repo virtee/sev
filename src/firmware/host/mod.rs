@@ -237,6 +237,30 @@ impl Firmware {
 
         Ok(())
     }
+
+    #[cfg(feature = "snp")]
+    /// Insert a Version Loaded Endorsement Key Hashstick into the AMD Secure Processor.
+    ///
+    /// # Example:
+    /// ```ignore
+    /// # Read the VLEK Hashstick Bytes into your application.
+    /// # Our variable will be "hashstick_bytes"
+    ///
+    /// let mut firmware: Firmware = Firmware::open().unwrap();
+    ///
+    /// firmware.snp_vlek_load(hashstick_bytes.as_slice()).unwrap();
+    /// ```
+    pub fn snp_vlek_load(&mut self, hashstick_bytes: &[u8]) -> Result<(), UserApiError> {
+        use types::FFI::types::{SnpVlekLoad, WrappedVlekHashstick};
+
+        let parsed_bytes: WrappedVlekHashstick = hashstick_bytes.try_into()?;
+
+        let mut vlek_load: SnpVlekLoad = SnpVlekLoad::new(&parsed_bytes);
+
+        SNP_VLEK_LOAD.ioctl(&mut self.0, &mut Command::from_mut(&mut vlek_load))?;
+
+        Ok(())
+    }
 }
 
 #[cfg(target_os = "linux")]

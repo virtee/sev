@@ -3,7 +3,7 @@
 #[cfg(target_os = "linux")]
 use crate::error::CertError;
 
-use crate::firmware::host as UAPI;
+use crate::{error::HashstickError, firmware::host as UAPI};
 
 #[cfg(target_os = "linux")]
 use uuid::Uuid;
@@ -249,6 +249,71 @@ impl Default for SnpSetConfig {
     }
 }
 
+// Length defined in the Linux Kernel for the IOCTL.
+const HASHSTICK_BUFFER_LEN: usize = 432;
+
+#[cfg(feature = "snp")]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[repr(C, packed)]
+/// Wrapped VLEK data.
+pub struct WrappedVlekHashstick<'a> {
+    /// Opaque data provided by AMD Key Distribution Server
+    /// (as described in SEV-SNP Firmware ABI 1.54, SNP_VLEK_LOAD)
+    pub data: &'a [u8], // 432 bytes of data
+}
+
+impl<'a, 'b: 'a> std::convert::TryFrom<&'b [u8]> for WrappedVlekHashstick<'a> {
+    type Error = HashstickError;
+
+    fn try_from(value: &'b [u8]) -> Result<Self, Self::Error> {
+        if value.len() != HASHSTICK_BUFFER_LEN {
+            return Err(HashstickError::InvalidLength);
+        }
+
+        if value == [0u8; HASHSTICK_BUFFER_LEN] {
+            return Err(HashstickError::EmptyHashstickBuffer);
+        }
+
+        Ok(Self { data: value })
+    }
+}
+
+#[cfg(feature = "snp")]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+#[repr(C, packed)]
+/// Structure used to load a VLEK hashstick into the AMD Secure Processor.
+pub struct SnpVlekLoad {
+    /// Length of the command buffer read by the AMD Secure Processor.
+    pub len: u32,
+
+    /// Version of wrapped VLEK hashstick (Must be 0h).
+    pub vlek_wrapped_version: u8,
+
+    _reserved: [u8; 3],
+
+    /// Address of wrapped VLEK hashstick ([WrappedVlekHashstick])
+    pub vlek_wrapped_address: u64,
+}
+
+#[cfg(feature = "snp")]
+impl SnpVlekLoad {
+    /// Creates a new VLEK load instruction from a hashstick.
+    pub fn new(hashstick: &WrappedVlekHashstick) -> Self {
+        hashstick.into()
+    }
+}
+
+impl<'a> std::convert::From<&WrappedVlekHashstick<'a>> for SnpVlekLoad {
+    fn from(value: &WrappedVlekHashstick<'a>) -> Self {
+        Self {
+            len: value.data.len() as u32,
+            vlek_wrapped_version: 0u8,
+            _reserved: Default::default(),
+            vlek_wrapped_address: value as *const WrappedVlekHashstick as u64,
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     mod raw_data {
@@ -304,6 +369,78 @@ mod test {
             let actual: RawData = (&mut value).into();
             let expected: RawData = RawData::Vector(value);
             assert_eq!(expected, actual);
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    mod hashstick {
+        use std::convert::TryFrom;
+
+        use crate::{error::HashstickError, firmware::linux::host::types::SnpVlekLoad};
+
+        use super::super::{WrappedVlekHashstick, HASHSTICK_BUFFER_LEN};
+
+        const VALID_HASHSTICK_BYTES: [u8; HASHSTICK_BUFFER_LEN] = [1u8; HASHSTICK_BUFFER_LEN];
+        const INVALID_HASHSTICK_BYTES: [u8; 25] = [2u8; 25];
+
+        #[test]
+        fn test_bytes_to_wrapped_hashstick() {
+            let bytes: [u8; HASHSTICK_BUFFER_LEN] = VALID_HASHSTICK_BYTES;
+            let expected: WrappedVlekHashstick = WrappedVlekHashstick { data: &bytes };
+            let actual: WrappedVlekHashstick =
+                WrappedVlekHashstick::try_from(VALID_HASHSTICK_BYTES.as_slice()).unwrap();
+
+            assert_eq!(actual, expected)
+        }
+
+        #[test]
+        fn test_invalid_bytes_to_wrapped_hashstick() {
+            assert_eq!(
+                WrappedVlekHashstick::try_from(INVALID_HASHSTICK_BYTES.as_slice()).unwrap_err(),
+                HashstickError::InvalidLength
+            );
+        }
+
+        #[test]
+        fn test_empty_buffer_to_wrapped_hashstick() {
+            assert_eq!(
+                WrappedVlekHashstick::try_from([0; HASHSTICK_BUFFER_LEN].as_slice()).unwrap_err(),
+                HashstickError::EmptyHashstickBuffer
+            )
+        }
+
+        #[test]
+        fn test_wrapped_hashtick_into_snp_vlek_load() {
+            let test_hashstick: WrappedVlekHashstick =
+                WrappedVlekHashstick::try_from(VALID_HASHSTICK_BYTES.as_slice()).unwrap();
+
+            let actual: SnpVlekLoad = (&test_hashstick).into();
+
+            let expected: SnpVlekLoad = SnpVlekLoad {
+                len: HASHSTICK_BUFFER_LEN as u32,
+                vlek_wrapped_version: 0u8,
+                _reserved: Default::default(),
+                vlek_wrapped_address: &test_hashstick as *const WrappedVlekHashstick as u64,
+            };
+
+            assert_eq!(actual, expected);
+        }
+
+        #[test]
+        fn test_snp_vlek_load_new() {
+            let test_hashstick: WrappedVlekHashstick =
+                WrappedVlekHashstick::try_from(VALID_HASHSTICK_BYTES.as_slice()).unwrap();
+
+            let actual: SnpVlekLoad = SnpVlekLoad::new(&test_hashstick);
+
+            let expected: SnpVlekLoad = SnpVlekLoad {
+                len: HASHSTICK_BUFFER_LEN as u32,
+                vlek_wrapped_version: 0u8,
+                _reserved: Default::default(),
+                vlek_wrapped_address: &test_hashstick as *const WrappedVlekHashstick as u64,
+            };
+
+            assert_eq!(actual, expected);
         }
     }
 
