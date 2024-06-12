@@ -12,7 +12,7 @@ use crate::error::CertError;
 
 use std::{
     convert::{TryFrom, TryInto},
-    fmt::Display,
+    fmt::{self, Display, Formatter},
 };
 
 use bitfield::bitfield;
@@ -61,9 +61,9 @@ pub enum CertType {
     OTHER(uuid::Uuid),
 }
 
-impl ToString for CertType {
-    fn to_string(&self) -> String {
-        match self {
+impl Display for CertType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let guid = match self {
             CertType::Empty => "00000000-0000-0000-0000-000000000000".to_string(),
             CertType::ARK => "c0b406a4-a803-4952-9743-3fb6014cd0ae".to_string(),
             CertType::ASK => "4ab7b379-bbac-4fe4-a02f-05aef327c782".to_string(),
@@ -71,7 +71,9 @@ impl ToString for CertType {
             CertType::VLEK => "a8074bc2-a25a-483e-aae6-39c045a0b8a1".to_string(),
             CertType::CRL => "92f81bc3-5811-4d3d-97ff-d19f88dc67ea".to_string(),
             CertType::OTHER(guid) => guid.to_string(),
-        }
+        };
+
+        write!(f, "{}", guid)
     }
 }
 
