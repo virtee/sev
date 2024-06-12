@@ -27,6 +27,7 @@ pub use cert_nossl::Certificate;
 #[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
 pub use chain::Chain;
 
+#[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
 use std::io::Result;
 
 #[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
@@ -57,10 +58,12 @@ pub trait Signer<T> {
     fn sign(&self, target: &mut T) -> Result<Self::Output>;
 }
 
+#[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
 pub(crate) trait FromLe: Sized {
     fn from_le(value: &[u8]) -> Result<Self>;
 }
 
+#[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
 pub(crate) trait AsLeBytes<T> {
     fn as_le_bytes(&self) -> T;
 }
