@@ -23,7 +23,7 @@ pub fn guid_le_to_slice(guid: &str) -> Result<[u8; 16], MeasurementError> {
     Ok(guid.try_into()?)
 }
 
-/// Types of sections declared by OVMF SEV Metadata, as appears in: https://github.com/tianocore/edk2/blob/edk2-stable202205/OvmfPkg/ResetVector/X64/OvmfSevMetadata.asm
+/// Types of sections declared by OVMF SEV Metadata, as appears in: https://github.com/tianocore/edk2/blob/edk2-stable202405/OvmfPkg/ResetVector/X64/OvmfSevMetadata.asm
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 #[serde(into = "u8", try_from = "u8")]
 pub enum SectionType {
@@ -32,7 +32,9 @@ pub enum SectionType {
     /// SNP secret
     SnpSecrets = 2,
     /// CPUID
-    CPUID = 3,
+    Cpuid = 3,
+    /// SVSM_CAA
+    SvsmCaa = 4,
     /// SNP kernel hashes
     SnpKernelHashes = 0x10,
 }
@@ -50,7 +52,8 @@ impl TryFrom<u8> for SectionType {
         match value {
             1 => Ok(SectionType::SnpSecMemory),
             2 => Ok(SectionType::SnpSecrets),
-            3 => Ok(SectionType::CPUID),
+            3 => Ok(SectionType::Cpuid),
+            4 => Ok(SectionType::SvsmCaa),
             0x10 => Ok(SectionType::SnpKernelHashes),
             _ => Err(OVMFError::InvalidSectionType),
         }

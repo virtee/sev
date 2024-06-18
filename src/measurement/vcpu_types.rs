@@ -64,6 +64,22 @@ impl TryFrom<u8> for CpuType {
     }
 }
 
+impl TryFrom<i32> for CpuType {
+    type Error = MeasurementError;
+
+    fn try_from(value: i32) -> Result<Self, MeasurementError> {
+        match value {
+            sig if sig == cpu_sig(23, 1, 2) => Ok(CpuType::Epyc),
+            sig if sig == cpu_sig(23, 49, 0) => Ok(CpuType::EpycRome),
+            sig if sig == cpu_sig(25, 1, 1) => Ok(CpuType::EpycMilan),
+            sig if sig == cpu_sig(25, 17, 0) => Ok(CpuType::EpycGenoa),
+            _ => Err(MeasurementError::InvalidVcpuSignatureError(
+                value.to_string(),
+            )),
+        }
+    }
+}
+
 impl CpuType {
     /// Matching CPU-Type with its CPU signature
     pub fn sig(&self) -> i32 {
