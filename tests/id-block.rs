@@ -14,14 +14,15 @@ use hex::{self, FromHex};
 
 use sev::measurement::{
     idblock::{load_priv_key, snp_calculate_id},
-    idblock_types::{IdAuth, IdBlockLaunchDigest, SevEcdsaPubKey, SevEcdsaSig},
+    idblock_types::{IdAuth, SevEcdsaPubKey, SevEcdsaSig},
+    snp::SnpLaunchDigest,
 };
 
 // Testing that the appropriate id-block and key digests are being generated.
 #[test]
 fn test_id_block_and_key_digests() {
     // Expected ID-BLOCk, ID-KEY digest and AUTH-KEY digest
-    let expected_id_block = "oU1jg0HlZ0Yo/h4C++3r5eWrT68d1y2JZgaOYVu5nv0T0hSzXCMXFbOOJj3GBZdFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAMAAAAAAA".to_string();
+    let expected_id_block = "oU1jg0HlZ0Yo/h4C++3r5eWrT68d1y2JZgaOYVu5nv0T0hSzXCMXFbOOJj3GBZdFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAwAAAAAA".to_string();
     let expected_id_key_digest =
         "WfssaG36T+9J84M5qndckAUcKNVzg93DuvO160sUlt87DbvcuuX+J2d6ZEggdz/i".to_string();
     let expected_auth_key_digest =
@@ -29,8 +30,7 @@ fn test_id_block_and_key_digests() {
 
     // Pre-generated launch digest
     let launch_digest = Vec::from_hex("a14d638341e5674628fe1e02fbedebe5e5ab4faf1dd72d8966068e615bb99efd13d214b35c231715b38e263dc6059745").unwrap();
-    let id_launch_digest: IdBlockLaunchDigest =
-        IdBlockLaunchDigest::new(launch_digest.try_into().unwrap());
+    let id_launch_digest: SnpLaunchDigest = SnpLaunchDigest::new(launch_digest.try_into().unwrap());
 
     // Generating ID-block and key digests
     let block_calculations = snp_calculate_id(

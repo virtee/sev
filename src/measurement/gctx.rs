@@ -7,18 +7,18 @@ use openssl::sha::sha384;
 use crate::error::*;
 
 #[cfg(target_os = "linux")]
-use crate::launch::snp::PageType;
-
-// Launch digest size in bytes
-pub(crate) const LD_SIZE: usize = 384 / 8;
+use crate::{
+    launch::snp::PageType,
+    measurement::snp::{SnpLaunchDigest, LD_BYTES},
+};
 
 // VMSA page is recorded in the RMP table with GPA (u64)(-1).
 // However, the address is page-aligned, and also all the bits above
 // 51 are cleared.
 pub(crate) const VMSA_GPA: u64 = 0xFFFFFFFFF000;
 
-// Launch digest intialized in all zeros
-const ZEROS: [u8; LD_SIZE] = [0; LD_SIZE];
+// Launch digest sized array with all zeros
+const ZEROS: [u8; LD_BYTES] = [0; LD_BYTES];
 
 fn validate_block_size(length: usize) -> Result<(), GCTXError> {
     if (length % 4096) != 0 {
@@ -33,8 +33,9 @@ pub(crate) struct Completed;
 
 /// Guest context field structure
 pub struct Gctx<T> {
-    /// Launch Digest, 48 bytes long
-    ld: [u8; LD_SIZE],
+    /// 48 byte Launch Digest
+    ld: SnpLaunchDigest,
+    /// Current GCTX state
     _state: T,
 }
 
@@ -42,7 +43,7 @@ pub struct Gctx<T> {
 impl Default for Gctx<Updating> {
     fn default() -> Self {
         Self {
-            ld: ZEROS,
+            ld: SnpLaunchDigest::default(),
             _state: Updating,
         }
     }
@@ -58,14 +59,14 @@ impl Gctx<Updating> {
     }
 
     /// Will update guest context launch digest with provided data from page
-    fn update(&mut self, page_type: u8, gpa: u64, contents: &[u8]) -> Result<(), GCTXError> {
+    fn update(&mut self, page_type: u8, gpa: u64, contents: &[u8]) -> Result<(), MeasurementError> {
         let page_info_len: u16 = 0x70;
         let is_imi: u8 = 0;
         let vmpl3_perms: u8 = 0;
         let vmpl2_perms: u8 = 0;
         let vmpl1_perms: u8 = 0;
 
-        let mut page_info: Vec<u8> = self.ld.to_vec();
+        let mut page_info: Vec<u8> = self.ld.try_into()?;
         page_info.extend_from_slice(contents);
 
         page_info.extend_from_slice(&page_info_len.to_le_bytes());
@@ -80,17 +81,14 @@ impl Gctx<Updating> {
         page_info.extend_from_slice(&gpa.to_le_bytes());
 
         if page_info.len() != (page_info_len as usize) {
-            return Err(GCTXError::InvalidPageSize(
-                page_info.len(),
-                page_info_len as usize,
-            ));
+            return Err(GCTXError::InvalidPageSize(page_info.len(), page_info_len as usize).into());
         }
-        self.ld = sha384(&page_info);
+        self.ld = sha384(&page_info).as_slice().try_into()?;
 
         Ok(())
     }
 
-    /// Update Lanunch digest type accprding to page type and guest physical address.
+    /// Update Lanunch digest type according to page type and guest physical address.
     /// Some Page types don't require data. Some page types just require size of the page.
     #[cfg(target_os = "linux")]
     pub fn update_page(
@@ -99,7 +97,7 @@ impl Gctx<Updating> {
         gpa: u64,
         contents: Option<&[u8]>,
         length_bytes: Option<usize>,
-    ) -> Result<(), GCTXError> {
+    ) -> Result<(), MeasurementError> {
         match page_type {
             PageType::Normal => {
                 if let Some(data) = contents {
@@ -116,7 +114,7 @@ impl Gctx<Updating> {
                     }
                     Ok(())
                 } else {
-                    Err(GCTXError::MissingData)
+                    Err(GCTXError::MissingData.into())
                 }
             }
 
@@ -126,7 +124,7 @@ impl Gctx<Updating> {
                     self.update(page_type as u8, VMSA_GPA, sha384(data).as_slice())?;
                     Ok(())
                 } else {
-                    Err(GCTXError::MissingData)
+                    Err(GCTXError::MissingData.into())
                 }
             }
 
@@ -140,7 +138,7 @@ impl Gctx<Updating> {
                     }
                     Ok(())
                 } else {
-                    Err(GCTXError::MissingBlockSize)
+                    Err(GCTXError::MissingBlockSize.into())
                 }
             }
 
@@ -161,7 +159,7 @@ impl Gctx<Updating> {
         }
     }
 
-    /// Update is done and now we switch to a completed state
+    /// Change State to Completed
     pub(crate) fn finished(&self) -> Gctx<Completed> {
         Gctx {
             ld: self.ld,
@@ -172,7 +170,7 @@ impl Gctx<Updating> {
 
 impl Gctx<Completed> {
     /// Get the launch digest bytes
-    pub(crate) fn ld(&self) -> &[u8; LD_SIZE] {
-        &self.ld
+    pub(crate) fn ld(&self) -> SnpLaunchDigest {
+        self.ld
     }
 }

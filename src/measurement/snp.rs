@@ -2,27 +2,63 @@
 
 //! Operations to calculate guest measurement for different SEV modes
 use crate::{
+    error::*,
     launch::snp::PageType,
     measurement::{
         gctx::{Gctx, Updating, VMSA_GPA},
+        large_array::LargeArray,
         ovmf::{OvmfSevMetadataSectionDesc, SectionType, OVMF},
         sev_hashes::SevHashes,
         vcpu_types::CpuType,
-        vmsa::{VMMType, VMSA},
+        vmsa::{GuestFeatures, VMMType, VMSA},
     },
 };
 use hex::FromHex;
+use serde::{Deserialize, Serialize};
+use std::convert::{TryFrom, TryInto};
 use std::path::PathBuf;
-
-use crate::error::*;
-
-use super::{gctx::LD_SIZE, vmsa::GuestFeatures};
 
 const _PAGE_MASK: u64 = 0xfff;
 
-/// Get the launch digest as a hex string
-pub fn get_hex_ld(ld: Vec<u8>) -> String {
-    hex::encode(ld)
+/// Launch Digest sizes
+pub(crate) const LD_BITS: usize = 384;
+pub(crate) const LD_BYTES: usize = LD_BITS / 8;
+
+/// The expected launch digest of the guest
+#[repr(C)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, Copy)]
+pub struct SnpLaunchDigest(LargeArray<u8, LD_BYTES>);
+
+// Try from slice
+impl TryFrom<&[u8]> for SnpLaunchDigest {
+    type Error = MeasurementError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, MeasurementError> {
+        Ok(SnpLaunchDigest(bytes.try_into()?))
+    }
+}
+
+/// Vecotrize Launch Digest
+impl TryInto<Vec<u8>> for SnpLaunchDigest {
+    type Error = MeasurementError;
+
+    fn try_into(self) -> Result<Vec<u8>, MeasurementError> {
+        let array = self.0.as_array();
+        let vec: Vec<u8> = array.to_vec(); // Convert the array into a Vec<u8>
+        Ok(vec)
+    }
+}
+
+impl SnpLaunchDigest {
+    /// Create Launch Digest from large array
+    pub fn new(data: LargeArray<u8, LD_BYTES>) -> Self {
+        Self(data)
+    }
+
+    /// Get the launch digest as a hex string
+    pub fn get_hex_ld(self) -> String {
+        hex::encode::<&[u8]>(self.0.as_slice())
+    }
 }
 
 /// Update launch digest with SEV kernel hashes
@@ -70,7 +106,7 @@ fn snp_update_section(
         SectionType::SnpSecrets => {
             gctx.update_page(PageType::Secrets, desc.gpa.into(), None, None)?
         }
-        SectionType::CPUID => {
+        SectionType::Cpuid => {
             if vmm_type != VMMType::EC2 {
                 gctx.update_page(PageType::Cpuid, desc.gpa.into(), None, None)?
             }
@@ -78,6 +114,12 @@ fn snp_update_section(
         SectionType::SnpKernelHashes => {
             snp_update_kernel_hashes(gctx, ovmf, sev_hashes, desc.gpa.into(), desc.size as usize)?
         }
+        SectionType::SvsmCaa => gctx.update_page(
+            PageType::Zero,
+            desc.gpa.into(),
+            None,
+            Some(desc.size as usize),
+        )?,
     }
 
     Ok(())
@@ -96,7 +138,7 @@ fn snp_update_metadata_pages(
 
     if vmm_type == VMMType::EC2 {
         for desc in ovmf.metadata_items() {
-            if desc.section_type == SectionType::CPUID {
+            if desc.section_type == SectionType::Cpuid {
                 gctx.update_page(PageType::Cpuid, desc.gpa.into(), None, None)?
             }
         }
@@ -111,7 +153,7 @@ fn snp_update_metadata_pages(
 }
 
 /// Calculate the OVMF hash from OVMF file
-pub fn calc_snp_ovmf_hash(ovmf_file: PathBuf) -> Result<[u8; LD_SIZE], MeasurementError> {
+pub fn calc_snp_ovmf_hash(ovmf_file: PathBuf) -> Result<SnpLaunchDigest, MeasurementError> {
     let ovmf = OVMF::new(ovmf_file)?;
     let mut gctx = Gctx::default();
 
@@ -119,7 +161,7 @@ pub fn calc_snp_ovmf_hash(ovmf_file: PathBuf) -> Result<[u8; LD_SIZE], Measureme
 
     let gctx = gctx.finished();
 
-    Ok(*gctx.ld())
+    Ok(gctx.ld())
 }
 
 /// Arguments required to calculate the SNP measurement
@@ -147,7 +189,7 @@ pub struct SnpMeasurementArgs<'a> {
 /// Calulate an SEV-SNP launch digest
 pub fn snp_calc_launch_digest(
     snp_measurement: SnpMeasurementArgs,
-) -> Result<[u8; LD_SIZE], MeasurementError> {
+) -> Result<SnpLaunchDigest, MeasurementError> {
     let ovmf = OVMF::new(snp_measurement.ovmf_file)?;
 
     let mut gctx: Gctx<Updating> = match snp_measurement.ovmf_hash_str {
@@ -194,5 +236,5 @@ pub fn snp_calc_launch_digest(
 
     let gctx = gctx.finished();
 
-    Ok(*gctx.ld())
+    Ok(gctx.ld())
 }

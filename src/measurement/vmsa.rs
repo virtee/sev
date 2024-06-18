@@ -57,6 +57,19 @@ impl TryFrom<u8> for VMMType {
     }
 }
 
+impl FromStr for VMMType {
+    type Err = MeasurementError;
+
+    fn from_str(value: &str) -> Result<Self, MeasurementError> {
+        match value.to_lowercase().as_str() {
+            "qemu" => Ok(VMMType::QEMU),
+            "ec2" => Ok(VMMType::EC2),
+            "krun" => Ok(VMMType::KRUN),
+            _ => Err(MeasurementError::InvalidVcpuTypeError(value.to_string())),
+        }
+    }
+}
+
 impl fmt::Debug for VMMType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

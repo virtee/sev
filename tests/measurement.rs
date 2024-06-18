@@ -13,7 +13,7 @@ mod snp_tests {
     // Test if we can compute a full LD from a pre generated hash using snp only kernel
     #[test]
     fn test_snp_ovmf_hash_gen_snp_only() {
-        let ovmf_hash = "cab7e085874b3acfdbe2d96dcaa3125111f00c35c6fc9708464c2ae74bfdb048a198cb9a9ccae0b3e5e1a33f5f249819";
+        let ovmf_hash = "086e2e9149ebf45abdc3445fba5b2da8270bdbb04094d7a2c37faaa4b24af3aa16aff8c374c2a55c467a50da6d466b74";
 
         let arguments = SnpMeasurementArgs {
             vcpus: 1,
@@ -29,17 +29,15 @@ mod snp_tests {
 
         let ld = snp_calc_launch_digest(arguments).unwrap();
 
-        let ld_hex = hex::encode(ld);
+        let exp_result = "ddc5224521617a536ee7ce9dd6224d1b58a8d4fda1c741f3ac99fc4bfa04ba6e9fc98646d4a07a9079397fa3852819b5";
 
-        let exp_result = "3c018b826531c5f625f10004d51ee51ab5dbfaf1fdd79998ab649cff11b4afbdb2f50941d2a23b5d77fe00cf988242e7";
-
-        assert_eq!(ld_hex.as_str(), exp_result);
+        assert_eq!(ld.get_hex_ld().as_str(), exp_result);
     }
 
     // Test if we can compute a full LD from a pre generated hash using the default kernel setting
     #[test]
     fn test_snp_ovmf_hash_gen_default() {
-        let ovmf_hash = "cab7e085874b3acfdbe2d96dcaa3125111f00c35c6fc9708464c2ae74bfdb048a198cb9a9ccae0b3e5e1a33f5f249819";
+        let ovmf_hash = "086e2e9149ebf45abdc3445fba5b2da8270bdbb04094d7a2c37faaa4b24af3aa16aff8c374c2a55c467a50da6d466b74";
 
         let arguments = SnpMeasurementArgs {
             vcpus: 1,
@@ -55,21 +53,19 @@ mod snp_tests {
 
         let ld = snp_calc_launch_digest(arguments).unwrap();
 
-        let ld_hex = hex::encode(ld);
+        let exp_result = "329c8ce0972ae52343b64d34a434a86f245dfd74f5ed7aae15d22efc78fb9683632b9b50e4e1d7fa41179ef98a7ef198";
 
-        let exp_result = "aa6f24465c304e3ad553a18069510996fc92a84f48ae2140cb95dfbd422cdb14087588fb6eec89ef0a65e6d376d9a300";
-
-        assert_eq!(ld_hex.as_str(), exp_result);
+        assert_eq!(ld.get_hex_ld().as_str(), exp_result);
     }
 
     // Test if we can compute a full LD from the OVMF hash usin snp only kernel
     #[test]
     fn test_snp_ovmf_hash_full_snp_only() {
-        let ovmf_hash = hex::encode(
-            calc_snp_ovmf_hash("./tests/measurement/ovmf_AmdSev_suffix.bin".into()).unwrap(),
-        );
+        let ovmf_hash = calc_snp_ovmf_hash("./tests/measurement/ovmf_AmdSev_suffix.bin".into())
+            .unwrap()
+            .get_hex_ld();
 
-        let exp_hash = "edcf6d1c57ce868a167c990f58c8667c698269ef9e0803246419eea914186343054d557e1f17acd93b032c106bc70d25";
+        let exp_hash = "086e2e9149ebf45abdc3445fba5b2da8270bdbb04094d7a2c37faaa4b24af3aa16aff8c374c2a55c467a50da6d466b74";
 
         assert_eq!(ovmf_hash.as_str(), exp_hash);
 
@@ -87,21 +83,19 @@ mod snp_tests {
 
         let ld = snp_calc_launch_digest(arguments).unwrap();
 
-        let ld_hex = hex::encode(ld);
+        let exp_result = "6d287813eb5222d770f75005c664e34c204f385ce832cc2ce7d0d6f354454362f390ef83a92046c042e706363b4b08fa";
 
-        let exp_result = "72b3f3c1ed0df9e5279eb2317a9861be3b878537e8513b318b49c1e184f6228e3ff367d133a8688f430e412ba66f558f";
-
-        assert_eq!(ld_hex.as_str(), exp_result);
+        assert_eq!(ld.get_hex_ld().as_str(), exp_result);
     }
 
     // Test if we can compute a full LD from the OVMF hash using default kernel
     #[test]
     fn test_snp_ovmf_hash_full_default() {
-        let ovmf_hash = hex::encode(
-            calc_snp_ovmf_hash("./tests/measurement/ovmf_AmdSev_suffix.bin".into()).unwrap(),
-        );
+        let ovmf_hash = calc_snp_ovmf_hash("./tests/measurement/ovmf_AmdSev_suffix.bin".into())
+            .unwrap()
+            .get_hex_ld();
 
-        let exp_hash = "edcf6d1c57ce868a167c990f58c8667c698269ef9e0803246419eea914186343054d557e1f17acd93b032c106bc70d25";
+        let exp_hash = "086e2e9149ebf45abdc3445fba5b2da8270bdbb04094d7a2c37faaa4b24af3aa16aff8c374c2a55c467a50da6d466b74";
 
         assert_eq!(ovmf_hash.as_str(), exp_hash);
 
@@ -119,11 +113,9 @@ mod snp_tests {
 
         let ld = snp_calc_launch_digest(arguments).unwrap();
 
-        let ld_hex = hex::encode(ld);
+        let exp_result = "803f691094946e42068aaa3a8f9e26a5c89f36f7b73ecfb28c653360fe4b3aba7e534442e7e1e17895dfe778d0228977";
 
-        let exp_result = "2b9ca4d24c46845280fdca6f0ca0edf0f704bf179243e5c1b139acf3668ce7bc040e12d16b2ee8738aeaa39faddc8912";
-
-        assert_eq!(ld_hex.as_str(), exp_result);
+        assert_eq!(ld.get_hex_ld().as_str(), exp_result);
     }
 
     // Test EC2 vmm type with SNP only kernel
@@ -143,11 +135,9 @@ mod snp_tests {
 
         let ld = snp_calc_launch_digest(arguments).unwrap();
 
-        let ld_hex = hex::encode(ld);
+        let exp_result = "7d3756157c805bf6adf617064c8552e8c1688fa1c8756f11cbf56ba5d25c9270fb69c0505c1cbe1c5c66c0e34c6ed3be";
 
-        let exp_result = "760b6e51039d2d6c1fc6d38ca5c387967d158e0294883e4522c36f89bd61bfc9cdb975cd1ceedffbe1b23b1daf4e3f42";
-
-        assert_eq!(ld_hex.as_str(), exp_result);
+        assert_eq!(ld.get_hex_ld().as_str(), exp_result);
     }
 
     // Test EC2 vmm type with default kernel
@@ -167,16 +157,14 @@ mod snp_tests {
 
         let ld = snp_calc_launch_digest(arguments).unwrap();
 
-        let ld_hex = hex::encode(ld);
+        let exp_result = "6ae80856486b1396af8c82a40351d6ed76a20c785e9c7fa4ffa27c22d5d6313b4b3b458cd3c9968e6f89fb5d8450d7a6";
 
-        let exp_result = "cd4a4690a1f679ac8f3d6e446aab8d0061d535cc94615d98c7d7dbe4b16dbceeaf7fc7944e7874b202e27041f179e7e6";
-
-        assert_eq!(ld_hex.as_str(), exp_result);
+        assert_eq!(ld.get_hex_ld().as_str(), exp_result);
     }
 
     // Test a regular snp type with snp only kernel
     #[test]
-    fn test_snp_snp_only() {
+    fn test_sev_snp_only() {
         let arguments = SnpMeasurementArgs {
             vcpus: 1,
             vcpu_type: CpuType::EpycV4,
@@ -191,11 +179,9 @@ mod snp_tests {
 
         let ld = snp_calc_launch_digest(arguments).unwrap();
 
-        let ld_hex = hex::encode(ld);
+        let exp_result = "6d287813eb5222d770f75005c664e34c204f385ce832cc2ce7d0d6f354454362f390ef83a92046c042e706363b4b08fa";
 
-        let exp_result = "72b3f3c1ed0df9e5279eb2317a9861be3b878537e8513b318b49c1e184f6228e3ff367d133a8688f430e412ba66f558f";
-
-        assert_eq!(ld_hex.as_str(), exp_result);
+        assert_eq!(ld.get_hex_ld().as_str(), exp_result);
     }
 
     // Test a regular snp type with default kernel
@@ -215,11 +201,9 @@ mod snp_tests {
 
         let ld = snp_calc_launch_digest(arguments).unwrap();
 
-        let ld_hex = hex::encode(ld);
+        let exp_result = "803f691094946e42068aaa3a8f9e26a5c89f36f7b73ecfb28c653360fe4b3aba7e534442e7e1e17895dfe778d0228977";
 
-        let exp_result = "2b9ca4d24c46845280fdca6f0ca0edf0f704bf179243e5c1b139acf3668ce7bc040e12d16b2ee8738aeaa39faddc8912";
-
-        assert_eq!(ld_hex.as_str(), exp_result);
+        assert_eq!(ld.get_hex_ld().as_str(), exp_result);
     }
 
     // Test a regular snp without specified kernel using an snp only guest kernel
@@ -239,11 +223,9 @@ mod snp_tests {
 
         let ld = snp_calc_launch_digest(arguments).unwrap();
 
-        let ld_hex = hex::encode(ld);
+        let exp_result = "19358ba9a7615534a9a1e2f0dfc29384dcd4dcb7062ff9c6013b26869a5fc6ecabe033c48dd6f6db5d6d76e7c5df632d";
 
-        let exp_result = "c4ee889e2ca38dc7137f5a448c56960a1eb5c08919fd2107a1249eb899afda42be9ba11e417530938cfa8d62a5890557";
-
-        assert_eq!(ld_hex.as_str(), exp_result);
+        assert_eq!(ld.get_hex_ld().as_str(), exp_result);
     }
 
     // Test a regular snp without specified kernel using a default guest kernel
@@ -263,11 +245,9 @@ mod snp_tests {
 
         let ld = snp_calc_launch_digest(arguments).unwrap();
 
-        let ld_hex = hex::encode(ld);
+        let exp_result = "e1e1ca029dd7973ab9513295be68198472dcd4fc834bd9af9b63f6e8a1674dbf281a9278a4a2ebe0eed9f22adbcd0e2b";
 
-        let exp_result = "d35ca073e73701aa476d9d1b2feeee9efd935b7ec9dc43a0105857f506addb48ba3a1d443e5c10db430ad1a436ac5b2c";
-
-        assert_eq!(ld_hex.as_str(), exp_result);
+        assert_eq!(ld.get_hex_ld().as_str(), exp_result);
     }
 
     // Test snp with multiple cpus with an snp only guest kernel
@@ -287,11 +267,9 @@ mod snp_tests {
 
         let ld = snp_calc_launch_digest(arguments).unwrap();
 
-        let ld_hex = hex::encode(ld);
+        let exp_result = "5061fffb019493a903613d56d54b94912a1a2f9e4502385f5c194616753720a92441310ba6c4933de877c36e23046ad5";
 
-        let exp_result = "74b2f532253c8214df9998ba8df305aa98eb1733c0010014c5ed728b8d1a9fa83df0a0caf047e9cee14087cc79bbc7c9";
-
-        assert_eq!(ld_hex.as_str(), exp_result);
+        assert_eq!(ld.get_hex_ld().as_str(), exp_result);
     }
 
     // Test snp with multiple cpus with a default guest kernel
@@ -311,11 +289,9 @@ mod snp_tests {
 
         let ld = snp_calc_launch_digest(arguments).unwrap();
 
-        let ld_hex = hex::encode(ld);
+        let exp_result = "4953b1fb416fa874980e8442b3706d345926d5f38879134e00813c5d7abcbe78eafe7b422907be0b4698e2414a631942";
 
-        let exp_result = "6258fc4d3c60d6964de64811587a903f309b9391efdccd448bb8bc39b78c1d153378077ca37e32d06d6ead319a5c7bce";
-
-        assert_eq!(ld_hex.as_str(), exp_result);
+        assert_eq!(ld.get_hex_ld().as_str(), exp_result);
     }
 
     // Test snp with with ovmf64 and no kernel using a snp only guest kernel
@@ -335,11 +311,9 @@ mod snp_tests {
 
         let ld = snp_calc_launch_digest(arguments).unwrap();
 
-        let ld_hex = hex::encode(ld);
+        let exp_result = "da0296de8193586a5512078dcd719eccecbd87e2b825ad4148c44f665dc87df21e5b49e21523a9ad993afdb6a30b4005";
 
-        let exp_result = "6ea57de00ffc6f159c6b799f9c053cd165a021efed1614678b1a0ae24c6b0374387f52ace64e0fbc08d1129a857a0b0c";
-
-        assert_eq!(ld_hex.as_str(), exp_result);
+        assert_eq!(ld.get_hex_ld().as_str(), exp_result);
     }
 
     // Test snp with with ovmf64 and no kernel using a default guest kernel
@@ -359,11 +333,9 @@ mod snp_tests {
 
         let ld = snp_calc_launch_digest(arguments).unwrap();
 
-        let ld_hex = hex::encode(ld);
+        let exp_result = "28797ae0afaba4005a81e629acebfb59e6687949d6be44007cd5506823b0dd66f146aaae26ff291eed7b493d8a64c385";
 
-        let exp_result = "7b30bdd3f3124ccfceaa882f4b3ab2ff3641bb421bb9bc6df6b9be0d8ecde33e6fba86505808ab5257e3e620a2006e53";
-
-        assert_eq!(ld_hex.as_str(), exp_result);
+        assert_eq!(ld.get_hex_ld().as_str(), exp_result);
     }
 
     // Test non-SNP OVMF and SNP measure should fail
@@ -411,7 +383,7 @@ mod sev_tests {
 
         let ld_hex = hex::encode(ld);
 
-        let exp_result = "c9c378be09902e3d5927a93b73ed383620eea5387e1d16416807cfc949b7f834";
+        let exp_result = "13810ae661ea11e2bb205621f582fee268f0367c8f97bc297b7fadef3e12002c";
 
         assert_eq!(ld_hex.as_str(), exp_result);
     }
@@ -433,7 +405,7 @@ mod sev_tests {
 
         let ld_hex = hex::encode(ld);
 
-        let exp_result = "2806971adf7a9d5bdef59d007f0200af685dec6721781fe1d6efa9236b3361f1";
+        let exp_result = "0dccbcaba8e90b261bd0d2e1863a2f9da714768b7b2a19363cd6ae35aa90de91";
 
         assert_eq!(ld_hex.as_str(), exp_result);
     }
@@ -474,7 +446,7 @@ mod sev_tests {
 
         let ld_hex = hex::encode(ld);
 
-        let exp_result = "f0d92a1fda00249e008820bd40def6abbed2ee65fea8a8bc47e532863ca0cc6a";
+        let exp_result = "82a3ee5d537c3620628270c292ae30cb40c3c878666a7890ee7ef2a08fb535ff";
 
         assert_eq!(ld_hex.as_str(), exp_result);
     }
@@ -493,7 +465,7 @@ mod sev_tests {
 
         let ld_hex = hex::encode(ld);
 
-        let exp_result = "7332f6ef294f79919b46302e4541900a2dfc96714e2b7b4b5ccdc1899b78a195";
+        let exp_result = "77f613d7bbcdf12a73782ea9e88b0172aeda50d1a54201cb903594ff52846898";
 
         assert_eq!(ld_hex.as_str(), exp_result);
     }
@@ -512,7 +484,7 @@ mod sev_tests {
 
         let ld_hex = hex::encode(ld);
 
-        let exp_result = "af9d6c674b1ff04937084c98c99ca106b25c37b2c9541ac313e6e0c54426314f";
+        let exp_result = "b4c021e085fb83ceffe6571a3d357b4a98773c83c474e47f76c876708fe316da";
 
         assert_eq!(ld_hex.as_str(), exp_result);
     }

@@ -834,6 +834,9 @@ pub enum IdBlockError {
     /// Bincode Error Handling
     BincodeError(bincode::ErrorKind),
 
+    /// TryFrom Slice Error handling
+    FromSliceError(TryFromSliceError),
+
     /// Error from when handling SEV Curve algorithm
     SevCurveError(),
 
@@ -849,6 +852,7 @@ impl std::fmt::Display for IdBlockError {
             IdBlockError::LargeArrayError(e) => write!(f, "{e}"),
             IdBlockError::FileError(e) => write!(f, "Failed handling file: {e}"),
             IdBlockError::BincodeError(e) => write!(f, "Bincode error encountered: {e}"),
+            IdBlockError::FromSliceError(e) => write!(f, "Error converting slice: {e}"),
             IdBlockError::SevCurveError() => {
                 write!(f, "Wrong curve used in the provided private key")
             }
@@ -879,9 +883,16 @@ impl std::convert::From<std::io::Error> for IdBlockError {
         Self::FileError(value)
     }
 }
+
 impl std::convert::From<bincode::ErrorKind> for IdBlockError {
     fn from(value: bincode::ErrorKind) -> Self {
         Self::BincodeError(value)
+    }
+}
+
+impl std::convert::From<TryFromSliceError> for IdBlockError {
+    fn from(value: TryFromSliceError) -> Self {
+        Self::FromSliceError(value)
     }
 }
 
@@ -915,8 +926,14 @@ pub enum MeasurementError {
     /// Id Block Error Handling
     IdBlockError(IdBlockError),
 
+    /// Large Array Error handling
+    LargeArrayError(LargeArrayError),
+
     /// Invalid VCPU provided
     InvalidVcpuTypeError(String),
+
+    /// Invalid VCPU Signature provided
+    InvalidVcpuSignatureError(String),
 
     /// Invalid VMM Provided
     InvalidVmmError(String),
@@ -943,8 +960,14 @@ impl std::fmt::Display for MeasurementError {
             MeasurementError::OVMFError(e) => write!(f, "OVMF Error Encountered: {e}"),
             MeasurementError::SevHashError(e) => write!(f, "Sev hash Error Encountered: {e}"),
             MeasurementError::IdBlockError(e) => write!(f, "Id Block Error Encountered: {e}"),
+            MeasurementError::LargeArrayError(e) => {
+                write!(f, "Error when handling Large arrays: {e}")
+            }
             MeasurementError::InvalidVcpuTypeError(value) => {
                 write!(f, "Invalid VCPU type value provided: {value}")
+            }
+            MeasurementError::InvalidVcpuSignatureError(value) => {
+                write!(f, "Invalid VCPU signature provided: {value}")
             }
             MeasurementError::InvalidVmmError(value) => {
                 write!(f, "Invalid VMM type provided: {value}")
@@ -1011,5 +1034,17 @@ impl std::convert::From<OVMFError> for MeasurementError {
 impl std::convert::From<SevHashError> for MeasurementError {
     fn from(value: SevHashError) -> Self {
         Self::SevHashError(value)
+    }
+}
+
+impl std::convert::From<IdBlockError> for MeasurementError {
+    fn from(value: IdBlockError) -> Self {
+        Self::IdBlockError(value)
+    }
+}
+
+impl std::convert::From<LargeArrayError> for MeasurementError {
+    fn from(value: LargeArrayError) -> Self {
+        Self::LargeArrayError(value)
     }
 }

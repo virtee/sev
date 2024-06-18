@@ -13,9 +13,13 @@ use std::{
 
 use crate::{
     error::IdBlockError,
-    measurement::idblock_types::{
-        FamilyId, IdAuth, IdBlock, IdBlockLaunchDigest, IdMeasurements, ImageId, SevEcdsaPubKey,
-        SevEcdsaSig, CURVE_P384_NID,
+    firmware::guest::GuestPolicy,
+    measurement::{
+        idblock_types::{
+            FamilyId, IdAuth, IdBlock, IdMeasurements, ImageId, SevEcdsaPubKey, SevEcdsaSig,
+            CURVE_P384_NID,
+        },
+        snp::SnpLaunchDigest,
     },
 };
 
@@ -99,13 +103,13 @@ pub fn load_priv_key(path: PathBuf) -> Result<EcKey<Private>, IdBlockError> {
     Ok(pkey)
 }
 
-/// Generate the sha384 digest of the provided pem key
-pub fn generate_key_digest(key_path: PathBuf) -> Result<IdBlockLaunchDigest, IdBlockError> {
+/// Generate the sha384 digest of the provided pem key (same sized digest as SNP Launch Digest)
+pub fn generate_key_digest(key_path: PathBuf) -> Result<SnpLaunchDigest, IdBlockError> {
     let ec_key = load_priv_key(key_path)?;
 
     let pub_key = SevEcdsaPubKey::try_from(&ec_key)?;
 
-    Ok(IdBlockLaunchDigest::new(
+    Ok(SnpLaunchDigest::new(
         sha384(
             bincode::serialize(&pub_key)
                 .map_err(|e| IdBlockError::BincodeError(*e))?
@@ -118,11 +122,11 @@ pub fn generate_key_digest(key_path: PathBuf) -> Result<IdBlockLaunchDigest, IdB
 /// Calculate the different pieces needed for a complete pre-attestation.
 /// ID-BLOCK, AUTH-BLOCK, id-key digest and auth-key digest.
 pub fn snp_calculate_id(
-    ld: Option<IdBlockLaunchDigest>,
+    ld: Option<SnpLaunchDigest>,
     family_id: Option<FamilyId>,
     image_id: Option<ImageId>,
     svn: Option<u32>,
-    policy: Option<u64>,
+    policy: Option<GuestPolicy>,
     id_key_file: PathBuf,
     auth_key_file: PathBuf,
 ) -> Result<IdMeasurements, IdBlockError> {

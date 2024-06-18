@@ -14,17 +14,18 @@ use openssl::{
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 
-use crate::{error::IdBlockError, measurement::large_array::LargeArray};
+use crate::{
+    error::IdBlockError,
+    firmware::guest::GuestPolicy,
+    measurement::{large_array::LargeArray, snp::SnpLaunchDigest},
+};
 
 pub(crate) const DEFAULT_ID_VERSION: u32 = 1;
-pub(crate) const DEFAULT_ID_POLICY: u64 = 0x300000;
+pub(crate) const DEFAULT_ID_POLICY: u64 = 0x30000;
 
 pub(crate) const CURVE_P384_NID: Nid = openssl::nid::Nid::SECP384R1;
 pub(crate) const DEFAULT_KEY_ALGO: u32 = 1;
 pub(crate) const CURVE_P384: u32 = 2;
-
-pub(crate) const ID_BLK_DIGEST_BITS: usize = 384;
-pub(crate) const ID_BLK_DIGEST_BYTES: usize = ID_BLK_DIGEST_BITS / 8;
 
 pub(crate) const ID_BLK_ID_BITS: usize = 128;
 pub(crate) const ID_BLK_ID_BYTES: usize = ID_BLK_ID_BITS / 8;
@@ -39,45 +40,30 @@ pub(crate) const ECDSA_POINT_SIZE_BYTES: usize = ECDSA_POINT_SIZE_BITS / 8;
 pub(crate) const ECDSA_PUBKEY_RESERVED: usize = 0x403 - 0x94 + 1;
 pub(crate) const ECDSA_SIG_RESERVED: usize = 0x1ff - 0x90 + 1;
 
-/// The expected launch digest of the guest
-#[repr(C)]
-#[derive(Default, Serialize, Deserialize, Clone, Copy)]
-pub struct IdBlockLaunchDigest(LargeArray<u8, ID_BLK_DIGEST_BYTES>);
-
-impl TryFrom<&[u8]> for IdBlockLaunchDigest {
-    type Error = IdBlockError;
-
-    fn try_from(bytes: &[u8]) -> Result<Self, IdBlockError> {
-        Ok(IdBlockLaunchDigest(bytes.try_into()?))
-    }
-}
-
-impl TryInto<Vec<u8>> for IdBlockLaunchDigest {
-    type Error = &'static str;
-
-    fn try_into(self) -> Result<Vec<u8>, Self::Error> {
-        let array = self.0.as_array();
-        let vec: Vec<u8> = array.to_vec(); // Convert the array into a Vec<u8>
-        Ok(vec)
-    }
-}
-
-impl IdBlockLaunchDigest {
-    /// Create Launch Digest from large array
-    pub fn new(data: LargeArray<u8, ID_BLK_DIGEST_BYTES>) -> Self {
-        Self(data)
-    }
-}
-
-/// Family ID of the guest, provided by the guest owner and uninterpreted by the firmware.
+/// Family-Id of the guest, provided by the guest owner and uninterpreted by the firmware.
 #[repr(C)]
 #[derive(Default, Serialize, Deserialize, Clone, Copy)]
 pub struct FamilyId([u8; ID_BLK_ID_BYTES]);
 
-/// Image ID to be provided to the ID-BLOCK
-#[repr(C)]
-#[derive(Default, Serialize, Deserialize, Clone, Copy)]
-pub struct ImageId([u8; ID_BLK_ID_BYTES]);
+impl FamilyId {
+    /// Create a new Family Id with the provided data
+    pub fn new(data: [u8; ID_BLK_ID_BYTES]) -> Self {
+        Self(data)
+    }
+}
+
+// Try from slice for Family Id
+impl TryFrom<&[u8]> for FamilyId {
+    type Error = IdBlockError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, IdBlockError> {
+        Ok(FamilyId(bytes.try_into()?))
+    }
+}
+
+/// Family-Id of the guest, provided by the guest owner and uninterpreted by the firmware.
+/// Esentially the same structure as Family Id.
+pub type ImageId = FamilyId;
 
 /// The way the ECDSA SEV signature is strucutred. Need it in this format to calculate the AUTH-ID.
 #[repr(C)]
@@ -208,12 +194,12 @@ impl TryFrom<&EcKey<Private>> for SevEcdsaPubKey {
     }
 }
 
-/// SEV ID-BLOCK
+/// SEV-SNP ID-BLOCK
 #[repr(C)]
 #[derive(Serialize, Deserialize, Clone, Copy)]
 pub struct IdBlock {
     /// The expected launch digest of the guest (aka measurement)
-    pub launch_digest: IdBlockLaunchDigest,
+    pub launch_digest: SnpLaunchDigest,
     /// Family ID of the guest, provided by the guest owner and uninterpreted by the firmware.
     pub family_id: FamilyId,
     /// Image ID of the guest, provided by the guest owner and uninterpreted by the firmware.
@@ -223,7 +209,7 @@ pub struct IdBlock {
     /// SVN of the guest.
     pub guest_svn: u32,
     ///The policy of the guest.
-    pub policy: u64,
+    pub policy: GuestPolicy,
 }
 
 impl Default for IdBlock {
@@ -234,19 +220,19 @@ impl Default for IdBlock {
             image_id: Default::default(),
             version: DEFAULT_ID_VERSION,
             guest_svn: Default::default(),
-            policy: DEFAULT_ID_POLICY,
+            policy: GuestPolicy(DEFAULT_ID_POLICY),
         }
     }
 }
 
 impl IdBlock {
-    /// Function to create a new ID-BLOCK with provided parameters.
+    /// Create a new ID-BLOCK with provided parameters.
     pub fn new(
-        ld: Option<IdBlockLaunchDigest>,
+        ld: Option<SnpLaunchDigest>,
         family_id: Option<FamilyId>,
         image_id: Option<ImageId>,
         svn: Option<u32>,
-        policy: Option<u64>,
+        policy: Option<GuestPolicy>,
     ) -> Result<Self, IdBlockError> {
         let mut id_block = IdBlock::default();
 
@@ -348,14 +334,14 @@ impl Default for IdAuth {
 }
 
 #[derive(Default)]
-/// All the measurments that can be used for pre-attestation
+/// All the calculated pieces needed for ID verfication
 pub struct IdMeasurements {
     /// ID-BLOCK
     pub id_block: IdBlock,
     /// ID-AUTH-BLOCK
     pub id_auth: IdAuth,
     /// ID-KEY DIGEST
-    pub id_key_digest: IdBlockLaunchDigest,
+    pub id_key_digest: SnpLaunchDigest,
     /// AUTH-KEY DIGEST
-    pub auth_key_digest: IdBlockLaunchDigest,
+    pub auth_key_digest: SnpLaunchDigest,
 }
