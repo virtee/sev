@@ -17,7 +17,7 @@ use std::convert::{TryFrom, TryInto};
 use crate::{error::IdBlockError, measurement::large_array::LargeArray};
 
 pub(crate) const DEFAULT_ID_VERSION: u32 = 1;
-pub(crate) const DEFAULT_ID_POLICY: u64 = 0x300000;
+pub(crate) const DEFAULT_ID_POLICY: u64 = 0x30000;
 
 pub(crate) const CURVE_P384_NID: Nid = openssl::nid::Nid::SECP384R1;
 pub(crate) const DEFAULT_KEY_ALGO: u32 = 1;

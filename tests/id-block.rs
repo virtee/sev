@@ -21,7 +21,7 @@ use sev::measurement::{
 #[test]
 fn test_id_block_and_key_digests() {
     // Expected ID-BLOCk, ID-KEY digest and AUTH-KEY digest
-    let expected_id_block = "oU1jg0HlZ0Yo/h4C++3r5eWrT68d1y2JZgaOYVu5nv0T0hSzXCMXFbOOJj3GBZdFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAMAAAAAAA".to_string();
+    let expected_id_block = "oU1jg0HlZ0Yo/h4C++3r5eWrT68d1y2JZgaOYVu5nv0T0hSzXCMXFbOOJj3GBZdFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAwAAAAAA".to_string();
     let expected_id_key_digest =
         "WfssaG36T+9J84M5qndckAUcKNVzg93DuvO160sUlt87DbvcuuX+J2d6ZEggdz/i".to_string();
     let expected_auth_key_digest =
