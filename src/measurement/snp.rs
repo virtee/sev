@@ -70,7 +70,7 @@ fn snp_update_section(
         SectionType::SnpSecrets => {
             gctx.update_page(PageType::Secrets, desc.gpa.into(), None, None)?
         }
-        SectionType::CPUID => {
+        SectionType::Cpuid => {
             if vmm_type != VMMType::EC2 {
                 gctx.update_page(PageType::Cpuid, desc.gpa.into(), None, None)?
             }
@@ -78,6 +78,12 @@ fn snp_update_section(
         SectionType::SnpKernelHashes => {
             snp_update_kernel_hashes(gctx, ovmf, sev_hashes, desc.gpa.into(), desc.size as usize)?
         }
+        SectionType::SvsmCaa => gctx.update_page(
+            PageType::Zero,
+            desc.gpa.into(),
+            None,
+            Some(desc.size as usize),
+        )?,
     }
 
     Ok(())
@@ -96,7 +102,7 @@ fn snp_update_metadata_pages(
 
     if vmm_type == VMMType::EC2 {
         for desc in ovmf.metadata_items() {
-            if desc.section_type == SectionType::CPUID {
+            if desc.section_type == SectionType::Cpuid {
                 gctx.update_page(PageType::Cpuid, desc.gpa.into(), None, None)?
             }
         }

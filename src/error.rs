@@ -918,6 +918,9 @@ pub enum MeasurementError {
     /// Invalid VCPU provided
     InvalidVcpuTypeError(String),
 
+    /// Invalid VCPU Signature provided
+    InvalidVcpuSignatureError(String),
+
     /// Invalid VMM Provided
     InvalidVmmError(String),
 
@@ -945,6 +948,9 @@ impl std::fmt::Display for MeasurementError {
             MeasurementError::IdBlockError(e) => write!(f, "Id Block Error Encountered: {e}"),
             MeasurementError::InvalidVcpuTypeError(value) => {
                 write!(f, "Invalid VCPU type value provided: {value}")
+            }
+            MeasurementError::InvalidVcpuSignatureError(value) => {
+                write!(f, "Invalid VCPU signature provided: {value}")
             }
             MeasurementError::InvalidVmmError(value) => {
                 write!(f, "Invalid VMM type provided: {value}")
