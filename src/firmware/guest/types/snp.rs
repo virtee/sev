@@ -447,7 +447,7 @@ impl Display for GuestPolicy {
         write!(
             f,
             r#"
-    Guest Policy ({}):
+    Guest Policy (0x{:x}):
     ABI Major:     {}
     ABI Minor:     {}
     SMT Allowed:   {}
