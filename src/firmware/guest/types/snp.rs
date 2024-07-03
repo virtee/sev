@@ -414,9 +414,8 @@ bitfield! {
     /// | 24     | CIPHERTEXT_HIDING | 0: Ciphertext hiding may be enabled or disabled.<br>1: Ciphertext hiding must be enabled.                          >
     /// | 63:25  | -                 | Reserved. MBZ.                                                                                                     >
     ///
-    #[derive(Default, Clone, Copy,Eq, PartialEq)]
-    #[derive(Deserialize, Serialize)]
     #[repr(C)]
+    #[derive(Default, Deserialize, Clone, Copy, Eq, PartialEq, Serialize)]
     pub struct GuestPolicy(u64);
     impl Debug;
     /// ABI_MINOR field: Indicates the minor API version.
@@ -479,9 +478,8 @@ bitfield! {
     /// Bit 3 indicates if RAPL is disabled.
     /// Bit 4 indicates if ciphertext hiding is enabled
     /// Bits 5-63 are reserved.
-    #[derive(Default, Clone, Copy)]
-    #[derive(Deserialize, Serialize)]
     #[repr(C)]
+    #[derive(Default, Deserialize, Clone, Copy, Serialize)]
     pub struct PlatformInfo(u64);
     impl Debug;
     /// Returns the bit state of SMT
