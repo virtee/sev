@@ -466,7 +466,10 @@ impl Display for GuestPolicy {
 
 impl From<GuestPolicy> for u64 {
     fn from(value: GuestPolicy) -> Self {
-        value.0
+        // Bit 17 of the guest policy is reserved and must always be set to 1.
+        let reserved: u64 = 1 << 17;
+
+        value.0 | reserved
     }
 }
 
