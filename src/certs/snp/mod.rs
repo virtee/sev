@@ -58,12 +58,12 @@ pub trait Signer<T> {
     fn sign(&self, target: &mut T) -> Result<Self::Output>;
 }
 
-#[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
+#[cfg(feature = "openssl")]
 pub(crate) trait FromLe: Sized {
     fn from_le(value: &[u8]) -> Result<Self>;
 }
 
-#[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
+#[cfg(feature = "openssl")]
 pub(crate) trait AsLeBytes<T> {
     fn as_le_bytes(&self) -> T;
 }
