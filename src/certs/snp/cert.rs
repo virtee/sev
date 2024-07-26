@@ -59,6 +59,25 @@ impl From<&Certificate> for X509 {
     }
 }
 
+impl From<&X509> for Certificate {
+    fn from(value: &X509) -> Self {
+        Self(value.clone())
+    }
+}
+
+impl From<&[X509]> for Certificate {
+    /// Retrieves only the first value from the hash, ignoring all other values.
+    fn from(value: &[X509]) -> Self {
+        value[0].clone().into()
+    }
+}
+
+impl<'a: 'b, 'b> From<&'a Certificate> for &'b X509 {
+    fn from(value: &'a Certificate) -> Self {
+        &value.0
+    }
+}
+
 /// Verify if the public key of one Certificate signs another Certificate.
 impl Verifiable for (&Certificate, &Certificate) {
     type Output = ();
