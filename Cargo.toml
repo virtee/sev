@@ -1,6 +1,6 @@
 [package]
 name = "sev"
-version = "3.2.0"
+version = "3.3.0"
 authors = [
     "Nathaniel McCallum <npmccallum@redhat.com>",
     "The VirTEE Project Developers",

@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(feature = "openssl")]
+use openssl::x509::X509;
+
 use super::*;
 
 use crate::firmware::host::{CertTableEntry, CertType};
 
 /// Interfaces for a complete SEV-SNP certificate chain.
 
+#[derive(Debug, Clone)]
 pub struct Chain {
     /// The Certificate Authority (CA) chain.
     pub ca: ca::Chain,
@@ -35,6 +39,88 @@ enum ChainEncodingFormat {
 
     /// PEM-encoded.
     Pem,
+}
+
+#[cfg(feature = "openssl")]
+impl From<(X509, X509, X509)> for Chain {
+    /// Will presume the provided data is formated as (ASK,ARK,VCEK) or (ASVK,ARK,VLEK).
+    fn from(value: (X509, X509, X509)) -> Self {
+        Self {
+            ca: ca::Chain {
+                ark: value.1.into(),
+                ask: value.0.into(),
+            },
+            vek: value.2.into(),
+        }
+    }
+}
+
+#[cfg(feature = "openssl")]
+impl<'a: 'b, 'b> From<&'a Chain> for (&'b X509, &'b X509, &'b X509) {
+    /// Will presume the provided data is formated as (ASK,ARK,VCEK) or (ASVK,ARK,VLEK).
+    fn from(value: &'a Chain) -> Self {
+        (
+            (&value.ca.ask).into(),
+            (&value.ca.ark).into(),
+            (&value.vek).into(),
+        )
+    }
+}
+
+#[cfg(feature = "openssl")]
+impl From<(&X509, &X509, &X509)> for Chain {
+    fn from(value: (&X509, &X509, &X509)) -> Self {
+        (value.0.clone(), value.1.clone(), value.2.clone()).into()
+    }
+}
+
+impl<'a: 'b, 'b> From<&'a Chain> for (&'b Certificate, &'b Certificate, &'b Certificate) {
+    fn from(value: &'a Chain) -> Self {
+        (&value.ca.ask, &value.ca.ark, &value.vek)
+    }
+}
+
+impl From<(Certificate, Certificate, Certificate)> for Chain {
+    fn from(value: (Certificate, Certificate, Certificate)) -> Self {
+        Self {
+            ca: ca::Chain {
+                ark: value.1,
+                ask: value.0,
+            },
+            vek: value.2,
+        }
+    }
+}
+
+impl From<(&Certificate, &Certificate, &Certificate)> for Chain {
+    fn from(value: (&Certificate, &Certificate, &Certificate)) -> Self {
+        Self {
+            ca: ca::Chain {
+                ark: value.1.clone(),
+                ask: value.0.clone(),
+            },
+            vek: value.2.clone(),
+        }
+    }
+}
+
+impl From<&Chain> for (Certificate, Certificate, Certificate) {
+    /// Will presume the user wants the format of (ASK,ARK,VCEK) or (ASVK,ARK,VLEK).
+    fn from(value: &Chain) -> Self {
+        (
+            value.ca.ask.clone(),
+            value.ca.ark.clone(),
+            value.vek.clone(),
+        )
+    }
+}
+
+impl From<&[Certificate]> for Chain {
+    /// Assumes the Format of ASK/ARK/VCEK or ASVK/ARK/VLEK. Any additional
+    /// certificates are ignored.
+    fn from(value: &[Certificate]) -> Self {
+        (value[0].clone(), value[1].clone(), value[2].clone()).into()
+    }
 }
 
 impl Chain {
