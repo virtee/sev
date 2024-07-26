@@ -9,7 +9,7 @@ use openssl::x509::X509;
 /// Structures/interfaces for SEV-SNP certificates.
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Certificate(X509);
+pub struct Certificate(pub X509);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CertFormat {
@@ -56,6 +56,25 @@ impl From<Certificate> for X509 {
 impl From<&Certificate> for X509 {
     fn from(cert: &Certificate) -> Self {
         cert.0.clone()
+    }
+}
+
+impl From<&X509> for Certificate {
+    fn from(value: &X509) -> Self {
+        Self(value.clone())
+    }
+}
+
+impl From<&[X509]> for Certificate {
+    /// Retrieves only the first value from the hash, ignoring all other values.
+    fn from(value: &[X509]) -> Self {
+        value[0].clone().into()
+    }
+}
+
+impl<'a: 'b, 'b> From<&'a Certificate> for &'b X509 {
+    fn from(value: &'a Certificate) -> Self {
+        &value.0
     }
 }
 

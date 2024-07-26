@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use openssl::x509::X509;
+
 use super::*;
 
 /// Operations for a Certificate Authority (CA) chain.
@@ -26,6 +28,63 @@ impl<'a> Verifiable for &'a Chain {
         (&self.ark, &self.ask).verify()?;
 
         Ok(&self.ask)
+    }
+}
+
+impl From<(X509, X509)> for Chain {
+    fn from(value: (X509, X509)) -> Self {
+        Self {
+            ark: value.1.into(),
+            ask: value.0.into(),
+        }
+    }
+}
+
+impl From<(&X509, &X509)> for Chain {
+    fn from(value: (&X509, &X509)) -> Self {
+        (value.0.clone(), value.1.clone()).into()
+    }
+}
+
+impl<'a: 'b, 'b> From<&'a Chain> for (&'b X509, &'b X509) {
+    fn from(value: &'a Chain) -> Self {
+        (&value.ask.0, &value.ark.0)
+    }
+}
+
+impl From<&[X509]> for Chain {
+    fn from(value: &[X509]) -> Self {
+        (&value[0], &value[1]).into()
+    }
+}
+
+impl From<(Certificate, Certificate)> for Chain {
+    fn from(value: (Certificate, Certificate)) -> Self {
+        Self {
+            ark: value.1,
+            ask: value.0,
+        }
+    }
+}
+
+impl From<(&Certificate, &Certificate)> for Chain {
+    fn from(value: (&Certificate, &Certificate)) -> Self {
+        Self {
+            ark: value.1.clone(),
+            ask: value.0.clone(),
+        }
+    }
+}
+
+impl<'a: 'b, 'b> From<&'a Chain> for (&'b Certificate, &'b Certificate) {
+    fn from(value: &'a Chain) -> Self {
+        (&value.ask, &value.ark)
+    }
+}
+
+impl From<&[Certificate]> for Chain {
+    fn from(value: &[Certificate]) -> Self {
+        (&value[0], &value[1]).into()
     }
 }
 
