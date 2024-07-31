@@ -242,7 +242,7 @@ impl Session<Verified> {
         let mut sig = sign::Signer::new(hash::MessageDigest::sha256(), &key)?;
 
         sig.update(&[0x01u8])?;
-        sig.update(&unsafe { std::mem::transmute::<_, [u8; 4]>(flags) })?;
+        sig.update(&unsafe { std::mem::transmute::<launch::sev::HeaderFlags, [u8; 4]>(flags) })?;
         sig.update(&iv)?;
         sig.update(&(data.len() as u32).to_le_bytes())?;
         sig.update(&(ciphertext.len() as u32).to_le_bytes())?;

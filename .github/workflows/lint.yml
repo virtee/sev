@@ -21,7 +21,7 @@ jobs:
         with:
           components: clippy
           toolchain: 1.70.0
-      - run: cargo clippy --features=openssl,hw_tests,dangerous_hw_tests --all-targets -- -D clippy::all -D unused_imports -D warnings
+      - run: cargo clippy --features=openssl,hw_tests,dangerous_hw_tests --all-targets -- -D clippy::all -D unused_imports -D warnings -D clippy::style
 
   clippy-crypto_nossl:
     name: cargo clippy crypto_nossl
@@ -32,7 +32,7 @@ jobs:
         with:
           components: clippy
           toolchain: 1.70.0
-      - run: cargo clippy --features=crypto_nossl,hw_tests,dangerous_hw_tests --all-targets -- -D clippy::all -D unused_imports -D warnings
+      - run: cargo clippy --features=crypto_nossl,hw_tests,dangerous_hw_tests --all-targets -- -D clippy::all -D unused_imports -D warnings -D clippy::style
 
   readme:
     name: cargo rdme
