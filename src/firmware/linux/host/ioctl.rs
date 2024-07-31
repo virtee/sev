@@ -107,6 +107,7 @@ pub const SNP_PLATFORM_STATUS: Ioctl<WriteRead, &Command<SnpPlatformStatus>> =
 /// - Set the CommittedVersion to the FirmwareVersion of the current firmware.
 /// - Sets the ReportedTCB to the CurrentTCB.
 /// - Deletes the VLEK hashstick if the ReportedTCB changed.
+///
 /// C IOCTL calls -> sev_ioctl_do_snp_commit
 #[cfg(feature = "snp")]
 pub const SNP_COMMIT: Ioctl<WriteRead, &Command<SnpCommit>> = unsafe { SEV.write_read(0) };
