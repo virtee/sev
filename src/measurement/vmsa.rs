@@ -135,7 +135,7 @@ bitfield! {
     /// | 15 | SmtProtection |
     /// | 63:16 | Reserved, SBZ |
     #[repr(C)]
-    #[derive(Default, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
     pub struct GuestFeatures(u64);
     impl Debug;
     /// SNPActive
@@ -172,6 +172,12 @@ bitfield! {
     pub smt_protection, _: 15,15;
     /// Reserved, SBZ
     reserved_3, sbz: 16, 63;
+}
+
+impl Default for GuestFeatures {
+    fn default() -> Self {
+        Self(0x1)
+    }
 }
 
 /// SEV-ES VMSA page
