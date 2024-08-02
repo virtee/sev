@@ -703,6 +703,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rdrand"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d92195228612ac8eed47adbc2ed0f04e513a4ccb98175b6f2bd04d963b533655"
+dependencies = [
+ "rand_core",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -852,7 +861,7 @@ dependencies = [
 
 [[package]]
 name = "sev"
-version = "3.3.0"
+version = "4.0.0"
 dependencies = [
  "base64",
  "bincode",
@@ -869,6 +878,7 @@ dependencies = [
  "libc",
  "openssl",
  "p384",
+ "rdrand",
  "rsa",
  "serde",
  "serde-big-array",

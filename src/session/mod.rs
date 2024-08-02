@@ -5,9 +5,13 @@
 
 mod key;
 
+use crate::error::SessionError;
+
 use super::*;
 
 use std::io::{Error, ErrorKind, Result};
+
+use rdrand::{ErrorCode, RdRand};
 
 use openssl::*;
 
@@ -43,9 +47,9 @@ impl launch::sev::Policy {
 }
 
 impl std::convert::TryFrom<launch::sev::Policy> for Session<Initialized> {
-    type Error = std::io::Error;
+    type Error = ErrorCode;
 
-    fn try_from(value: launch::sev::Policy) -> Result<Self> {
+    fn try_from(value: launch::sev::Policy) -> std::result::Result<Self, Self::Error> {
         Ok(Self {
             tek: key::Key::random(16)?,
             tik: key::Key::random(16)?,
@@ -88,7 +92,10 @@ impl Session<Initialized> {
     }
 
     /// Produces data needed to initiate the SEV launch sequence.
-    pub fn start(&self, chain: certs::sev::Chain) -> Result<launch::sev::Start> {
+    pub fn start(
+        &self,
+        chain: certs::sev::Chain,
+    ) -> std::result::Result<launch::sev::Start, SessionError> {
         use certs::sev::*;
 
         let pdh = chain.verify()?;
@@ -97,8 +104,11 @@ impl Session<Initialized> {
         let z = key::Key::new(prv.derive(pdh)?);
         let mut nonce = [0u8; 16];
         let mut iv = [0u8; 16];
-        rand::rand_bytes(&mut nonce)?;
-        rand::rand_bytes(&mut iv)?;
+
+        let mut rng: RdRand = RdRand::new()?;
+
+        rng.try_fill_bytes(&mut nonce)?;
+        rng.try_fill_bytes(&mut iv)?;
 
         Ok(launch::sev::Start {
             policy: self.policy,
@@ -109,14 +119,20 @@ impl Session<Initialized> {
 
     /// Like the above start function, yet takes PDH as input instead of deriving it from a
     /// certificate chain.
-    pub fn start_pdh(&self, pdh: certs::sev::sev::Certificate) -> Result<launch::sev::Start> {
+    pub fn start_pdh(
+        &self,
+        pdh: certs::sev::sev::Certificate,
+    ) -> std::result::Result<launch::sev::Start, SessionError> {
         let (crt, prv) = sev::Certificate::generate(sev::Usage::PDH)?;
 
         let z = key::Key::new(prv.derive(&pdh)?);
         let mut nonce = [0u8; 16];
         let mut iv = [0u8; 16];
-        rand::rand_bytes(&mut nonce)?;
-        rand::rand_bytes(&mut iv)?;
+
+        let mut rng: RdRand = RdRand::new()?;
+
+        rng.try_fill_bytes(&mut nonce)?;
+        rng.try_fill_bytes(&mut iv)?;
 
         Ok(launch::sev::Start {
             policy: self.policy,
@@ -232,9 +248,12 @@ impl Session<Verified> {
         &self,
         flags: launch::sev::HeaderFlags,
         data: &[u8],
-    ) -> Result<launch::sev::Secret> {
+    ) -> std::result::Result<launch::sev::Secret, SessionError> {
         let mut iv = [0u8; 16];
-        rand::rand_bytes(&mut iv)?;
+
+        let mut rng: RdRand = RdRand::new()?;
+
+        rng.try_fill_bytes(&mut iv)?;
 
         let ciphertext = symm::encrypt(symm::Cipher::aes_128_ctr(), &self.tek, Some(&iv), data)?;
 

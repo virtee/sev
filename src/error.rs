@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use bincode;
+#[cfg(feature = "openssl")]
+use openssl::error::ErrorStack;
 use std::{
     array::TryFromSliceError,
     convert::From,
@@ -8,6 +10,9 @@ use std::{
     fmt::{Debug, Display},
     io,
 };
+
+#[cfg(feature = "openssl")]
+use rdrand::ErrorCode;
 
 use std::os::raw::c_int;
 
@@ -157,6 +162,13 @@ pub enum Indeterminate<T: Debug> {
 
     /// The error condition is unknown.
     Unknown,
+}
+
+impl<T: Debug> From<T> for Indeterminate<T> {
+    /// Creates an easy
+    fn from(value: T) -> Self {
+        Self::Known(value)
+    }
 }
 
 #[derive(Debug)]
@@ -1046,5 +1058,40 @@ impl std::convert::From<IdBlockError> for MeasurementError {
 impl std::convert::From<LargeArrayError> for MeasurementError {
     fn from(value: LargeArrayError) -> Self {
         Self::LargeArrayError(value)
+    }
+}
+
+#[cfg(feature = "openssl")]
+#[derive(Debug)]
+/// Used to describe errors related to SEV-ES "Sessions".
+pub enum SessionError {
+    /// Errors which occur from using the rdrand crate.
+    RandError(ErrorCode),
+
+    /// OpenSSL Error Stack
+    OpenSSLStack(ErrorStack),
+
+    /// Errors occuring from IO operations.
+    IOError(std::io::Error),
+}
+
+#[cfg(feature = "openssl")]
+impl From<ErrorCode> for SessionError {
+    fn from(value: ErrorCode) -> Self {
+        Self::RandError(value)
+    }
+}
+
+#[cfg(feature = "openssl")]
+impl From<std::io::Error> for SessionError {
+    fn from(value: std::io::Error) -> Self {
+        Self::IOError(value)
+    }
+}
+
+#[cfg(feature = "openssl")]
+impl From<ErrorStack> for SessionError {
+    fn from(value: ErrorStack) -> Self {
+        Self::OpenSSLStack(value)
     }
 }
