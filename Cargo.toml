@@ -1,6 +1,6 @@
 [package]
 name = "sev"
-version = "3.3.0"
+version = "4.0.0"
 authors = [
     "Nathaniel McCallum <npmccallum@redhat.com>",
     "The VirTEE Project Developers",
@@ -38,6 +38,7 @@ doc = false
 
 [features]
 default = ["sev", "snp"]
+openssl = ["dep:openssl", "rdrand"]
 hw_tests = []
 dangerous_hw_tests = ["hw_tests"]
 sev = []
@@ -68,6 +69,7 @@ sha2 = { version = "0.10.8", optional = true }
 x509-cert = { version = "0.2.5", optional = true }
 byteorder = "1.4.3"
 base64 = "0.22.1"
+rdrand = { version = "^0.8", optional = true }
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 kvm-ioctls = ">=0.16"

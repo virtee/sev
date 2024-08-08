@@ -8,6 +8,8 @@ use std::{
     ptr::write_volatile,
 };
 
+use rdrand::{ErrorCode, RdRand};
+
 use openssl::*;
 
 #[repr(transparent)]
@@ -55,9 +57,21 @@ impl Key {
         Key(vec![0u8; size])
     }
 
-    pub fn random(size: usize) -> Result<Self> {
+    /// Will attempt to create a random Key derived from the CPU RDRAND instruction.
+    pub fn random(size: usize) -> std::result::Result<Self, ErrorCode> {
+        // Create a new empty key to store the pseudo-random bytes in.
         let mut key = Key::zeroed(size);
-        rand::rand_bytes(&mut key)?;
+
+        // Instantiate a pseudo-random number generator instance to pull
+        // random data from the CPU RDRAND instruction set.
+        let mut rng = RdRand::new()?;
+
+        // Attempt to generate N-number of bytes specified by the `size`
+        // parameter, storing the bytes inside they key generated at the
+        // start of the method.
+        rng.try_fill_bytes(&mut key)?;
+
+        // Return the key when successful.
         Ok(key)
     }
 }
