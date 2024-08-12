@@ -89,7 +89,7 @@ impl codicon::Decoder<()> for Certificate {
             1 => Certificate {
                 v1: v1::Certificate::decode(reader, params)?,
             },
-            _ => return Err(ErrorKind::InvalidData.into()),
+            _ => return Err(ErrorKind::InvalidData)?,
         })
     }
 }
@@ -100,7 +100,7 @@ impl codicon::Encoder<()> for Certificate {
     fn encode(&self, writer: impl Write, _: ()) -> Result<()> {
         match self.version() {
             1 => unsafe { self.v1.encode(writer, ()) },
-            _ => Err(ErrorKind::InvalidInput.into()),
+            _ => Err(ErrorKind::InvalidInput)?,
         }
     }
 }
@@ -112,7 +112,7 @@ impl codicon::Encoder<Body> for Certificate {
     fn encode(&self, writer: impl Write, _: Body) -> Result<()> {
         match self.version() {
             1 => unsafe { self.v1.encode(writer, Body) },
-            _ => Err(ErrorKind::InvalidInput.into()),
+            _ => Err(ErrorKind::InvalidInput)?,
         }
     }
 }
@@ -148,7 +148,7 @@ impl TryFrom<&Certificate> for Usage {
     fn try_from(value: &Certificate) -> Result<Self> {
         match value.version() {
             1 => Ok(unsafe { value.v1.preamble.data.usage }),
-            _ => Err(ErrorKind::InvalidInput.into()),
+            _ => Err(ErrorKind::InvalidInput)?,
         }
     }
 }
@@ -168,7 +168,7 @@ impl TryFrom<&Certificate> for PublicKey<Usage> {
     fn try_from(value: &Certificate) -> Result<Self> {
         match value.version() {
             1 => unsafe { value.v1.try_into() },
-            _ => Err(ErrorKind::InvalidInput.into()),
+            _ => Err(ErrorKind::InvalidInput)?,
         }
     }
 }

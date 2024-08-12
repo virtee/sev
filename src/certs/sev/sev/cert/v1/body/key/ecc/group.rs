@@ -16,7 +16,7 @@ impl Group {
         Ok(match self {
             Group::P256 => 32,
             Group::P384 => 48,
-            _ => return Err(ErrorKind::InvalidInput.into()),
+            _ => return Err(ErrorKind::InvalidInput)?,
         })
     }
 }
@@ -29,7 +29,7 @@ impl TryFrom<Group> for nid::Nid {
         Ok(match value {
             Group::P256 => nid::Nid::X9_62_PRIME256V1,
             Group::P384 => nid::Nid::SECP384R1,
-            _ => return Err(ErrorKind::InvalidInput.into()),
+            _ => return Err(ErrorKind::InvalidInput)?,
         })
     }
 }
@@ -42,7 +42,7 @@ impl TryFrom<nid::Nid> for Group {
         Ok(match value {
             nid::Nid::X9_62_PRIME256V1 => Group::P256,
             nid::Nid::SECP384R1 => Group::P384,
-            _ => return Err(ErrorKind::InvalidInput.into()),
+            _ => return Err(ErrorKind::InvalidInput)?,
         })
     }
 }

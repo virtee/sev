@@ -29,22 +29,22 @@ impl codicon::Decoder<()> for Chain {
     fn decode(mut reader: impl Read, _: ()) -> Result<Self> {
         let pdh = Certificate::decode(&mut reader, ())?;
         if Usage::try_from(&pdh)? != Usage::PDH {
-            return Err(ErrorKind::InvalidInput.into());
+            return Err(ErrorKind::InvalidInput)?;
         }
 
         let pek = Certificate::decode(&mut reader, ())?;
         if Usage::try_from(&pek)? != Usage::PEK {
-            return Err(ErrorKind::InvalidInput.into());
+            return Err(ErrorKind::InvalidInput)?;
         }
 
         let oca = Certificate::decode(&mut reader, ())?;
         if Usage::try_from(&oca)? != Usage::OCA {
-            return Err(ErrorKind::InvalidInput.into());
+            return Err(ErrorKind::InvalidInput)?;
         }
 
         let cek = Certificate::decode(&mut reader, ())?;
         if Usage::try_from(&cek)? != Usage::CEK {
-            return Err(ErrorKind::InvalidInput.into());
+            return Err(ErrorKind::InvalidInput)?;
         }
 
         Ok(Self { pdh, pek, oca, cek })

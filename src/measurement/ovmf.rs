@@ -274,7 +274,7 @@ impl OVMF {
         let expected_footer_guid = guid_le_to_slice(OVMF_TABLE_FOOTER_GUID.to_string().as_str())?;
 
         if !footer.guid.eq(&expected_footer_guid) {
-            return Err(OVMFError::MismatchingGUID.into());
+            return Err(OVMFError::MismatchingGUID)?;
         }
 
         if (footer.size as usize) < ENTRY_HEADER_SIZE {
@@ -282,8 +282,7 @@ impl OVMF {
                 "OVMF Table Footer".to_string(),
                 footer.size as usize,
                 ENTRY_HEADER_SIZE,
-            )
-            .into());
+            ))?;
         }
 
         let table_size = footer.size as usize - ENTRY_HEADER_SIZE;
@@ -299,8 +298,7 @@ impl OVMF {
                     "OVMF Table Entry".to_string(),
                     entry.size as usize,
                     ENTRY_HEADER_SIZE,
-                )
-                .into());
+                ))?;
             }
             let entry_guid = Uuid::from_slice_le(&entry.guid)?;
 
@@ -335,9 +333,9 @@ impl OVMF {
             }
 
             None => {
-                return Err(
-                    OVMFError::EntryMissingInTable("OVMF_SEV_METADATA_GUID".to_string()).into(),
-                );
+                return Err(OVMFError::EntryMissingInTable(
+                    "OVMF_SEV_METADATA_GUID".to_string(),
+                ))?;
             }
         }
 

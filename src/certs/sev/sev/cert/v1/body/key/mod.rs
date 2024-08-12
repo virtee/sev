@@ -64,7 +64,7 @@ impl TryFrom<&PubKey> for pkey::PKey<pkey::Public> {
         match v.algo.try_into()? {
             pkey::Id::RSA => Ok(unsafe { &v.key.rsa }.try_into()?),
             pkey::Id::EC => Ok(unsafe { &v.key.ecc }.try_into()?),
-            _ => Err(ErrorKind::InvalidInput.into()),
+            _ => Err(ErrorKind::InvalidInput)?,
         }
     }
 }
@@ -93,7 +93,7 @@ impl PubKey {
             Usage::PEK => Algorithm::ECDSA_SHA256,
             Usage::CEK => Algorithm::ECDSA_SHA256,
             Usage::PDH => Algorithm::ECDH_SHA256,
-            _ => return Err(ErrorKind::InvalidInput.into()),
+            _ => return Err(ErrorKind::InvalidInput)?,
         };
 
         let (key, prv) = ecc::PubKey::generate(ecc::group::Group::P384)?;

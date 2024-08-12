@@ -27,7 +27,7 @@ macro_rules! prv_decoder {
                     let prv = pkey::PKey::private_key_from_der(&buf)?;
                     let key = PublicKey::try_from(params)?;
                     if !prv.public_eq(&key.key) {
-                        return Err(ErrorKind::InvalidData.into());
+                        return Err(ErrorKind::InvalidData)?;
                     }
 
                     Ok(PrivateKey {
@@ -108,7 +108,7 @@ where
         let hash = sig.hash == self.hash;
         let id = sig.id.is_none() || sig.id == self.id;
         if !usage || !kind || !hash || !id {
-            return Err(ErrorKind::InvalidInput.into());
+            return Err(ErrorKind::InvalidInput)?;
         }
 
         let mut ver = sign::Verifier::new(sig.hash, &self.key)?;
@@ -125,7 +125,7 @@ where
             if ok {
                 Ok(())
             } else {
-                Err(ErrorKind::NotFound.into())
+                Err(ErrorKind::NotFound)?
             }
         })?
     }

@@ -33,7 +33,7 @@ impl TryFrom<Algorithm> for pkey::Id {
             Algorithm::RSA_SHA256 | Algorithm::RSA_SHA384 => pkey::Id::RSA,
             Algorithm::ECDSA_SHA256 | Algorithm::ECDSA_SHA384 => pkey::Id::EC,
             Algorithm::ECDH_SHA256 | Algorithm::ECDH_SHA384 => pkey::Id::EC,
-            _ => return Err(ErrorKind::InvalidInput.into()),
+            _ => return Err(ErrorKind::InvalidInput)?,
         })
     }
 }
@@ -52,7 +52,7 @@ impl TryFrom<Algorithm> for hash::MessageDigest {
                 Ok(hash::MessageDigest::sha384())
             }
 
-            _ => Err(ErrorKind::InvalidInput.into()),
+            _ => Err(ErrorKind::InvalidInput)?,
         }
     }
 }

@@ -40,7 +40,7 @@ use std::fs::{File, OpenOptions};
 //
 //         if lower != 0 {
 //             match lower.into() {
-//                 Indeterminate::Known(error) => return Err(error.into()),
+//                 Indeterminate::Known(error) => return Err(error)?,
 //                 Indeterminate::Unknown => return Err(UserApiError::Unknown),
 //             }
 //         }
@@ -149,10 +149,8 @@ impl Firmware {
         if let Err(ioctl_error) = SNP_GET_EXT_REPORT.ioctl(&mut self.0, &mut guest_request) {
             match guest_request.fw_err.into() {
                 VmmError::InvalidCertificatePageLength => (),
-                VmmError::RateLimitRetryRequest => {
-                    return Err(VmmError::RateLimitRetryRequest.into())
-                }
-                _ => return Err(ioctl_error.into()),
+                VmmError::RateLimitRetryRequest => return Err(VmmError::RateLimitRetryRequest)?,
+                _ => return Err(ioctl_error)?,
             }
 
             // Eventually the code below will be moved back into this scope.

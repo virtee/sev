@@ -23,12 +23,12 @@ impl codicon::Decoder<()> for Chain {
     fn decode(mut reader: impl Read, _: ()) -> Result<Self> {
         let ask = Certificate::decode(&mut reader, ())?;
         if Usage::try_from(&ask)? != Usage::ASK {
-            return Err(ErrorKind::InvalidInput.into());
+            return Err(ErrorKind::InvalidInput)?;
         }
 
         let ark = Certificate::decode(&mut reader, ())?;
         if Usage::try_from(&ark)? != Usage::ARK {
-            return Err(ErrorKind::InvalidInput.into());
+            return Err(ErrorKind::InvalidInput)?;
         }
 
         Ok(Self { ask, ark })
