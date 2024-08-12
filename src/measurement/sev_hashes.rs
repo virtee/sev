@@ -198,7 +198,7 @@ impl SevHashes {
     /// Construct an SEV Hash page using hash table.
     pub fn construct_page(&self, offset: usize) -> Result<Vec<u8>, MeasurementError> {
         if offset >= 4096 {
-            return Err(SevHashError::InvalidOffset(offset, 4096).into());
+            return Err(SevHashError::InvalidOffset(offset, 4096))?;
         }
 
         let hashes_table = self.construct_table()?;
@@ -207,7 +207,7 @@ impl SevHashes {
         page.extend_from_slice(&hashes_table[..]);
         page.resize(4096, 0);
         if page.len() != 4096 {
-            return Err(SevHashError::InvalidSize(page.len(), 4096).into());
+            return Err(SevHashError::InvalidSize(page.len(), 4096))?;
         }
         Ok(page)
     }

@@ -81,7 +81,10 @@ impl Gctx<Updating> {
         page_info.extend_from_slice(&gpa.to_le_bytes());
 
         if page_info.len() != (page_info_len as usize) {
-            return Err(GCTXError::InvalidPageSize(page_info.len(), page_info_len as usize).into());
+            return Err(GCTXError::InvalidPageSize(
+                page_info.len(),
+                page_info_len as usize,
+            ))?;
         }
         self.ld = sha384(&page_info).as_slice().try_into()?;
 
@@ -114,7 +117,7 @@ impl Gctx<Updating> {
                     }
                     Ok(())
                 } else {
-                    Err(GCTXError::MissingData.into())
+                    Err(GCTXError::MissingData)?
                 }
             }
 
@@ -124,7 +127,7 @@ impl Gctx<Updating> {
                     self.update(page_type as u8, VMSA_GPA, sha384(data).as_slice())?;
                     Ok(())
                 } else {
-                    Err(GCTXError::MissingData.into())
+                    Err(GCTXError::MissingData)?
                 }
             }
 
@@ -138,7 +141,7 @@ impl Gctx<Updating> {
                     }
                     Ok(())
                 } else {
-                    Err(GCTXError::MissingBlockSize.into())
+                    Err(GCTXError::MissingBlockSize)?
                 }
             }
 

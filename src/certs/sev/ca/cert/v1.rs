@@ -54,13 +54,13 @@ pub struct Preamble {
 impl Preamble {
     fn size(&self) -> Result<Size> {
         if self.data.psize != self.data.msize {
-            return Err(ErrorKind::InvalidInput.into());
+            return Err(ErrorKind::InvalidInput)?;
         }
 
         match u32::from_le(self.data.msize) {
             2048 => Ok(Size::Small),
             4096 => Ok(Size::Large),
-            _ => Err(ErrorKind::InvalidInput.into()),
+            _ => Err(ErrorKind::InvalidInput)?,
         }
     }
 }

@@ -53,7 +53,7 @@ impl Signer<Certificate> for PrivateKey<Usage> {
         } else if target.sigs[1].is_empty() {
             &mut target.sigs[1]
         } else {
-            return Err(ErrorKind::InvalidInput.into());
+            return Err(ErrorKind::InvalidInput)?;
         };
 
         let mut sig = sign::Signer::new(self.hash, &self.key)?;

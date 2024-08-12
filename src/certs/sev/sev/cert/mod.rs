@@ -80,7 +80,7 @@ impl codicon::Decoder<()> for Certificate {
             1 => Certificate {
                 v1: v1::Certificate::decode(reader, params)?,
             },
-            _ => return Err(ErrorKind::InvalidData.into()),
+            _ => return Err(ErrorKind::InvalidData)?,
         })
     }
 }
@@ -91,7 +91,7 @@ impl codicon::Encoder<()> for Certificate {
     fn encode(&self, mut writer: impl Write, _: ()) -> Result<()> {
         match self.version() {
             1 => unsafe { writer.save(&self.v1) },
-            _ => Err(ErrorKind::InvalidInput.into()),
+            _ => Err(ErrorKind::InvalidInput)?,
         }
     }
 }
@@ -103,7 +103,7 @@ impl codicon::Encoder<Body> for Certificate {
     fn encode(&self, mut writer: impl Write, _: Body) -> Result<()> {
         match self.version() {
             1 => unsafe { writer.save(&self.v1.body) },
-            _ => Err(ErrorKind::InvalidInput.into()),
+            _ => Err(ErrorKind::InvalidInput)?,
         }
     }
 }
@@ -143,7 +143,7 @@ impl TryFrom<&Certificate> for [Option<Signature>; 2] {
                 unsafe { &value.v1.sigs[0] }.try_into()?,
                 unsafe { &value.v1.sigs[1] }.try_into()?,
             ]),
-            _ => Err(ErrorKind::InvalidInput.into()),
+            _ => Err(ErrorKind::InvalidInput)?,
         }
     }
 }
@@ -154,7 +154,7 @@ impl TryFrom<&Certificate> for Usage {
     fn try_from(value: &Certificate) -> Result<Self> {
         match value.version() {
             1 => Ok(unsafe { value.v1.body.data.key.usage }),
-            _ => Err(ErrorKind::InvalidInput.into()),
+            _ => Err(ErrorKind::InvalidInput)?,
         }
     }
 }
@@ -176,7 +176,7 @@ impl TryFrom<&Certificate> for PublicKey<Usage> {
             1 => PublicKey::try_from(unsafe {
                 &std::ptr::addr_of!(value.v1.body.data.key).read_unaligned()
             }),
-            _ => Err(ErrorKind::InvalidInput.into()),
+            _ => Err(ErrorKind::InvalidInput)?,
         }
     }
 }
@@ -195,7 +195,7 @@ impl Verifiable for (&Certificate, &Certificate) {
             }
         }
 
-        Err(ErrorKind::InvalidInput.into())
+        Err(ErrorKind::InvalidInput)?
     }
 }
 
@@ -213,7 +213,7 @@ impl Verifiable for (&ca::Certificate, &Certificate) {
             }
         }
 
-        Err(ErrorKind::InvalidInput.into())
+        Err(ErrorKind::InvalidInput)?
     }
 }
 
@@ -224,7 +224,7 @@ impl Signer<Certificate> for PrivateKey<Usage> {
     fn sign(&self, target: &mut Certificate) -> Result<()> {
         match target.version() {
             1 => self.sign(unsafe { &mut target.v1 }),
-            _ => Err(ErrorKind::InvalidInput.into()),
+            _ => Err(ErrorKind::InvalidInput)?,
         }
     }
 }

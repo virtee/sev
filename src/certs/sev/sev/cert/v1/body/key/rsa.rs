@@ -18,7 +18,7 @@ impl PubKey {
         match u32::from_le(self.modulus_size) {
             2048 => Ok(256),
             4096 => Ok(512),
-            _ => Err(ErrorKind::InvalidInput.into()),
+            _ => Err(ErrorKind::InvalidInput)?,
         }
     }
 }

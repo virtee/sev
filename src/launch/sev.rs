@@ -223,7 +223,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Finished, U, V> {
             if let Indeterminate::Known(InvalidLen) = err {
                 len = first.len;
             } else {
-                return Err(err.into());
+                return Err(err)?;
             }
         }
 

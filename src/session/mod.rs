@@ -171,7 +171,7 @@ impl Session<Initialized> {
         sig.update(&msr.mnonce)?;
 
         if sig.sign_to_vec()? != msr.measure {
-            return Err(ErrorKind::InvalidInput.into());
+            return Err(ErrorKind::InvalidInput)?;
         }
 
         Ok(Session {

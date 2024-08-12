@@ -83,7 +83,7 @@ impl TryFrom<crate::certs::sev::Signature> for Signature {
 
     fn try_from(value: crate::certs::sev::Signature) -> Result<Self> {
         if value.id.is_some() {
-            return Err(ErrorKind::InvalidInput.into());
+            return Err(ErrorKind::InvalidInput)?;
         }
 
         let (sig, algo) = match value.kind {
@@ -93,7 +93,7 @@ impl TryFrom<crate::certs::sev::Signature> for Signature {
                 match value.hash.type_() {
                     nid::Nid::SHA256 => (sig, Algorithm::RSA_SHA256),
                     nid::Nid::SHA384 => (sig, Algorithm::RSA_SHA384),
-                    _ => return Err(ErrorKind::InvalidInput.into()),
+                    _ => return Err(ErrorKind::InvalidInput)?,
                 }
             }
 
@@ -103,11 +103,11 @@ impl TryFrom<crate::certs::sev::Signature> for Signature {
                 match value.hash.type_() {
                     nid::Nid::SHA256 => (sig, Algorithm::ECDSA_SHA256),
                     nid::Nid::SHA384 => (sig, Algorithm::ECDSA_SHA384),
-                    _ => return Err(ErrorKind::InvalidInput.into()),
+                    _ => return Err(ErrorKind::InvalidInput)?,
                 }
             }
 
-            _ => return Err(ErrorKind::InvalidInput.into()),
+            _ => return Err(ErrorKind::InvalidInput)?,
         };
 
         Ok(Signature {
@@ -133,7 +133,7 @@ impl TryFrom<&Signature> for Option<crate::certs::sev::Signature> {
         let sig = match kind {
             pkey::Id::RSA => Vec::try_from(unsafe { &value.sig.rsa })?,
             pkey::Id::EC => Vec::try_from(unsafe { &value.sig.ecdsa })?,
-            _ => return Err(ErrorKind::InvalidInput.into()),
+            _ => return Err(ErrorKind::InvalidInput)?,
         };
 
         Ok(Some(crate::certs::sev::Signature {
