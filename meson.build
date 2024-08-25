@@ -1,7 +1,7 @@
 project('sev', ['c', 'rust'],
   meson_version: '>=0.61.0',
   license : 'Apache-2.0',
-  version : run_command(['./package-version.py'], check : true).stdout().strip(),
+  version : run_command(['python', './package-version.py'], check : true).stdout().strip(),
   default_options : ['buildtype=release'],
 )
 
