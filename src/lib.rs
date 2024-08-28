@@ -129,7 +129,7 @@ use certs::sev::builtin as SevBuiltin;
 use certs::snp::builtin as SnpBuiltin;
 
 #[cfg(all(feature = "sev", target_os = "linux"))]
-use crate::{certs::sev::sev::Certificate as SevCertificate, error::Indeterminate, launch::sev::*};
+use crate::{certs::sev::sev::Certificate as SevCertificate, error::FirmwareError, launch::sev::*};
 
 #[cfg(any(feature = "sev", feature = "snp"))]
 use std::convert::TryFrom;
@@ -139,7 +139,6 @@ use std::io::{Read, Write};
 #[cfg(all(feature = "sev", target_os = "linux"))]
 use std::{
     collections::HashMap,
-    io,
     mem::size_of,
     os::{
         fd::RawFd,
@@ -403,8 +402,8 @@ lazy_static! {
 }
 
 #[cfg(all(feature = "sev", target_os = "linux"))]
-fn set_fw_err(ptr: *mut c_int, err: io::Error) {
-    unsafe { *ptr = Indeterminate::from(err).into() };
+fn set_fw_err(ptr: *mut c_int, err: FirmwareError) {
+    unsafe { *ptr = err.into() };
 }
 
 /// A C FFI interface to the SEV_INIT ioctl.

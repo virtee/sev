@@ -4,7 +4,7 @@
 //! This ensures (at compile time) that the right steps are called in the
 //! right order.
 
-use crate::error::{Error::InvalidLen, Indeterminate};
+use crate::error::{FirmwareError, SevError};
 
 #[cfg(target_os = "linux")]
 use crate::launch::linux::ioctl::*;
@@ -12,10 +12,7 @@ use crate::launch::linux::ioctl::*;
 use crate::launch::linux::{sev::*, shared::*};
 use crate::*;
 
-use std::convert::TryFrom;
-use std::io::Result;
-use std::mem::MaybeUninit;
-use std::os::unix::io::AsRawFd;
+use std::{convert::TryFrom, mem::MaybeUninit, os::unix::io::AsRawFd, result::Result};
 
 use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
@@ -49,7 +46,7 @@ impl<T, U: AsRawFd, V: AsRawFd> Launcher<T, U, V> {
 
 impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
     /// Begin the SEV launch process.
-    pub fn new(kvm: U, sev: V) -> Result<Self> {
+    pub fn new(kvm: U, sev: V) -> Result<Self, FirmwareError> {
         let mut launcher = Launcher {
             vm_fd: kvm,
             sev,
@@ -62,13 +59,13 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
 
         INIT2
             .ioctl(&mut launcher.vm_fd, &mut cmd)
-            .map_err(|e| cmd.encapsulate(e))?;
+            .map_err(|_| cmd.encapsulate())?;
 
         Ok(launcher)
     }
 
     /// Begin the SEV-ES launch process.
-    pub fn new_es(kvm: U, sev: V) -> Result<Self> {
+    pub fn new_es(kvm: U, sev: V) -> Result<Self, FirmwareError> {
         let mut launcher = Launcher {
             vm_fd: kvm,
             sev,
@@ -80,18 +77,18 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
         let mut cmd = Command::from(&launcher.sev, &init);
         INIT2
             .ioctl(&mut launcher.vm_fd, &mut cmd)
-            .map_err(|e| cmd.encapsulate(e))?;
+            .map_err(|_| cmd.encapsulate())?;
 
         Ok(launcher)
     }
 
     /// Create an encrypted guest context.
-    pub fn start(mut self, start: Start) -> Result<Launcher<Started, U, V>> {
+    pub fn start(mut self, start: Start) -> Result<Launcher<Started, U, V>, FirmwareError> {
         let mut launch_start = LaunchStart::new(&start.policy, &start.cert, &start.session);
         let mut cmd = Command::from_mut(&self.sev, &mut launch_start);
         LAUNCH_START
             .ioctl(&mut self.vm_fd, &mut cmd)
-            .map_err(|e| cmd.encapsulate(e))?;
+            .map_err(|_| cmd.encapsulate())?;
 
         let next = Launcher {
             state: Started(launch_start.into()),
@@ -105,7 +102,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
 
 impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
     /// Encrypt guest data with its VEK.
-    pub fn update_data(&mut self, data: &[u8]) -> Result<()> {
+    pub fn update_data(&mut self, data: &[u8]) -> Result<(), FirmwareError> {
         let launch_update_data = LaunchUpdateData::new(data);
         let mut cmd = Command::from(&self.sev, &launch_update_data);
 
@@ -113,50 +110,50 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
 
         LAUNCH_UPDATE_DATA
             .ioctl(&mut self.vm_fd, &mut cmd)
-            .map_err(|e| cmd.encapsulate(e))?;
+            .map_err(|_| cmd.encapsulate())?;
 
         Ok(())
     }
 
     /// Register the encrypted memory region to a virtual machine.
     /// Corresponds to the `KVM_MEMORY_ENCRYPT_REG_REGION` ioctl.
-    pub fn register_kvm_enc_region(&mut self, data: &[u8]) -> Result<()> {
+    pub fn register_kvm_enc_region(&mut self, data: &[u8]) -> Result<(), FirmwareError> {
         KvmEncRegion::new(data).register(&mut self.vm_fd)?;
         Ok(())
     }
 
     /// Encrypt guest data with its VEK, while the KVM encrypted memory region is not registered.
-    pub fn update_data_without_registration(&mut self, data: &[u8]) -> Result<()> {
+    pub fn update_data_without_registration(&mut self, data: &[u8]) -> Result<(), FirmwareError> {
         let launch_update_data = LaunchUpdateData::new(data);
         let mut cmd = Command::from(&self.sev, &launch_update_data);
 
         LAUNCH_UPDATE_DATA
             .ioctl(&mut self.vm_fd, &mut cmd)
-            .map_err(|e| cmd.encapsulate(e))?;
+            .map_err(|_| cmd.encapsulate())?;
 
         Ok(())
     }
 
     /// Encrypt the VMSA on SEV-ES.
-    pub fn update_vmsa(&mut self) -> Result<()> {
+    pub fn update_vmsa(&mut self) -> Result<(), FirmwareError> {
         let launch_update_vmsa = LaunchUpdateVmsa::new();
         let mut cmd = Command::from(&self.sev, &launch_update_vmsa);
 
         LAUNCH_UPDATE_VMSA
             .ioctl(&mut self.vm_fd, &mut cmd)
-            .map_err(|e| cmd.encapsulate(e))?;
+            .map_err(|_| cmd.encapsulate())?;
 
         Ok(())
     }
 
     /// Request a measurement from the SEV firmware.
-    pub fn measure(mut self) -> Result<Launcher<Measured, U, V>> {
+    pub fn measure(mut self) -> Result<Launcher<Measured, U, V>, FirmwareError> {
         let mut measurement = MaybeUninit::uninit();
         let mut launch_measure = LaunchMeasure::new(&mut measurement);
         let mut cmd = Command::from_mut(&self.sev, &mut launch_measure);
         LAUNCH_MEASUREMENT
             .ioctl(&mut self.vm_fd, &mut cmd)
-            .map_err(|e| cmd.encapsulate(e))?;
+            .map_err(|_| cmd.encapsulate())?;
 
         let next = Launcher {
             state: Measured(self.state.0, unsafe { measurement.assume_init() }),
@@ -179,31 +176,31 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Measured, U, V> {
     /// ## Remarks
     ///
     /// This should only be called after a successful attestation flow.
-    pub fn inject(&mut self, secret: &Secret, guest: usize) -> Result<()> {
+    pub fn inject(&mut self, secret: &Secret, guest: usize) -> Result<(), FirmwareError> {
         let launch_secret = LaunchSecret::new(&secret.header, guest, &secret.ciphertext[..]);
         let mut cmd = Command::from(&self.sev, &launch_secret);
         LAUNCH_SECRET
             .ioctl(&mut self.vm_fd, &mut cmd)
-            .map_err(|e| cmd.encapsulate(e))?;
+            .map_err(|_| cmd.encapsulate())?;
         Ok(())
     }
 
     /// Complete the SEV launch process.
-    pub fn finish(mut self) -> Result<Handle> {
+    pub fn finish(mut self) -> Result<Handle, FirmwareError> {
         let mut cmd = Command::from(&self.sev, &LaunchFinish);
         LAUNCH_FINISH
             .ioctl(&mut self.vm_fd, &mut cmd)
-            .map_err(|e| cmd.encapsulate(e))?;
+            .map_err(|_| cmd.encapsulate())?;
         Ok(self.state.0)
     }
 
     /// Complete the SEV launch process, and produce another Launcher capable of fetching an
     /// attestation report.
-    pub fn finish_attestable(mut self) -> Result<Launcher<Finished, U, V>> {
+    pub fn finish_attestable(mut self) -> Result<Launcher<Finished, U, V>, FirmwareError> {
         let mut cmd = Command::from(&self.sev, &LaunchFinish);
         LAUNCH_FINISH
             .ioctl(&mut self.vm_fd, &mut cmd)
-            .map_err(|e| cmd.encapsulate(e))?;
+            .map_err(|_| cmd.encapsulate())?;
 
         let next = Launcher {
             state: Finished,
@@ -217,16 +214,17 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Measured, U, V> {
 
 impl<U: AsRawFd, V: AsRawFd> Launcher<Finished, U, V> {
     /// Get the attestation report of the VM.
-    pub fn report(&mut self, mnonce: [u8; 16]) -> Result<Vec<u8>> {
+    pub fn report(&mut self, mnonce: [u8; 16]) -> Result<Vec<u8>, FirmwareError> {
         let mut first = LaunchAttestation::default();
         let mut cmd = Command::from_mut(&self.sev, &mut first);
         let mut len = 0;
 
         let e = LAUNCH_ATTESTATION
             .ioctl(&mut self.vm_fd, &mut cmd)
-            .map_err(|e| cmd.encapsulate(e));
+            .map_err(|_| cmd.encapsulate());
+
         if let Err(err) = e {
-            if let Indeterminate::Known(InvalidLen) = err {
+            if let FirmwareError::KnownSevError(SevError::InvalidLen) = err {
                 len = first.len;
             } else {
                 return Err(err)?;
@@ -239,7 +237,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Finished, U, V> {
 
         LAUNCH_ATTESTATION
             .ioctl(&mut self.vm_fd, &mut cmd)
-            .map_err(|e| cmd.encapsulate(e))?;
+            .map_err(|_| cmd.encapsulate())?;
 
         Ok(bytes)
     }
