@@ -7,6 +7,8 @@ use super::types::*;
 
 use crate::impl_const_id;
 
+use crate::error::FirmwareError;
+
 #[cfg(feature = "snp")]
 use crate::firmware::host::SnpPlatformStatus;
 
@@ -158,5 +160,10 @@ impl<'a, T: Id> Command<'a, T> {
             error: 0,
             _phantom: PhantomData,
         }
+    }
+
+    /// encapsulate a SEV errors in command as a Firmware error.
+    pub fn encapsulate(&self) -> FirmwareError {
+        FirmwareError::from(self.error)
     }
 }

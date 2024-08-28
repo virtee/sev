@@ -3,10 +3,7 @@
 //! A collection of type-safe ioctl implementations for the AMD Secure Encrypted Virtualization
 //! (SEV) platform. These ioctls are exported by the Linux kernel.
 
-use crate::{
-    error::{Error, Indeterminate},
-    impl_const_id,
-};
+use crate::{error::FirmwareError, impl_const_id};
 
 #[cfg(feature = "sev")]
 use crate::launch::linux::sev;
@@ -259,11 +256,8 @@ impl<'a, T: Id> Command<'a, T> {
         }
     }
 
-    /// encapsulate a `std::io::Error` in an `Indeterminate<Error>`
-    pub fn encapsulate(&self, err: std::io::Error) -> Indeterminate<Error> {
-        match self.error {
-            0 => Indeterminate::<Error>::from(err),
-            _ => Indeterminate::<Error>::from(self.error),
-        }
+    /// encapsulate a SEV errors in command as a Firmware error.
+    pub fn encapsulate(&self) -> FirmwareError {
+        FirmwareError::from(self.error)
     }
 }

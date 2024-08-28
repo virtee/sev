@@ -2,7 +2,6 @@
 
 //! Operations for managing the SEV platform.
 mod types;
-
 pub use types::*;
 
 #[cfg(target_os = "linux")]
@@ -77,16 +76,22 @@ impl Firmware {
 
     /// Reset the platform persistent state.
     #[cfg(feature = "sev")]
-    pub fn platform_reset(&mut self) -> Result<(), Indeterminate<Error>> {
-        PLATFORM_RESET.ioctl(&mut self.0, &mut Command::from(&PlatformReset))?;
+    pub fn platform_reset(&mut self) -> Result<(), UserApiError> {
+        let mut cmd_buf = Command::from(&PlatformReset);
+        PLATFORM_RESET
+            .ioctl(&mut self.0, &mut cmd_buf)
+            .map_err(|_| cmd_buf.encapsulate())?;
         Ok(())
     }
 
     /// Query the platform status.
     #[cfg(feature = "sev")]
-    pub fn platform_status(&mut self) -> Result<Status, Indeterminate<Error>> {
+    pub fn platform_status(&mut self) -> Result<Status, UserApiError> {
         let mut info: PlatformStatus = Default::default();
-        PLATFORM_STATUS.ioctl(&mut self.0, &mut Command::from_mut(&mut info))?;
+        let mut cmd_buf = Command::from_mut(&mut info);
+        PLATFORM_STATUS
+            .ioctl(&mut self.0, &mut cmd_buf)
+            .map_err(|_| cmd_buf.encapsulate())?;
 
         Ok(Status {
             build: CertBuild {
@@ -102,46 +107,58 @@ impl Firmware {
                 0 => State::Uninitialized,
                 1 => State::Initialized,
                 2 => State::Working,
-                _ => return Err(Indeterminate::Unknown),
+                _ => return Err(SevError::InvalidPlatformState)?,
             },
         })
     }
 
     /// Generate a new Platform Encryption Key (PEK).
     #[cfg(feature = "sev")]
-    pub fn pek_generate(&mut self) -> Result<(), Indeterminate<Error>> {
-        PEK_GEN.ioctl(&mut self.0, &mut Command::from(&PekGen))?;
+    pub fn pek_generate(&mut self) -> Result<(), UserApiError> {
+        let mut cmd_buf = Command::from(&PekGen);
+        PEK_GEN
+            .ioctl(&mut self.0, &mut cmd_buf)
+            .map_err(|_| cmd_buf.encapsulate())?;
         Ok(())
     }
 
     /// Request a signature for the PEK.
     #[cfg(feature = "sev")]
-    pub fn pek_csr(&mut self) -> Result<Certificate, Indeterminate<Error>> {
+    pub fn pek_csr(&mut self) -> Result<Certificate, UserApiError> {
         #[allow(clippy::uninit_assumed_init)]
         let mut pek: Certificate = unsafe { MaybeUninit::uninit().assume_init() };
         let mut csr = PekCsr::new(&mut pek);
-        PEK_CSR.ioctl(&mut self.0, &mut Command::from_mut(&mut csr))?;
+        let mut cmd_buf = Command::from_mut(&mut csr);
+        PEK_CSR
+            .ioctl(&mut self.0, &mut cmd_buf)
+            .map_err(|_| cmd_buf.encapsulate())?;
 
         Ok(pek)
     }
 
     /// Generate a new Platform Diffie-Hellman (PDH) key pair.
     #[cfg(feature = "sev")]
-    pub fn pdh_generate(&mut self) -> Result<(), Indeterminate<Error>> {
-        PDH_GEN.ioctl(&mut self.0, &mut Command::from(&PdhGen))?;
+    pub fn pdh_generate(&mut self) -> Result<(), UserApiError> {
+        let mut cmd_buf = Command::from(&PdhGen);
+        PDH_GEN
+            .ioctl(&mut self.0, &mut cmd_buf)
+            .map_err(|_| cmd_buf.encapsulate())?;
         Ok(())
     }
 
     /// Export the SEV certificate chain.
     #[cfg(feature = "sev")]
-    pub fn pdh_cert_export(&mut self) -> Result<Chain, Indeterminate<Error>> {
+    pub fn pdh_cert_export(&mut self) -> Result<Chain, UserApiError> {
         #[allow(clippy::uninit_assumed_init)]
         let mut chain: [Certificate; 3] = unsafe { MaybeUninit::uninit().assume_init() };
         #[allow(clippy::uninit_assumed_init)]
         let mut pdh: Certificate = unsafe { MaybeUninit::uninit().assume_init() };
-
         let mut pdh_cert_export = PdhCertExport::new(&mut pdh, &mut chain);
-        PDH_CERT_EXPORT.ioctl(&mut self.0, &mut Command::from_mut(&mut pdh_cert_export))?;
+        let mut cmd_buf = Command::from_mut(&mut pdh_cert_export);
+
+        PDH_CERT_EXPORT
+            .ioctl(&mut self.0, &mut cmd_buf)
+            .map_err(|_| cmd_buf.encapsulate())?;
 
         Ok(Chain {
             pdh,
@@ -157,9 +174,13 @@ impl Firmware {
         &mut self,
         pek: &Certificate,
         oca: &Certificate,
-    ) -> Result<(), Indeterminate<Error>> {
+    ) -> Result<(), UserApiError> {
         let pek_cert_import = PekCertImport::new(pek, oca);
-        PEK_CERT_IMPORT.ioctl(&mut self.0, &mut Command::from(&pek_cert_import))?;
+        let mut cmd_buf = Command::from(&pek_cert_import);
+
+        PEK_CERT_IMPORT
+            .ioctl(&mut self.0, &mut cmd_buf)
+            .map_err(|_| cmd_buf.encapsulate())?;
         Ok(())
     }
 
@@ -168,12 +189,14 @@ impl Firmware {
     /// This is especially helpful for sending AMD an HTTP request to fetch
     /// the signed CEK certificate.
     #[cfg(any(feature = "sev", feature = "snp"))]
-    pub fn get_identifier(&mut self) -> Result<Identifier, Indeterminate<Error>> {
+    pub fn get_identifier(&mut self) -> Result<Identifier, UserApiError> {
         let mut bytes = [0u8; 64];
         let mut id = GetId::new(&mut bytes);
+        let mut cmd_buf = Command::from_mut(&mut id);
 
-        GET_ID.ioctl(&mut self.0, &mut Command::from_mut(&mut id))?;
-
+        GET_ID
+            .ioctl(&mut self.0, &mut cmd_buf)
+            .map_err(|_| cmd_buf.encapsulate())?;
         Ok(Identifier(id.as_slice().to_vec()))
     }
 
@@ -188,10 +211,13 @@ impl Firmware {
     /// let status: PlatformStatus = firmware.platform_status().unwrap();
     /// ```
     #[cfg(feature = "snp")]
-    pub fn snp_platform_status(&mut self) -> Result<SnpPlatformStatus, Indeterminate<Error>> {
+    pub fn snp_platform_status(&mut self) -> Result<SnpPlatformStatus, UserApiError> {
         let mut platform_status: SnpPlatformStatus = SnpPlatformStatus::default();
+        let mut cmd_buf = Command::from_mut(&mut platform_status);
 
-        SNP_PLATFORM_STATUS.ioctl(&mut self.0, &mut Command::from_mut(&mut platform_status))?;
+        SNP_PLATFORM_STATUS
+            .ioctl(&mut self.0, &mut cmd_buf)
+            .map_err(|_| cmd_buf.encapsulate())?;
 
         Ok(platform_status)
     }
@@ -211,7 +237,11 @@ impl Firmware {
     #[cfg(feature = "snp")]
     pub fn snp_commit(&mut self) -> Result<(), UserApiError> {
         let mut buf: SnpCommit = Default::default();
-        SNP_COMMIT.ioctl(&mut self.0, &mut Command::from_mut(&mut buf))?;
+        let mut cmd_buf = Command::from_mut(&mut buf);
+
+        SNP_COMMIT
+            .ioctl(&mut self.0, &mut cmd_buf)
+            .map_err(|_| cmd_buf.encapsulate())?;
 
         Ok(())
     }
@@ -230,10 +260,12 @@ impl Firmware {
     /// ```
     #[cfg(feature = "snp")]
     pub fn snp_set_config(&mut self, new_config: Config) -> Result<(), UserApiError> {
-        SNP_SET_CONFIG.ioctl(
-            &mut self.0,
-            &mut Command::from_mut(&mut new_config.try_into()?),
-        )?;
+        let mut binding = new_config.try_into()?;
+        let mut cmd_buf = Command::from_mut(&mut binding);
+
+        SNP_SET_CONFIG
+            .ioctl(&mut self.0, &mut cmd_buf)
+            .map_err(|_| cmd_buf.encapsulate())?;
 
         Ok(())
     }
@@ -256,8 +288,11 @@ impl Firmware {
         let parsed_bytes: WrappedVlekHashstick = hashstick_bytes.try_into()?;
 
         let mut vlek_load: SnpVlekLoad = SnpVlekLoad::new(&parsed_bytes);
+        let mut cmd_buf = Command::from_mut(&mut vlek_load);
 
-        SNP_VLEK_LOAD.ioctl(&mut self.0, &mut Command::from_mut(&mut vlek_load))?;
+        SNP_VLEK_LOAD
+            .ioctl(&mut self.0, &mut cmd_buf)
+            .map_err(|_| cmd_buf.encapsulate())?;
 
         Ok(())
     }

@@ -185,4 +185,14 @@ mod snp {
         let new_config = Config::new(TcbVersion::new(1, 0, 1, 1), MaskId(31));
         fw.snp_set_config(new_config).unwrap();
     }
+
+    #[cfg_attr(not(all(has_sev, feature = "dangerous_hw_tests")), ignore)]
+    #[test]
+    #[serial]
+    fn test_host_fw_error() {
+        let mut fw: Firmware = Firmware::open().unwrap();
+        let invalid_config = Config::new(TcbVersion::new(100, 100, 100, 100), MaskId(31));
+        let fw_error = fw.snp_set_config(invalid_config).unwrap_err().to_string();
+        assert_eq!(fw_error, "Firmware Error Encountered: Known SEV FW Error: Status Code: 0x16: Given parameter is invalid.")
+    }
 }

@@ -30,7 +30,7 @@ pub const SNP_GET_EXT_REPORT: Ioctl<WriteRead, &GuestRequest<ExtReportReq, Repor
 #[repr(C)]
 pub struct GuestRequest<'a, 'b, Req, Rsp> {
     /// Message version number (must be non-zero)
-    pub message_version: u8,
+    pub message_version: u32,
     /// Request structure address.
     pub request_data: u64,
     /// Response structure address.
@@ -47,10 +47,10 @@ impl<'a, 'b, Req, Rsp> GuestRequest<'a, 'b, Req, Rsp> {
     ///
     /// # Arguments:
     ///
-    /// * `ver` - Option<u8> - Version of the message.
+    /// * `ver` - Option<u32> - Version of the message.
     /// * `req` - &Req - The reference a Request object.
     /// * `rsp` - &Rsp - The reference a Response object.
-    pub fn new(ver: Option<u8>, req: &'a mut Req, rsp: &'b mut Rsp) -> Self {
+    pub fn new(ver: Option<u32>, req: &'a mut Req, rsp: &'b mut Rsp) -> Self {
         Self {
             message_version: ver.unwrap_or(1),
             request_data: req as *mut Req as u64,
