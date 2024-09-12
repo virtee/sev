@@ -31,6 +31,9 @@ const CODE: &[u8; 16] = &[
 #[test]
 #[serial]
 fn sev() {
+    // KVM SEV type
+    const KVM_X86_SEV_VM: u64 = 2;
+
     let mut sev = Firmware::open().unwrap();
     let build = sev.platform_status().unwrap().build;
     let chain = cached_chain::get().expect(
@@ -43,7 +46,9 @@ fn sev() {
     let start = session.start(chain).unwrap();
 
     let kvm = Kvm::new().unwrap();
-    let vm = kvm.create_vm().unwrap();
+
+    // Create VMft with SEV type
+    let vm = kvm.create_vm_with_type(KVM_X86_SEV_VM).unwrap();
 
     // Allocate a 1kB page of memory for the address space of the VM.
     const MEM_SIZE: usize = 0x1000;

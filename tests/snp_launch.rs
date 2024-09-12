@@ -4,13 +4,16 @@
 use std::slice::from_raw_parts_mut;
 
 #[cfg(all(feature = "snp", target_os = "linux"))]
-use sev::firmware::host::Firmware;
+use std::os::fd::RawFd;
+
+#[cfg(all(feature = "snp", target_os = "linux"))]
+use sev::firmware::{guest::GuestPolicy, host::Firmware};
 
 #[cfg(all(feature = "snp", target_os = "linux"))]
 use sev::launch::snp::*;
 
 #[cfg(all(feature = "snp", target_os = "linux"))]
-use kvm_bindings::kvm_userspace_memory_region;
+use kvm_bindings::{kvm_create_guest_memfd, kvm_userspace_memory_region2, KVM_MEM_GUEST_MEMFD};
 
 #[cfg(all(feature = "snp", target_os = "linux"))]
 use kvm_ioctls::{Kvm, VcpuExit};
@@ -21,14 +24,16 @@ const CODE: &[u8; 4096] = &[
     0xf4; 4096 // hlt
 ];
 
+const KVM_X86_SNP_VM: u64 = 4;
+
 #[cfg(all(feature = "snp", target_os = "linux"))]
 #[cfg_attr(not(has_sev), ignore)]
 #[test]
 fn snp() {
-    use sev::firmware::guest::GuestPolicy;
-
     let kvm_fd = Kvm::new().unwrap();
-    let vm_fd = kvm_fd.create_vm().unwrap();
+
+    // Create VM-fd with SEV-SNP type
+    let vm_fd = kvm_fd.create_vm_with_type(KVM_X86_SNP_VM).unwrap();
 
     const MEM_ADDR: u64 = 0x1000;
 
@@ -46,39 +51,51 @@ fn snp() {
 
     let userspace_addr = address_space as *const [u8] as *const u8 as u64;
 
-    let mem_region = kvm_userspace_memory_region {
-        slot: 0,
-        guest_phys_addr: MEM_ADDR,
-        memory_size: CODE.len() as _,
-        userspace_addr,
+    // Create KVM guest_memfd struct
+    let gmem = kvm_create_guest_memfd {
+        size: 0x1000,
         flags: 0,
+        reserved: [0; 6],
+    };
+
+    // Create KVM guest_memfd
+    let fd: RawFd = vm_fd.create_guest_memfd(gmem).unwrap();
+
+    // Create memory region
+    let mem_region = kvm_userspace_memory_region2 {
+        slot: 0,
+        flags: KVM_MEM_GUEST_MEMFD,
+        guest_phys_addr: 0x1000_u64,
+        memory_size: 0x1000_u64,
+        userspace_addr,
+        guest_memfd_offset: 0,
+        guest_memfd: fd as u32,
+        pad1: 0,
+        pad2: [0; 14],
     };
 
     unsafe {
-        vm_fd.set_user_memory_region(mem_region).unwrap();
-    }
+        vm_fd.set_user_memory_region2(mem_region).unwrap();
+    };
 
     let sev = Firmware::open().unwrap();
     let launcher = Launcher::new(vm_fd, sev).unwrap();
 
     let mut policy = GuestPolicy(0);
     policy.set_smt_allowed(1);
-    let start = Start::new(None, policy, false, [0; 16]);
+    let start = Start::new(policy, [0; 16]);
 
     let mut launcher = launcher.start(start).unwrap();
-
-    // If VMPL is not enabled, perms must be zero
-    let dp = VmplPerms::empty();
 
     let update = Update::new(
         mem_region.guest_phys_addr >> 12,
         address_space,
-        false,
         PageType::Normal,
-        (dp, dp, dp),
     );
 
-    launcher.update_data(update).unwrap();
+    launcher
+        .update_data(update, mem_region.guest_phys_addr, mem_region.memory_size)
+        .unwrap();
 
     let finish = Finish::new(None, None, [0u8; 32]);
 

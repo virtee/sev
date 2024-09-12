@@ -14,6 +14,9 @@ use crate::launch::linux::sev;
 #[cfg(feature = "snp")]
 use crate::launch::linux::snp;
 
+#[cfg(all(feature = "sev", feature = "snp"))]
+use crate::launch::linux::shared;
+
 use std::{
     marker::PhantomData,
     os::{raw::c_ulong, unix::io::AsRawFd},
@@ -22,7 +25,7 @@ use std::{
 use iocuddle::*;
 
 // These enum ordinal values are defined in the Linux kernel
-// source code: include/uapi/linux/kvm.h
+// source code: arch/x86/include/uapi/asm/kvm.h
 #[cfg(all(feature = "sev", feature = "snp"))]
 impl_const_id! {
     /// The ioctl sub number
@@ -38,10 +41,11 @@ impl_const_id! {
     sev::LaunchFinish = 7,
     sev::LaunchAttestation<'_> = 20,
 
-    snp::Init = 22,
-    snp::LaunchStart<'_> = 23,
-    snp::LaunchUpdate<'_> = 24,
-    snp::LaunchFinish<'_> = 25,
+    shared::Init2 = 22,
+
+    snp::LaunchStart = 100,
+    snp::LaunchUpdate<'_> = 101,
+    snp::LaunchFinish<'_> = 102,
 }
 
 #[cfg(all(feature = "sev", not(feature = "snp")))]
@@ -58,6 +62,8 @@ impl_const_id! {
     sev::LaunchMeasure<'_> = 6,
     sev::LaunchFinish = 7,
     sev::LaunchAttestation<'_> = 20,
+
+    shared::Init2 = 22
 }
 
 #[cfg(all(not(feature = "sev"), feature = "snp"))]
@@ -65,14 +71,16 @@ impl_const_id! {
     /// The ioctl sub number
     pub Id => u32;
 
-    snp::Init = 22,
-    snp::LaunchStart<'_> = 23,
-    snp::LaunchUpdate<'_> = 24,
-    snp::LaunchFinish<'_> = 25,
+    shared::Init2 = 22,
+
+    snp::LaunchStart = 100,
+    snp::LaunchUpdate<'_> = 101,
+    snp::LaunchFinish<'_> = 102,
 }
 
 const KVM: Group = Group::new(0xAE);
 const ENC_OP: Ioctl<WriteRead, &c_ulong> = unsafe { KVM.write_read(0xBA) };
+pub const KVM_MEMORY_ATTRIBUTE_PRIVATE: u64 = 1 << 3;
 
 // Note: the iocuddle::Ioctl::lie() constructor has been used here because
 // KVM_MEMORY_ENCRYPT_OP ioctl was defined like this:
@@ -88,11 +96,13 @@ const ENC_OP: Ioctl<WriteRead, &c_ulong> = unsafe { KVM.write_read(0xBA) };
 
 /// Initialize the SEV platform context.
 #[cfg(feature = "sev")]
-pub const INIT: Ioctl<WriteRead, &Command<sev::Init>> = unsafe { ENC_OP.lie() };
+#[deprecated(note = "Init2 should be used instead")]
+pub const _INIT: Ioctl<WriteRead, &Command<sev::Init>> = unsafe { ENC_OP.lie() };
 
 /// Initialize the SEV-ES platform context.
 #[cfg(feature = "sev")]
-pub const ES_INIT: Ioctl<WriteRead, &Command<sev::EsInit>> = unsafe { ENC_OP.lie() };
+#[deprecated(note = "Init2 should be used instead")]
+pub const _ES_INIT: Ioctl<WriteRead, &Command<sev::EsInit>> = unsafe { ENC_OP.lie() };
 
 /// Create encrypted guest context.
 #[cfg(feature = "sev")]
@@ -132,9 +142,14 @@ pub const LAUNCH_ATTESTATION: Ioctl<WriteRead, &Command<sev::LaunchAttestation>>
 pub const ENC_REG_REGION: Ioctl<Write, &KvmEncRegion> =
     unsafe { KVM.read::<KvmEncRegion>(0xBB).lie() };
 
-/// Initialize the SEV-SNP platform in KVM.
-#[cfg(feature = "snp")]
-pub const SNP_INIT: Ioctl<WriteRead, &Command<snp::Init>> = unsafe { ENC_OP.lie() };
+/// Corresponds to the `KVM_SET_MEMORY_ATTRIBUTES` ioctl
+#[cfg(any(feature = "sev", feature = "snp"))]
+pub const SET_MEMORY_ATTRIBUTES: Ioctl<Write, &KvmSetMemoryAttributes> =
+    unsafe { KVM.write::<KvmSetMemoryAttributes>(0xd2) };
+
+/// Use the KVM_SEV_INIT2 ioctl to initialize the SEV platform context.
+#[cfg(any(feature = "sev", feature = "snp"))]
+pub const INIT2: Ioctl<WriteRead, &Command<shared::Init2>> = unsafe { ENC_OP.lie() };
 
 /// Initialize the flow to launch a guest.
 #[cfg(feature = "snp")]
@@ -172,6 +187,36 @@ impl<'a> KvmEncRegion<'a> {
     /// Register the encrypted memory region to a virtual machine
     pub fn register(&mut self, vm_fd: &mut impl AsRawFd) -> std::io::Result<std::os::raw::c_uint> {
         ENC_REG_REGION.ioctl(vm_fd, self)
+    }
+}
+
+/// Corresponds to the kernel struct `kvm_memory_attributes`
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
+pub struct KvmSetMemoryAttributes {
+    addr: u64,
+    size: u64,
+    attributes: u64,
+    flags: u64,
+}
+
+impl KvmSetMemoryAttributes {
+    /// Create a new `KvmEncRegion` referencing some memory assigned to the virtual machine.
+    pub fn new(data: u64, len: u64, attributes: u64) -> Self {
+        Self {
+            addr: data,
+            size: len,
+            attributes,
+            flags: 0,
+        }
+    }
+
+    /// Register the encrypted memory region to a virtual machine
+    pub fn set_attributes(
+        &mut self,
+        vm_fd: &mut impl AsRawFd,
+    ) -> std::io::Result<std::os::raw::c_uint> {
+        SET_MEMORY_ATTRIBUTES.ioctl(vm_fd, self)
     }
 }
 
