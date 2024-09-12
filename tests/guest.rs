@@ -35,3 +35,19 @@ fn get_derived_key() {
 
     fw.get_derived_key(None, derived_key).unwrap();
 }
+
+#[cfg(all(feature = "snp", target_os = "linux"))]
+#[cfg_attr(not(has_sev_guest), ignore)]
+#[test]
+fn guest_fw_error() {
+    let derived_key = DerivedKey::new(false, GuestFieldSelect(1), 0xFFFFFFFF, 0xFFFFFFFF, 0);
+
+    let mut fw = Firmware::open().unwrap();
+
+    let fw_err = fw
+        .get_derived_key(None, derived_key)
+        .unwrap_err()
+        .to_string();
+
+    assert_eq!(fw_err, "Firmware Error Encountered: Known SEV FW Error: Given parameter is invalid. Status Code: 22")
+}

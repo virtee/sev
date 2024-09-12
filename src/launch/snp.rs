@@ -4,11 +4,11 @@
 //! This ensures (at compile time) that the right steps are called in the
 //! right order.
 
-use crate::firmware::guest::GuestPolicy;
 #[cfg(target_os = "linux")]
 use crate::launch::linux::{ioctl::*, snp::*};
+use crate::{error::FirmwareError, firmware::guest::GuestPolicy};
 
-use std::{io::Result, marker::PhantomData, os::unix::io::AsRawFd};
+use std::{marker::PhantomData, os::unix::io::AsRawFd, result::Result};
 
 use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
@@ -43,7 +43,7 @@ impl<T, U: AsRawFd, V: AsRawFd> AsMut<U> for Launcher<T, U, V> {
 impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
     /// Begin the SEV-SNP launch process by creating a Launcher and issuing the
     /// KVM_SNP_INIT ioctl.
-    pub fn new(vm_fd: U, sev: V) -> Result<Self> {
+    pub fn new(vm_fd: U, sev: V) -> Result<Self, FirmwareError> {
         let mut launcher = Launcher {
             vm_fd,
             sev,
@@ -55,19 +55,19 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
         let mut cmd = Command::from(&launcher.sev, &init);
         SNP_INIT
             .ioctl(&mut launcher.vm_fd, &mut cmd)
-            .map_err(|e| cmd.encapsulate(e))?;
+            .map_err(|_| cmd.encapsulate())?;
 
         Ok(launcher)
     }
 
     /// Initialize the flow to launch a guest.
-    pub fn start(mut self, start: Start) -> Result<Launcher<Started, U, V>> {
+    pub fn start(mut self, start: Start) -> Result<Launcher<Started, U, V>, FirmwareError> {
         let mut launch_start = LaunchStart::from(start);
         let mut cmd = Command::from_mut(&self.sev, &mut launch_start);
 
         SNP_LAUNCH_START
             .ioctl(&mut self.vm_fd, &mut cmd)
-            .map_err(|e| cmd.encapsulate(e))?;
+            .map_err(|_| cmd.encapsulate())?;
 
         let launcher = Launcher {
             vm_fd: self.vm_fd,
@@ -81,7 +81,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
 
 impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
     /// Encrypt guest SNP data.
-    pub fn update_data(&mut self, update: Update) -> Result<()> {
+    pub fn update_data(&mut self, update: Update) -> Result<(), FirmwareError> {
         let launch_update_data = LaunchUpdate::from(update);
         let mut cmd = Command::from(&self.sev, &launch_update_data);
 
@@ -89,19 +89,19 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
 
         SNP_LAUNCH_UPDATE
             .ioctl(&mut self.vm_fd, &mut cmd)
-            .map_err(|e| cmd.encapsulate(e))?;
+            .map_err(|_| cmd.encapsulate())?;
 
         Ok(())
     }
 
     /// Complete the SNP launch process.
-    pub fn finish(mut self, finish: Finish) -> Result<(U, V)> {
+    pub fn finish(mut self, finish: Finish) -> Result<(U, V), FirmwareError> {
         let launch_finish = LaunchFinish::from(finish);
         let mut cmd = Command::from(&self.sev, &launch_finish);
 
         SNP_LAUNCH_FINISH
             .ioctl(&mut self.vm_fd, &mut cmd)
-            .map_err(|e| cmd.encapsulate(e))?;
+            .map_err(|_| cmd.encapsulate())?;
 
         Ok((self.vm_fd, self.sev))
     }
