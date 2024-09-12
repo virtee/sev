@@ -9,7 +9,7 @@ use crate::error::{Error::InvalidLen, Indeterminate};
 #[cfg(target_os = "linux")]
 use crate::launch::linux::ioctl::*;
 #[cfg(target_os = "linux")]
-use crate::launch::linux::sev::*;
+use crate::launch::linux::{sev::*, shared::*};
 use crate::*;
 
 use std::convert::TryFrom;
@@ -56,8 +56,12 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
             state: New,
         };
 
-        let mut cmd = Command::from(&launcher.sev, &Init);
-        INIT.ioctl(&mut launcher.vm_fd, &mut cmd)
+        let init = Init2::init_default_sev();
+
+        let mut cmd = Command::from(&launcher.sev, &init);
+
+        INIT2
+            .ioctl(&mut launcher.vm_fd, &mut cmd)
             .map_err(|e| cmd.encapsulate(e))?;
 
         Ok(launcher)
@@ -71,8 +75,10 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
             state: New,
         };
 
-        let mut cmd = Command::from(&launcher.sev, &EsInit);
-        ES_INIT
+        let init = Init2::init_default_es();
+
+        let mut cmd = Command::from(&launcher.sev, &init);
+        INIT2
             .ioctl(&mut launcher.vm_fd, &mut cmd)
             .map_err(|e| cmd.encapsulate(e))?;
 

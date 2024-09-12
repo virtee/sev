@@ -6,7 +6,7 @@
 
 use crate::firmware::guest::GuestPolicy;
 #[cfg(target_os = "linux")]
-use crate::launch::linux::{ioctl::*, snp::*};
+use crate::launch::linux::{ioctl::*, shared::*, snp::*};
 
 use std::{io::Result, marker::PhantomData, os::unix::io::AsRawFd};
 
@@ -50,10 +50,11 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
             state: PhantomData,
         };
 
-        let init = Init::default();
+        let init = Init2::init_default_snp();
 
         let mut cmd = Command::from(&launcher.sev, &init);
-        SNP_INIT
+
+        INIT2
             .ioctl(&mut launcher.vm_fd, &mut cmd)
             .map_err(|e| cmd.encapsulate(e))?;
 
@@ -62,8 +63,8 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
 
     /// Initialize the flow to launch a guest.
     pub fn start(mut self, start: Start) -> Result<Launcher<Started, U, V>> {
-        let mut launch_start = LaunchStart::from(start);
-        let mut cmd = Command::from_mut(&self.sev, &mut launch_start);
+        let launch_start = LaunchStart::from(start);
+        let mut cmd = Command::from(&self.sev, &launch_start);
 
         SNP_LAUNCH_START
             .ioctl(&mut self.vm_fd, &mut cmd)
@@ -81,15 +82,45 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
 
 impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
     /// Encrypt guest SNP data.
-    pub fn update_data(&mut self, update: Update) -> Result<()> {
-        let launch_update_data = LaunchUpdate::from(update);
-        let mut cmd = Command::from(&self.sev, &launch_update_data);
+    pub fn update_data(&mut self, mut update: Update, gpa: u64, gpa_len: u64) -> Result<()> {
+        loop {
+            let launch_update_data = LaunchUpdate::from(update);
+            let mut cmd = Command::from(&self.sev, &launch_update_data);
 
-        KvmEncRegion::new(update.uaddr).register(&mut self.vm_fd)?;
+            // Register the encryption region
+            KvmEncRegion::new(update.uaddr).register(&mut self.vm_fd)?;
 
-        SNP_LAUNCH_UPDATE
-            .ioctl(&mut self.vm_fd, &mut cmd)
-            .map_err(|e| cmd.encapsulate(e))?;
+            // Set memory attributes to private
+            KvmSetMemoryAttributes::new(gpa, gpa_len, KVM_MEMORY_ATTRIBUTE_PRIVATE)
+                .set_attributes(&mut self.vm_fd)?;
+
+            // Perform the SNP_LAUNCH_UPDATE ioctl call
+            match SNP_LAUNCH_UPDATE.ioctl(&mut self.vm_fd, &mut cmd) {
+                Ok(_) => {
+                    // Check if the entire range has been processed
+                    if launch_update_data.len == 0 {
+                        break;
+                    }
+
+                    // Update the `update` object with the remaining range
+                    update.start_gfn = launch_update_data.start_gfn;
+                    update.uaddr = unsafe {
+                        std::slice::from_raw_parts(
+                            launch_update_data.uaddr as *const u8,
+                            launch_update_data.len as usize,
+                        )
+                    };
+                }
+                Err(e) if e.raw_os_error() == Some(libc::EAGAIN) => {
+                    // Retry the operation if `-EAGAIN` is returned
+                    continue;
+                }
+                Err(e) => {
+                    // Handle other errors
+                    return Err(cmd.encapsulate(e).into());
+                }
+            }
+        }
 
         Ok(())
     }
@@ -109,98 +140,25 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
 
 /// Encapsulates the various data needed to begin the launch process.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
-pub struct Start<'a> {
-    /// The userspace address of the migration agent region to be encrypted.
-    pub(crate) ma_uaddr: Option<&'a [u8]>,
-
+pub struct Start {
     /// Describes a policy that the AMD Secure Processor will enforce.
     pub(crate) policy: GuestPolicy,
 
-    /// Indicates that this launch flow is launching an IMI for the purpose of guest-assisted migration.
-    pub(crate) imi_en: bool,
-
     /// Hypervisor provided value to indicate guest OS visible workarounds.The format is hypervisor defined.
     pub(crate) gosvw: [u8; 16],
+
+    /// Indicates that this launch flow is launching an IMI for the purpose of guest-assisted migration.
+    pub(crate) flags: u16,
 }
 
-impl<'a> Start<'a> {
+impl Start {
     /// Encapsulate all data needed for the SNP_LAUNCH_START ioctl.
-    pub fn new(
-        ma_uaddr: Option<&'a [u8]>,
-        policy: GuestPolicy,
-        imi_en: bool,
-        gosvw: [u8; 16],
-    ) -> Self {
+    pub fn new(policy: GuestPolicy, gosvw: [u8; 16]) -> Self {
         Self {
-            ma_uaddr,
             policy,
-            imi_en,
             gosvw,
+            flags: 0,
         }
-    }
-}
-
-/// Encapsulates the various data needed to begin the update process.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
-pub struct Update<'a> {
-    /// guest start frame number.
-    pub(crate) start_gfn: u64,
-
-    /// The userspace of address of the encrypted region.
-    pub(crate) uaddr: &'a [u8],
-
-    /// Indicates that this page is part of the IMI of the guest.
-    pub(crate) imi_page: bool,
-
-    /// Encoded page type.
-    pub(crate) page_type: PageType,
-
-    /// VMPL3 permission mask.
-    pub(crate) vmpl3_perms: VmplPerms,
-
-    /// VMPL2 permission mask.
-    pub(crate) vmpl2_perms: VmplPerms,
-
-    /// VMPL1 permission mask.
-    pub(crate) vmpl1_perms: VmplPerms,
-}
-
-impl<'a> Update<'a> {
-    /// Encapsulate all data needed for the SNP_LAUNCH_UPDATE ioctl.
-    pub fn new(
-        start_gfn: u64,
-        uaddr: &'a [u8],
-        imi_page: bool,
-        page_type: PageType,
-        perms: (VmplPerms, VmplPerms, VmplPerms),
-    ) -> Self {
-        Self {
-            start_gfn,
-            uaddr,
-            imi_page,
-            page_type,
-            vmpl3_perms: perms.2,
-            vmpl2_perms: perms.1,
-            vmpl1_perms: perms.0,
-        }
-    }
-}
-
-bitflags! {
-    #[derive(Default, Deserialize, Serialize)]
-    /// VMPL permission masks.
-    pub struct VmplPerms: u8 {
-        /// Page is readable by the VMPL.
-        const READ = 1;
-
-        /// Page is writeable by the VMPL.
-        const WRITE = 1 << 1;
-
-        /// Page is executable by the VMPL in CPL3.
-        const EXECUTE_USER = 1 << 2;
-
-        /// Page is executable by the VMPL in CPL2, CPL1, and CPL0.
-        const EXECUTE_SUPERVISOR = 1 << 3;
     }
 }
 
@@ -227,6 +185,48 @@ pub enum PageType {
 
     /// A page for the hypervisor to provide CPUID function values.
     Cpuid = 0x6,
+}
+
+/// Encapsulates the various data needed to begin the update process.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct Update<'a> {
+    /// guest start frame number.
+    pub(crate) start_gfn: u64,
+
+    /// The userspace of address of the encrypted region.
+    pub(crate) uaddr: &'a [u8],
+
+    /// Encoded page type.
+    pub(crate) page_type: PageType,
+}
+
+impl<'a> Update<'a> {
+    /// Encapsulate all data needed for the SNP_LAUNCH_UPDATE ioctl.
+    pub fn new(start_gfn: u64, uaddr: &'a [u8], page_type: PageType) -> Self {
+        Self {
+            start_gfn,
+            uaddr,
+            page_type,
+        }
+    }
+}
+
+bitflags! {
+    #[derive(Default, Deserialize, Serialize)]
+    /// VMPL permission masks.
+    pub struct VmplPerms: u8 {
+        /// Page is readable by the VMPL.
+        const READ = 1;
+
+        /// Page is writeable by the VMPL.
+        const WRITE = 1 << 1;
+
+        /// Page is executable by the VMPL in CPL3.
+        const EXECUTE_USER = 1 << 2;
+
+        /// Page is executable by the VMPL in CPL2, CPL1, and CPL0.
+        const EXECUTE_SUPERVISOR = 1 << 3;
+    }
 }
 
 /// Encapsulates the data needed to complete a guest launch.

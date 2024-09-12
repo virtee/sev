@@ -8,3 +8,6 @@ pub(crate) mod sev;
 
 #[cfg(feature = "snp")]
 pub(crate) mod snp;
+
+#[cfg(all(feature = "sev", feature = "snp"))]
+pub(crate) mod shared;

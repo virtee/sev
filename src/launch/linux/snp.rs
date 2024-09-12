@@ -14,46 +14,31 @@ pub struct Init {
     flags: u64,
 }
 
-/// Initialize the flow to launch a guest.
 #[repr(C)]
-pub struct LaunchStart<'a> {
+pub struct LaunchStart {
     /// Guest policy. See Table 7 of the AMD SEV-SNP Firmware
     /// specification for a description of the guest policy structure.
     policy: u64,
-
-    /// Userspace address of migration agent
-    ma_uaddr: u64,
-
-    /// 1 if this guest is associated with a migration agent. Otherwise 0.
-    ma_en: u8,
-
-    /// 1 if this launch flow is launching an IMI for the purpose of
-    /// guest-assisted migration. Otherwise 0.
-    imi_en: u8,
 
     /// Hypervisor provided value to indicate guest OS visible workarounds.
     /// The format is hypervisor defined.
     gosvw: [u8; 16],
 
-    pad: [u8; 6],
+    flags: u16,
 
-    _phantom: PhantomData<&'a [u8]>,
+    pad0: [u8; 6],
+
+    pad1: [u64; 4],
 }
 
-impl From<Start<'_>> for LaunchStart<'_> {
+impl From<Start> for LaunchStart {
     fn from(start: Start) -> Self {
         Self {
             policy: start.policy.into(),
-            ma_uaddr: if let Some(addr) = start.ma_uaddr {
-                addr.as_ptr() as u64
-            } else {
-                0
-            },
-            ma_en: u8::from(start.ma_uaddr.is_some()),
-            imi_en: start.imi_en as _,
             gosvw: start.gosvw,
-            pad: [0u8; 6],
-            _phantom: PhantomData,
+            flags: 0,
+            pad0: [0u8; 6],
+            pad1: [0u64; 4],
         }
     }
 }
@@ -62,32 +47,27 @@ impl From<Start<'_>> for LaunchStart<'_> {
 #[repr(C)]
 pub struct LaunchUpdate<'a> {
     /// guest start frame number.
-    start_gfn: u64,
+    pub start_gfn: u64,
 
     /// Userspace address of the page needed to be encrypted.
-    uaddr: u64,
+    pub uaddr: u64,
 
     /// Length of the page needed to be encrypted:
     /// (end encryption uaddr = uaddr + len).
-    len: u32,
-
-    /// Indicates that this page is part of the IMI of the guest.
-    imi_page: u8,
+    pub len: u64,
 
     /// Encoded page type. See Table 58 if the SNP Firmware specification.
-    page_type: u8,
+    pub page_type: u8,
 
-    /// VMPL permission mask for VMPL3. See Table 59 of the SNP Firmware
-    /// specification for the definition of the mask.
-    vmpl3_perms: u8,
+    pad0: u8,
 
-    /// VMPL permission mask for VMPL2.
-    vmpl2_perms: u8,
+    flags: u16,
 
-    /// VMPL permission mask for VMPL1.
-    vmpl1_perms: u8,
+    pad1: u32,
 
-    _phantom: PhantomData<&'a ()>,
+    pad2: [u64; 4],
+
+    _phantom: PhantomData<&'a [u8]>,
 }
 
 impl From<Update<'_>> for LaunchUpdate<'_> {
@@ -96,11 +76,11 @@ impl From<Update<'_>> for LaunchUpdate<'_> {
             start_gfn: update.start_gfn,
             uaddr: update.uaddr.as_ptr() as _,
             len: update.uaddr.len() as _,
-            imi_page: u8::from(update.imi_page),
             page_type: update.page_type as _,
-            vmpl3_perms: update.vmpl3_perms.bits(),
-            vmpl2_perms: update.vmpl2_perms.bits(),
-            vmpl1_perms: update.vmpl1_perms.bits(),
+            pad0: 0,
+            flags: 0,
+            pad1: 0,
+            pad2: [0u64; 4],
             _phantom: PhantomData,
         }
     }
