@@ -1,0 +1,138 @@
+name: Manual sev PR test
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        type: choice
+        description: 'Select the command to execute'
+        required: true
+        default: 'test-sev-on-host'
+        options:
+        - install-snp-on-the-host
+        - reboot-host
+        - verify-snp-on-host
+        - test-sev-on-host
+        - test-sev-on-guest
+      pr_number:
+        description: 'Test PR number'
+        required: true
+        default: '1'
+      pr_branch:
+        description: 'Test PR branch name'
+        required: true
+        default: 'main'
+jobs:
+  snp_tests:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      # Commented these, as these are already installed on self-hosted runner
+      # - name: Install Dependencies
+      #   run: |
+      #     sudo dnf update -y
+      #     sudo dnf clean packages -y
+      #     sudo dnf install -y wget git curl
+
+      - name: Execute Command
+        run: |
+          case "${{ github.event.inputs.command }}" in
+            install-snp-on-the-host)
+              echo "Installing SNP on the host..."
+              wget https://raw.githubusercontent.com/LakshmiSaiHarika/sev-utils/Fedora-Latest-SNP-kernel-Upstream/tools/snp.sh
+              chmod +x snp.sh
+              ./snp.sh setup-host
+              echo "The host must be rebooted for changes to take effect."
+              ;;
+
+            reboot-host)
+              echo "Rebooting the host..."
+              sudo reboot
+              ;;
+
+            verify-snp-on-host)
+              echo "Verifying SNP on the host..."
+              if ! sudo dmesg | grep -i "SEV-SNP enabled" 2>&1 >/dev/null; then
+                echo "SEV-SNP not enabled on the host."
+                exit 1
+              fi
+              echo "SEV-SNP is enabled on the host."
+              ;;
+
+            test-sev-on-host)
+              echo "Testing SEV on the host..."
+
+              # Give user access to /dev/sev to run cargo tests w/o permission issues
+              sudo usermod -a -G kvm virtee
+              sudo setfacl -m g:kvm:rw /dev/sev
+
+              git clone https://github.com/virtee/sev.git
+              cd sev
+              git fetch origin pull/${{ github.event.inputs.pr_number }}/head:${{ github.event.inputs.pr_branch }}
+              git switch ${{ github.event.inputs.pr_branch }}
+              source "${HOME}/.cargo/env" 2>/dev/null || true
+
+              if ! command -v rustc &> /dev/null; then
+                echo "Installing Rust..."
+                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -sSf | sh -s -- -y
+                source "${HOME}/.cargo/env" 2>/dev/null
+              fi
+
+              cargo test -- --skip snp
+              ;;
+
+            test-sev-on-guest)
+              echo "Testing SEV on the guest..."
+              wget https://raw.githubusercontent.com/LakshmiSaiHarika/sev-utils/Fedora-Latest-SNP-kernel-Upstream/tools/snp.sh
+              chmod +x snp.sh
+              ./snp.sh launch-guest
+
+              # SSH guest commands
+              GUEST_SSH_KEY_PATH="${HOME}/snp/launch/snp-guest-key"
+              if [ ! -f "${GUEST_SSH_KEY_PATH}" ]; then
+                echo "SSH key not present, cannot verify guest SNP enabled."
+                exit 1
+              fi
+
+              ssh_guest_command() {
+                command="$1"
+                ssh -p 10022 -i "${GUEST_SSH_KEY_PATH}" -o "StrictHostKeyChecking no" -o "PasswordAuthentication=no" -o ConnectTimeout=1 amd@localhost "${command}"
+              }
+
+              verify_snp_guest() {
+                local snp_enabled=$(ssh_guest_command "sudo dmesg | grep 'Memory Encryption Features active:.*SEV-SNP'")
+                if [[ -n "${snp_enabled}" ]]; then
+                  echo "SNP is Enabled"
+                else
+                  echo "SNP is NOT Enabled"
+                  exit 1
+                fi
+              }
+
+              verify_snp_guest
+
+              # Install sev dependencies as a root user
+              ssh_guest_command "sudo su - <<EOF
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -sSf | sh -s -- -y
+          source "${HOME}/.cargo/env" 2>/dev/null
+          sudo dnf install -y git gcc
+          EOF"
+
+              # Clean up previous sev, clone and perform PR test on sev library as root user to fix OS permission denied issues
+              ssh_guest_command "sudo su - <<EOF
+          rm -rf ~/sev
+          git clone https://github.com/virtee/sev.git
+          cd ~/sev
+          git fetch origin pull/${{ github.event.inputs.pr_number }}/head:${{ github.event.inputs.pr_branch }}
+          git switch ${{ github.event.inputs.pr_branch }}
+          cargo test
+          EOF"
+              ;;
+
+            *)
+              echo "Unsupported Command: [${{ github.event.inputs.command }}]"
+              exit 1
+              ;;
+          esac
