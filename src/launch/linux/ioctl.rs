@@ -14,7 +14,7 @@ use crate::launch::linux::sev;
 #[cfg(feature = "snp")]
 use crate::launch::linux::snp;
 
-#[cfg(all(feature = "sev", feature = "snp"))]
+#[cfg(any(feature = "sev", feature = "snp"))]
 use crate::launch::linux::shared;
 
 use std::{
