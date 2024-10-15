@@ -22,6 +22,7 @@ pub struct Init2 {
 
 impl Init2 {
     /// Default INIT2 values for SEV
+    #[cfg(feature = "sev")]
     pub fn init_default_sev() -> Self {
         Self {
             vmsa_features: 0,
@@ -33,6 +34,7 @@ impl Init2 {
     }
 
     /// Default INIT2 values for SEV-ES
+    #[cfg(feature = "sev")]
     pub fn init_default_es() -> Self {
         Self {
             vmsa_features: 0x1,
