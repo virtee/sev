@@ -44,6 +44,7 @@ impl Init2 {
     }
 
     /// Default INIT2 values for SEV-SNP
+    #[cfg(feature = "snp")]
     pub fn init_default_snp() -> Self {
         Self {
             vmsa_features: 0,

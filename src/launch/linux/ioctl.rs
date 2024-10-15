@@ -80,6 +80,8 @@ impl_const_id! {
 
 const KVM: Group = Group::new(0xAE);
 const ENC_OP: Ioctl<WriteRead, &c_ulong> = unsafe { KVM.write_read(0xBA) };
+
+#[cfg(feature = "snp")]
 pub const KVM_MEMORY_ATTRIBUTE_PRIVATE: u64 = 1 << 3;
 
 // Note: the iocuddle::Ioctl::lie() constructor has been used here because
@@ -143,7 +145,7 @@ pub const ENC_REG_REGION: Ioctl<Write, &KvmEncRegion> =
     unsafe { KVM.read::<KvmEncRegion>(0xBB).lie() };
 
 /// Corresponds to the `KVM_SET_MEMORY_ATTRIBUTES` ioctl
-#[cfg(any(feature = "sev", feature = "snp"))]
+#[cfg(feature = "snp")]
 pub const SET_MEMORY_ATTRIBUTES: Ioctl<Write, &KvmSetMemoryAttributes> =
     unsafe { KVM.write::<KvmSetMemoryAttributes>(0xd2) };
 
@@ -191,6 +193,7 @@ impl<'a> KvmEncRegion<'a> {
 }
 
 /// Corresponds to the kernel struct `kvm_memory_attributes`
+#[cfg(feature = "snp")]
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
 pub struct KvmSetMemoryAttributes {
@@ -200,6 +203,7 @@ pub struct KvmSetMemoryAttributes {
     flags: u64,
 }
 
+#[cfg(feature = "snp")]
 impl KvmSetMemoryAttributes {
     /// Create a new `KvmEncRegion` referencing some memory assigned to the virtual machine.
     pub fn new(data: u64, len: u64, attributes: u64) -> Self {
@@ -212,6 +216,7 @@ impl KvmSetMemoryAttributes {
     }
 
     /// Register the encrypted memory region to a virtual machine
+    #[cfg(feature = "snp")]
     pub fn set_attributes(
         &mut self,
         vm_fd: &mut impl AsRawFd,
