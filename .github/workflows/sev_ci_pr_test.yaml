@@ -1,0 +1,207 @@
+name: SEV CI PR test
+
+on:
+  pull_request_target:
+    types:
+      - reopened
+      - opened
+      - edited
+      - synchronize
+  workflow_dispatch:
+    inputs:
+      pull_request_number:
+        description: 'Specify the pull request number'
+        required: true
+      pull_request_branch:
+        description: 'Specify the pull request source branch'
+        required: true
+
+jobs:
+  host_firmware_tests:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Show the active SNP host kernel version on the host
+        run: uname -r
+
+      - name: Check if SNP is enabled on the host
+        run: |
+              set -e
+              source ./.github/workflows/snp_function_declarations.sh
+              verify_snp_host
+
+      - name: Set the PR number and PR branch environment based on GH Action event type
+        run: |
+            event_pr_number=''
+            event_pr_branch=''
+
+            if [ ${{ github.event_name }} == "pull_request_target" ]; then
+              event_pr_number=${{ github.event.pull_request.number }}
+              event_pr_branch=${{ github.event.pull_request.head.ref }}
+            elif [ ${{ github.event_name }} == "workflow_dispatch" ]; then
+              event_pr_number=${{ github.event.inputs.pull_request_number }}
+              event_pr_branch=${{ github.event.inputs.pull_request_branch }}
+            fi
+
+            echo "pr_number=${event_pr_number}" >> $GITHUB_ENV
+            echo "pr_branch=${event_pr_branch}" >> $GITHUB_ENV
+
+      - name: Show the GH environment variable current values
+        run: |
+            echo "GH Action PR number = ${{ env.pr_number }}"
+            echo "GH Action PR branch = ${{ env.pr_branch }}"
+
+      - name:  Run sev library cargo test on the host(without flags)
+        run: |
+              set -e
+
+              # Give user access to /dev/sev to run cargo tests w/o permission issues
+              sudo usermod -a -G kvm $USER
+              sudo setfacl -m g:kvm:rw /dev/sev
+
+              # Install dependencies on the host
+              source ./.github/workflows/snp_function_declarations.sh
+              check_rust_on_host
+
+              # Fetch and checkout SEV PR on the host
+              cd ${HOME}
+              git clone https://github.com/virtee/sev.git
+              cd sev
+
+              # Checkout the PR branch
+              if [[ ${{ github.event_name }} == "pull_request_target" || ${{ github.event_name }} == "workflow_dispatch" ]]; then
+                git fetch origin pull/${{ env.pr_number }}/head:${{ env.pr_branch }}
+                git switch ${{ env.pr_branch }}
+              fi
+
+              # Cargo SEV PR test on the host
+              cargo test
+
+      - name: Cleanup sev on the host
+        if: success() || failure()
+        run: rm -rf ${HOME}/sev
+
+  snp_guest_tests:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Sleep for 35 seconds
+        run: sleep 35
+
+      - name: Set the next available guest network port number
+        run: |
+             export DOTENV_PATH="${HOME}/.env"
+             echo "guest_port_in_use=$(python ./.github/workflows/handle_guest_network_ports.py get-next-available-port-number)" >> $GITHUB_ENV
+
+      - name: Set the PR number and PR branch environment based on GH Action event type
+        run: |
+            event_pr_number=''
+            event_pr_branch=''
+
+            if [ ${{ github.event_name }} == "pull_request_target" ]; then
+              event_pr_number=${{ github.event.pull_request.number }}
+              event_pr_branch=${{ github.event.pull_request.head.ref }}
+            elif [ ${{ github.event_name }} == "workflow_dispatch" ]; then
+              echo "workflow dispatch"
+              event_pr_number=${{ github.event.inputs.pull_request_number }}
+              event_pr_branch=${{ github.event.inputs.pull_request_branch }}
+            fi
+
+            echo "pr_number=${event_pr_number}" >> $GITHUB_ENV
+            echo "pr_branch=${event_pr_branch}" >> $GITHUB_ENV
+
+      - name: View and set the SNP guest name
+        run: |
+              echo "Guest Name = snp-guest-sev-${{ env.pr_number }}"
+              echo "guest_name=snp-guest-sev-${{ env.pr_number }}" >> $GITHUB_ENV
+
+      - name: Show the GH environment variable current values
+        run: |
+            echo "current guest port in use = ${{ env.guest_port_in_use }}"
+            echo "GH Action PR number = ${{ env.pr_number }}"
+            echo "GH Action PR branch = ${{ env.pr_branch }}"
+
+      - name: Launch SNP enabled guest
+        run: |
+          set -e
+          wget https://raw.githubusercontent.com/LakshmiSaiHarika/sev-utils/Fedora-Latest-SNP-kernel-Upstream/tools/snp.sh
+          chmod +x snp.sh
+
+          export GUEST_NAME=${{ env.guest_name }}
+          export HOST_SSH_PORT=${{ env.guest_port_in_use }}
+
+          ./snp.sh launch-guest
+
+      - name: Show SNP enabled guest qemu commandline in use
+        run:  cat ${HOME}/snp/launch/${{ env.guest_name }}/qemu.cmdline
+
+      - name: Show the SNP Guest Kernel version
+        run: |
+          set -e
+
+          source ./.github/workflows/snp_function_declarations.sh
+          ssh_guest_command "uname -r" ${{ env.guest_name }} ${{ env.guest_port_in_use }}
+
+      - name: Verify SNP on the guest via MSR
+        run: |
+          set -e
+
+          source ./.github/workflows/snp_function_declarations.sh
+          verify_snp_guest_msr ${{ env.guest_name }} ${{ env.guest_port_in_use }}
+
+      - name: Run sev library cargo test on the guest(without flags)
+        run: |
+          set -e
+          source ./.github/workflows/snp_function_declarations.sh
+
+          # Install sev dependencies as a root user
+           ssh_guest_command "sudo su - <<EOF
+           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -sSf | sh -s -- -y
+           source "/home/root/.cargo/env" 2>/dev/null
+           sudo dnf install -y git gcc
+          EOF" ${{ env.guest_name }} ${{ env.guest_port_in_use }}
+
+          # Perform sev CI PR test on SNP guest as root user to fix OS permission denied issues
+          ssh_guest_command "sudo su - <<EOF
+          git clone https://github.com/virtee/sev.git
+          cd ./sev
+
+          # Checkout the PR branch
+          if [[ ${{ github.event_name }} == "pull_request_target" || ${{ github.event_name }} == "workflow_dispatch" ]]; then
+            git fetch origin pull/${{ env.pr_number }}/head:${{ env.pr_branch }}
+            git switch ${{ env.pr_branch }}
+          fi
+
+          cargo test
+          EOF" ${{ env.guest_name }} ${{ env.guest_port_in_use }}
+
+      - name: Stop the active running SNP guest for this PR
+        if: success() || failure()
+        continue-on-error: true
+        run: |
+           export GUEST_NAME=${{ env.guest_name }}
+           export HOST_SSH_PORT=${{ env.guest_port_in_use }}
+
+           ./snp.sh stop-guests
+
+      - name: Remove current active guest network port from GHAW network port file
+        if: success() || failure()
+        run: |
+          export DOTENV_PATH="${HOME}/.env"
+          python ./.github/workflows/handle_guest_network_ports.py remove-ghaw-used-port-number ${{ env.guest_port_in_use }}
+
+      - name: Cleanup SNP guest folder
+        if: success() || failure()
+        run: |
+           rm -rf ${HOME}/snp/launch/${{ env.guest_name }}
+           ssh-keygen -R [localhost]:${{ env.guest_port_in_use }}
+
+# Update this workflow title dynamically with PR details
+run-name: |
+  ${{ (startsWith(github.event_name, 'workflow_dispatch') && format('sev PR CI test for PR #{0}/PR source branch({1})', github.event.inputs.pull_request_number, github.event.inputs.pull_request_branch)) ||
+         (startsWith(github.event_name, 'pull_request') && format('{0}', github.event.pull_request.title )) }}
+
