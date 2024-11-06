@@ -8,4 +8,7 @@ pub mod genoa;
 /// Milan generation.
 pub mod milan;
 
+/// TURIN generation
+pub mod turin;
+
 use super::*;
