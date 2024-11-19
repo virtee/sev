@@ -2,6 +2,7 @@
 //! Operations to handle and create a Guest Context
 use std::convert::TryInto;
 
+#[cfg(feature = "openssl")]
 use openssl::sha::sha384;
 
 use crate::error::*;
@@ -11,6 +12,14 @@ use crate::{
     launch::snp::PageType,
     measurement::snp::{SnpLaunchDigest, LD_BYTES},
 };
+
+#[cfg(all(not(feature = "openssl"), feature = "crypto_nossl"))]
+fn sha384(data: &[u8]) -> [u8; 48] {
+    use sha2::Digest;
+    let mut sha = sha2::Sha384::default();
+    sha.update(data);
+    sha.finalize().into()
+}
 
 // VMSA page is recorded in the RMP table with GPA (u64)(-1).
 // However, the address is page-aligned, and also all the bits above

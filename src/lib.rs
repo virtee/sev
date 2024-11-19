@@ -98,7 +98,7 @@ pub mod firmware;
 pub mod launch;
 #[cfg(all(
     any(feature = "sev", feature = "snp"),
-    feature = "openssl",
+    any(feature = "openssl", feature = "crypto_nossl"),
     target_os = "linux"
 ))]
 pub mod measurement;

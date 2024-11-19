@@ -438,6 +438,7 @@ impl From<SevError> for c_int {
 
 impl std::error::Error for SevError {}
 
+#[allow(clippy::too_long_first_doc_paragraph)]
 /// There are a number of error conditions that can occur between this
 /// layer all the way down to the SEV platform. Most of these cases have
 /// been enumerated; however, there is a possibility that some error
