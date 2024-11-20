@@ -1,45 +1,48 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#![cfg(feature = "openssl")]
+#![cfg(all(
+    feature = "openssl",
+    target_os = "linux",
+    feature = "sev",
+    feature = "dangerous_hw_tests"
+))]
 
-#[cfg(all(target_os = "linux", feature = "sev"))]
+use kvm_bindings::kvm_userspace_memory_region;
+use kvm_ioctls::{Kvm, VcpuExit};
+use serial_test::serial;
+use sev::certs::sev::sev::Usage;
+use sev::certs::sev::{sev::Certificate, Signer};
+use sev::{cached_chain, firmware::host::Firmware, launch::sev::*, session::Session};
 use std::slice::from_raw_parts;
-
-#[cfg(all(target_os = "linux", feature = "sev"))]
 use std::{convert::TryFrom, os::unix::io::AsRawFd};
 
-#[cfg(all(target_os = "linux", feature = "sev"))]
-use sev::{cached_chain, firmware::host::Firmware, launch::sev::*, session::Session};
-
-#[cfg(all(target_os = "linux", feature = "sev"))]
-use kvm_bindings::kvm_userspace_memory_region;
-
-#[cfg(all(target_os = "linux", feature = "sev"))]
-use kvm_ioctls::{Kvm, VcpuExit};
-
-#[cfg(all(target_os = "linux", feature = "sev"))]
-use serial_test::serial;
-
-// has to be a multiple of 16
-#[cfg(all(target_os = "linux", feature = "sev"))]
+// Has to be a multiple of 16
 const CODE: &[u8; 16] = &[
     0xf4; 16 // hlt
 ];
 
-#[cfg(all(target_os = "linux", feature = "sev"))]
-#[cfg_attr(not(has_sev), ignore)]
+#[cfg_attr(not(host), ignore)]
 #[test]
 #[serial]
-fn sev() {
+fn sev_launch_test() {
     // KVM SEV type
     const KVM_X86_SEV_VM: u64 = 2;
 
     let mut sev = Firmware::open().unwrap();
     let build = sev.platform_status().unwrap().build;
-    let chain = cached_chain::get().expect(
-        r"could not find certificate chain
-        export with: sevctl export --full ~/.cache/amd-sev/chain",
-    );
+
+    // Generating OCA cert and private key
+    let (mut oca, prv) = Certificate::generate(Usage::OCA).expect("Generating OCA key pair");
+    prv.sign(&mut oca).expect("OCA key signing");
+
+    // Provisioning the PEK with the generated OCA key pair
+    let mut pek = sev.pek_csr().expect("Cross signing request");
+    prv.sign(&mut pek).expect("Sign PEK with OCA private key");
+    sev.pek_cert_import(&pek, &oca)
+        .expect("Import the newly-signed PEK");
+
+    // Export the full chain to launch SEV guest
+    let chain = cached_chain::get_chain();
 
     let policy = Policy::default();
     let session = Session::try_from(policy).unwrap();
@@ -108,4 +111,10 @@ fn sev() {
         VcpuExit::Hlt => (),
         exit_reason => panic!("unexpected exit reason: {:?}", exit_reason),
     }
+
+    drop(vcpu);
+    drop(vm);
+
+    sev.platform_reset().unwrap();
+    cached_chain::rm_cached_chain();
 }

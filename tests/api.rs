@@ -1,32 +1,25 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#[cfg(all(feature = "snp", target_os = "linux"))]
+#[cfg(all(feature = "sev", target_os = "linux"))]
+
 mod sev {
+    #[cfg(feature = "dangerous_hw_tests")]
+    use serial_test::serial;
+    #[cfg(feature = "dangerous_hw_tests")]
     use sev::cached_chain;
     use sev::{certs::sev::sev::Usage, firmware::host::Firmware, Build, Version};
 
-    use serial_test::serial;
-
-    #[inline(always)]
-    fn rm_cached_chain() {
-        let paths = cached_chain::path();
-        if let Some(path) = paths.first() {
-            if path.exists() {
-                std::fs::remove_file(path).unwrap();
-            }
-        }
-    }
-
-    #[cfg_attr(not(all(has_sev, feature = "dangerous_hw_tests")), ignore)]
+    #[cfg(feature = "dangerous_hw_tests")]
+    #[cfg_attr(not(host), ignore)]
     #[test]
     #[serial]
     fn platform_reset() {
         let mut fw = Firmware::open().unwrap();
         fw.platform_reset().unwrap();
-        rm_cached_chain();
+        cached_chain::rm_cached_chain();
     }
 
-    #[cfg_attr(not(has_sev), ignore)]
+    #[cfg_attr(not(host), ignore)]
     #[test]
     fn platform_status() {
         let mut fw = Firmware::open().unwrap();
@@ -43,16 +36,17 @@ mod sev {
         );
     }
 
-    #[cfg_attr(not(all(has_sev, feature = "dangerous_hw_tests")), ignore)]
+    #[cfg(feature = "dangerous_hw_tests")]
+    #[cfg_attr(not(host), ignore)]
     #[test]
     #[serial]
     fn pek_generate() {
         let mut fw = Firmware::open().unwrap();
         fw.pek_generate().unwrap();
-        rm_cached_chain();
+        cached_chain::rm_cached_chain();
     }
 
-    #[cfg_attr(not(has_sev), ignore)]
+    #[cfg_attr(not(host), ignore)]
     #[test]
     fn pek_csr() {
         let mut fw = Firmware::open().unwrap();
@@ -60,17 +54,18 @@ mod sev {
         assert_eq!(pek, Usage::PEK);
     }
 
-    #[cfg_attr(not(all(has_sev, feature = "dangerous_hw_tests")), ignore)]
+    #[cfg(feature = "dangerous_hw_tests")]
+    #[cfg_attr(not(host), ignore)]
     #[test]
     #[serial]
     fn pdh_generate() {
         let mut fw = Firmware::open().unwrap();
         fw.pdh_generate().unwrap();
-        rm_cached_chain();
+        cached_chain::rm_cached_chain();
     }
 
-    #[cfg_attr(not(has_sev), ignore)]
     #[cfg(feature = "openssl")]
+    #[cfg_attr(not(host), ignore)]
     #[test]
     fn pdh_cert_export() {
         use sev::certs::sev::Verifiable;
@@ -86,8 +81,8 @@ mod sev {
         chain.verify().unwrap();
     }
 
-    #[cfg(feature = "openssl")]
-    #[cfg_attr(not(all(has_sev, feature = "dangerous_hw_tests")), ignore)]
+    #[cfg(all(feature = "openssl", feature = "dangerous_hw_tests"))]
+    #[cfg_attr(not(host), ignore)]
     #[test]
     #[serial]
     fn pek_cert_import() {
@@ -110,7 +105,7 @@ mod sev {
         fw.platform_reset().unwrap();
     }
 
-    #[cfg_attr(not(has_sev), ignore)]
+    #[cfg_attr(not(host), ignore)]
     #[test]
     fn get_identifier() {
         let mut fw = Firmware::open().unwrap();
@@ -121,11 +116,10 @@ mod sev {
 
 #[cfg(all(feature = "snp", target_os = "linux"))]
 mod snp {
+    use serial_test::serial;
     use sev::firmware::host::{Config, Firmware, MaskId, SnpPlatformStatus, TcbVersion};
 
-    use serial_test::serial;
-
-    #[cfg_attr(not(has_sev), ignore)]
+    #[cfg_attr(not(host), ignore)]
     #[test]
     fn get_identifier() {
         let mut fw = Firmware::open().unwrap();
@@ -133,7 +127,7 @@ mod snp {
         assert_ne!(Vec::from(id), vec![0u8; 64]);
     }
 
-    #[cfg_attr(not(has_sev), ignore)]
+    #[cfg_attr(not(host), ignore)]
     #[test]
     fn platform_status() {
         let mut fw: Firmware = Firmware::open().unwrap();
@@ -169,7 +163,7 @@ mod snp {
         );
     }
 
-    #[cfg_attr(not(all(has_sev, feature = "dangerous_hw_tests")), ignore)]
+    #[cfg_attr(not(all(host, feature = "dangerous_hw_tests")), ignore)]
     #[test]
     #[serial]
     fn commit_snp() {
@@ -177,16 +171,15 @@ mod snp {
         fw.snp_commit().unwrap();
     }
 
-    #[cfg_attr(not(all(has_sev, feature = "dangerous_hw_tests")), ignore)]
+    #[cfg_attr(not(all(host, feature = "dangerous_hw_tests")), ignore)]
     #[test]
     #[serial]
     fn set_config() {
         let mut fw: Firmware = Firmware::open().unwrap();
-        let new_config = Config::new(TcbVersion::new(1, 0, 1, 1), MaskId(31));
-        fw.snp_set_config(new_config).unwrap();
+        fw.snp_set_config(Config::default()).unwrap();
     }
 
-    #[cfg_attr(not(all(has_sev, feature = "dangerous_hw_tests")), ignore)]
+    #[cfg_attr(not(all(host, feature = "dangerous_hw_tests")), ignore)]
     #[test]
     #[serial]
     fn test_host_fw_error() {
