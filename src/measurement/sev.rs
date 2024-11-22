@@ -12,7 +12,11 @@ use std::path::PathBuf;
 
 use crate::error::*;
 
+#[cfg(feature = "openssl")]
 use openssl::sha::Sha256;
+
+#[cfg(all(not(feature = "openssl"), feature = "crypto_nossl"))]
+use {sha2::Digest, sha2::Sha256};
 
 const _PAGE_MASK: u64 = 0xfff;
 
@@ -44,7 +48,10 @@ pub fn seves_calc_launch_digest(
     sev_es_measurement: SevEsMeasurementArgs,
 ) -> Result<[u8; 32], MeasurementError> {
     let ovmf = OVMF::new(sev_es_measurement.ovmf_file)?;
+    #[cfg(feature = "openssl")]
     let mut launch_hash = Sha256::new();
+    #[cfg(all(not(feature = "openssl"), feature = "crypto_nossl"))]
+    let mut launch_hash = Sha256::default();
     launch_hash.update(ovmf.data().as_slice());
 
     if let Some(kernel) = sev_es_measurement.kernel_file {
@@ -77,7 +84,12 @@ pub fn seves_calc_launch_digest(
         launch_hash.update(vmsa_page.as_slice())
     }
 
-    Ok(launch_hash.finish())
+    #[cfg(feature = "openssl")]
+    {
+        Ok(launch_hash.finish())
+    }
+    #[cfg(all(not(feature = "openssl"), feature = "crypto_nossl"))]
+    Ok(launch_hash.finalize().into())
 }
 
 /// Arguments required to calculate the SEV measurement
@@ -97,7 +109,10 @@ pub fn sev_calc_launch_digest(
     sev_measurement: SevMeasurementArgs,
 ) -> Result<[u8; 32], MeasurementError> {
     let ovmf = OVMF::new(sev_measurement.ovmf_file)?;
+    #[cfg(feature = "openssl")]
     let mut launch_hash = Sha256::new();
+    #[cfg(all(not(feature = "openssl"), feature = "crypto_nossl"))]
+    let mut launch_hash = Sha256::default();
     launch_hash.update(ovmf.data().as_slice());
 
     if let Some(kernel) = sev_measurement.kernel_file {
@@ -110,5 +125,10 @@ pub fn sev_calc_launch_digest(
         launch_hash.update(sev_hashes.as_slice());
     };
 
-    Ok(launch_hash.finish())
+    #[cfg(feature = "openssl")]
+    {
+        Ok(launch_hash.finish())
+    }
+    #[cfg(all(not(feature = "openssl"), feature = "crypto_nossl"))]
+    Ok(launch_hash.finalize().into())
 }

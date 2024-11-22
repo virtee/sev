@@ -28,7 +28,7 @@ pub mod vcpu_types;
 #[cfg(all(feature = "snp", any(feature = "openssl", feature = "crypto_nossl")))]
 pub mod snp;
 
-#[cfg(all(feature = "sev", feature = "openssl"))]
+#[cfg(all(feature = "sev", any(feature = "openssl", feature = "crypto_nossl")))]
 pub mod sev;
 
 #[cfg(all(feature = "snp", feature = "openssl"))]
