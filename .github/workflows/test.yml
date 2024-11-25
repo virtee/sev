@@ -16,7 +16,7 @@ jobs:
       matrix:
         runner:
           - ubuntu-latest
-          - macos-12
+          - macos-13
         toolchain:
           - 1.80.0
           - stable
@@ -41,7 +41,7 @@ jobs:
       matrix:
         runner:
           - ubuntu-latest
-          - macos-12
+          - macos-13
           - windows-latest
         toolchain:
           - 1.80.0
