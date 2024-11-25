@@ -3,6 +3,10 @@
 //! Utilities for creating a secure channel and facilitating the
 //! attestation process between the tenant and the AMD SP.
 
+#[deprecated(
+    since = "5.0.0",
+    note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+)]
 mod key;
 
 use crate::error::SessionError;
@@ -28,6 +32,10 @@ pub struct Verified(launch::sev::Measurement);
 /// Describes a secure channel with the AMD SP.
 ///
 /// This is required for facilitating an SEV launch and attestation.
+#[deprecated(
+    since = "5.0.0",
+    note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+)]
 pub struct Session<T> {
     policy: launch::sev::Policy,
 
@@ -119,6 +127,10 @@ impl Session<Initialized> {
 
     /// Like the above start function, yet takes PDH as input instead of deriving it from a
     /// certificate chain.
+    #[deprecated(
+        since = "5.0.0",
+        note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+    )]
     pub fn start_pdh(
         &self,
         pdh: certs::sev::sev::Certificate,

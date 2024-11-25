@@ -1,11 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
+#[deprecated(
+    since = "5.0.0",
+    note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+)]
 #[cfg(feature = "sev")]
 mod sev;
 
 #[cfg(feature = "snp")]
 mod snp;
 
+#[deprecated(
+    since = "5.0.0",
+    note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+)]
 #[cfg(feature = "sev")]
 pub use self::sev::*;
 
@@ -48,6 +56,10 @@ impl<'a> GetId<'a> {
 /// Reset the platform's persistent state.
 ///
 /// (Chapter 5.5)
+#[deprecated(
+    since = "5.0.0",
+    note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+)]
 #[cfg(feature = "sev")]
 #[cfg(target_os = "linux")]
 pub struct PlatformReset;

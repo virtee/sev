@@ -2,7 +2,12 @@
 
 //! Helpful primitives for developing the crate.
 
+#[deprecated(
+    since = "5.0.0",
+    note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+)]
 pub mod cached_chain;
+
 mod impl_const_id;
 
 use std::{

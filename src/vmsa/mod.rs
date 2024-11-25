@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-//! Types and abstractions regarding Virtual Machine Save Areas (VMSAs).
+//! Types and abstractions regarding Legacy SEV Virtual Machine Save Areas (VMSAs).
 
 #![allow(dead_code)]
 
@@ -44,6 +44,10 @@ const ATTR_W_MASK: u16 = 1 << ATTR_W_SHIFT;
 /// Virtual Machine Control Block
 /// The layout of a VMCB struct is documented in Table B-1 of the
 /// AMD64 Architecture Programmer’s Manual, Volume 2: System Programming
+#[deprecated(
+    since = "5.0.0",
+    note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+)]
 #[repr(C, packed)]
 #[derive(Default, Serialize, Deserialize, Clone, Copy)]
 pub struct VmcbSegment {
@@ -65,6 +69,10 @@ pub struct VmcbSegment {
 /// Virtual Machine Save Area
 /// The layout of a VMCB struct is documented in Table B-4 of the
 /// AMD64 Architecture Programmer’s Manual, Volume 2: System Programming
+#[deprecated(
+    since = "5.0.0",
+    note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+)]
 #[repr(C, packed)]
 #[derive(Copy, Clone, Serialize, Deserialize)]
 pub struct Vmsa {

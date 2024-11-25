@@ -102,9 +102,19 @@ pub mod launch;
     target_os = "linux"
 ))]
 pub mod measurement;
+
+#[deprecated(
+    since = "5.0.0",
+    note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+)]
 #[cfg(all(target_os = "linux", feature = "openssl", feature = "sev"))]
 pub mod session;
 mod util;
+
+#[deprecated(
+    since = "5.0.0",
+    note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+)]
 pub mod vmsa;
 
 /// Error module.
@@ -238,10 +248,18 @@ impl codicon::Encoder<()> for Build {
 #[derive(Copy, Clone)]
 pub enum Generation {
     /// First generation EPYC (SEV).
+    #[deprecated(
+        since = "5.0.0",
+        note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+    )]
     #[cfg(feature = "sev")]
     Naples,
 
     /// Second generation EPYC (SEV, SEV-ES).
+    #[deprecated(
+        since = "5.0.0",
+        note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+    )]
     #[cfg(feature = "sev")]
     Rome,
 
