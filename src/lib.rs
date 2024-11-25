@@ -110,6 +110,7 @@ pub mod vmsa;
 /// Error module.
 pub mod error;
 
+#[cfg(all(feature = "sev", feature = "dangerous_hw_tests"))]
 pub use util::cached_chain;
 use util::{TypeLoad, TypeSave};
 
@@ -269,6 +270,10 @@ pub enum Generation {
     /// Fourth generation EPYC (SEV, SEV-ES, SEV-SNP).
     #[cfg(any(feature = "sev", feature = "snp"))]
     Genoa,
+
+    /// Fifth generation EPYC (SEV, SEV-ES, SEV-SNP).
+    #[cfg(any(feature = "sev", feature = "snp"))]
+    Turin,
 }
 
 #[cfg(all(feature = "sev", feature = "openssl"))]
@@ -285,6 +290,8 @@ impl From<Generation> for CertSevCaChain {
             Generation::Milan => (SevBuiltin::milan::ARK, SevBuiltin::milan::ASK),
             #[cfg(any(feature = "sev", feature = "snp"))]
             Generation::Genoa => (SevBuiltin::genoa::ARK, SevBuiltin::genoa::ASK),
+            #[cfg(any(feature = "sev", feature = "snp"))]
+            Generation::Turin => (SevBuiltin::turin::ARK, SevBuiltin::turin::ASK),
         };
 
         CertSevCaChain {
@@ -306,6 +313,10 @@ impl From<Generation> for CertSnpCaChain {
                 SnpBuiltin::genoa::ark().unwrap(),
                 SnpBuiltin::genoa::ask().unwrap(),
             ),
+            Generation::Turin => (
+                SnpBuiltin::turin::ark().unwrap(),
+                SnpBuiltin::turin::ask().unwrap(),
+            ),
         };
 
         CertSnpCaChain { ark, ask }
@@ -323,6 +334,7 @@ impl TryFrom<&sev::Chain> for Generation {
         let rome: CertSevCaChain = Generation::Rome.into();
         let milan: CertSevCaChain = Generation::Milan.into();
         let genoa: CertSevCaChain = Generation::Genoa.into();
+        let turin: CertSevCaChain = Generation::Turin.into();
 
         Ok(if (&naples.ask, &schain.cek).verify().is_ok() {
             Generation::Naples
@@ -332,6 +344,8 @@ impl TryFrom<&sev::Chain> for Generation {
             Generation::Milan
         } else if (&genoa.ask, &schain.cek).verify().is_ok() {
             Generation::Genoa
+        } else if (&turin.ask, &schain.cek).verify().is_ok() {
+            Generation::Turin
         } else {
             return Err(());
         })
@@ -362,6 +376,9 @@ impl TryFrom<String> for Generation {
             #[cfg(any(feature = "sev", feature = "snp"))]
             "siena" => Ok(Self::Genoa),
 
+            #[cfg(any(feature = "sev", feature = "snp"))]
+            "turin" => Ok(Self::Turin),
+
             _ => Err(()),
         }
     }
@@ -383,6 +400,9 @@ impl Generation {
 
             #[cfg(any(feature = "sev", feature = "snp"))]
             Self::Genoa => "Genoa".to_string(),
+
+            #[cfg(any(feature = "sev", feature = "snp"))]
+            Self::Turin => "Turin".to_string(),
         }
     }
 }

@@ -11,21 +11,31 @@
 //! An entire certificate chain can be created using the `sevctl`
 //! utility.
 
-#[cfg(feature = "sev")]
-use crate::certs::sev::Chain;
+#![cfg(all(feature = "sev", feature = "dangerous_hw_tests"))]
+
+#[cfg(feature = "openssl")]
+use crate::{
+    certs::sev::{ca::Chain as CaChain, Chain as FullChain},
+    firmware::host::Firmware,
+    sev::Certificate,
+    Generation,
+};
+
+#[cfg(feature = "openssl")]
+use reqwest::{
+    blocking::{get, Response},
+    StatusCode,
+};
 
 use std::{
     env,
     path::{Path, PathBuf},
 };
 
-#[cfg(feature = "sev")]
-use std::{
-    fs::File,
-    io::{ErrorKind, Result},
-};
+#[cfg(feature = "openssl")]
+use std::io::Cursor;
 
-#[cfg(feature = "sev")]
+#[cfg(feature = "openssl")]
 use codicon::Decoder;
 
 fn append_rest<P: AsRef<Path>>(path: P) -> PathBuf {
@@ -67,13 +77,54 @@ pub fn path() -> Vec<PathBuf> {
         .collect()
 }
 
-/// Searches for and decodes an SEV certificate chain.
-#[cfg(feature = "sev")]
-pub fn get() -> Result<Chain> {
-    let not_found: std::io::Error = ErrorKind::NotFound.into();
+/// Remove any certificates that may have been chached to reset
+/// testing for SEV APIS.
+pub fn rm_cached_chain() {
+    let paths = path();
+    if let Some(path) = paths.first() {
+        if path.exists() {
+            std::fs::remove_file(path).unwrap();
+        }
+    }
+}
 
-    let paths: Vec<_> = path().into_iter().filter(|p| p.exists()).collect();
-    let file_name = paths.first().ok_or(not_found)?;
-    let mut file = File::open(file_name)?;
-    Chain::decode(&mut file, ())
+/// Request CEK certificate from AMD KDS and generate a full chain.
+#[cfg(all(feature = "sev", feature = "openssl"))]
+pub fn get_chain() -> FullChain {
+    use std::convert::TryFrom;
+
+    let mut firmware = Firmware::open().unwrap();
+
+    const CEK_SVC: &str = "https://kdsintf.amd.com/cek/id";
+
+    let mut sev_chain = firmware.pdh_cert_export().unwrap();
+
+    let id = firmware.get_identifier().unwrap();
+
+    let url = format!("{}/{}", CEK_SVC, id);
+
+    // VCEK in DER format
+    let vcek_rsp: Response = get(url).expect("Failed to get CEK certificate");
+
+    let cek_resp_bytes = match vcek_rsp.status() {
+        StatusCode::OK => {
+            let vcek_rsp_bytes: Vec<u8> = vcek_rsp.bytes().unwrap().to_vec();
+            vcek_rsp_bytes
+        }
+        _ => panic!("Cek request returned an error"),
+    };
+
+    // Create a Cursor around the byte vector
+    let cursor = Cursor::new(cek_resp_bytes);
+
+    sev_chain.cek = Certificate::decode(cursor, ()).expect("Failed to decode CEK cert");
+
+    let ca_chain: CaChain = Generation::try_from(&sev_chain)
+        .expect("Failed to generate SEV CA chain")
+        .into();
+
+    FullChain {
+        ca: ca_chain,
+        sev: sev_chain,
+    }
 }
