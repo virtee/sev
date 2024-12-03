@@ -31,7 +31,6 @@ is-it-maintained-issue-resolution = { repository = "virtee/sev" }
 is-it-maintained-open-issues = { repository = "virtee/sev" }
 
 [lib]
-crate-type = ["staticlib", "dylib", "rlib"]
 name = 'sev'
 path = "src/lib.rs"
 doc = false
