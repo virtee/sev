@@ -143,9 +143,8 @@ pub struct AttestationReport {
     pub current_tcb: TcbVersion,
     /// Information about the platform. See PlatformInfo
     pub plat_info: PlatformInfo,
-    /// Private variable as only the first bit is important.
-    /// See [author_key_en()](self::AttestationReport::author_key_en).
-    _author_key_en: u32,
+    /// Information related to signing keys in the report. See KeyInfo
+    pub key_info: KeyInfo,
     _reserved_0: u32,
     #[serde(with = "BigArray")]
     /// Guest-provided 512 Bits of Data
@@ -199,12 +198,6 @@ pub struct AttestationReport {
     pub signature: Signature,
 }
 
-impl AttestationReport {
-    fn author_key_en(&self) -> bool {
-        self._author_key_en == 1
-    }
-}
-
 impl Default for AttestationReport {
     fn default() -> Self {
         Self {
@@ -217,7 +210,7 @@ impl Default for AttestationReport {
             sig_algo: Default::default(),
             current_tcb: Default::default(),
             plat_info: Default::default(),
-            _author_key_en: Default::default(),
+            key_info: Default::default(),
             _reserved_0: Default::default(),
             report_data: [0; 64],
             measurement: [0; 48],
@@ -261,7 +254,7 @@ Signature Algorithm:          {}
 Current TCB:
 {}
 {}
-Author Key Encryption:        {}
+{}
 Report Data:                  {}
 Measurement:                  {}
 Host Data:                    {}
@@ -293,7 +286,7 @@ Launch TCB:
             self.sig_algo,
             self.current_tcb,
             self.plat_info,
-            self.author_key_en(),
+            self.key_info,
             hexdump(&self.report_data),
             hexdump(&self.measurement),
             hexdump(&self.host_data),
@@ -517,6 +510,60 @@ Platform Info ({}):
             self.ecc_enabled(),
             self.rapl_disabled(),
             self.ciphertext_hiding_enabled(),
+        )
+    }
+}
+
+bitfield! {
+    /// When an attestation report is requested, the user can request to have the report to not be signed, or sign with different keys. The user may also
+    /// pass in the author key when launching the guest. This field provides that information and will be present in the attestation report.
+    ///
+    /// | Bit(s) | Name              | Description                                                                                                        >
+    /// |--------|-------------------|-------------------------------------------------------------------------------------------------------------------->
+    /// | 0      | AUTHOR_KEY_EN     | Indicates that the digest of the author key is present in AUTHOR_KEY_DIGEST. Set to the value of GCTX.AuthorKeyEn. >
+    /// | 1      | MASK_CHIP_KEY     | The value of MaskChipKey.                                                                                          >
+    /// | 4:2    | SIGNING_KEY       | Encodes the key used to sign this report.                                                                          >
+    /// | 5:31   | -                 | Reserved. Must be zero.                                                                                            >
+    #[repr(C)]
+    #[derive(Default, Deserialize, Clone, Copy, Eq, PartialEq, Serialize)]
+    pub struct KeyInfo(u32);
+    impl Debug;
+    /// AUTHOR_KEY_EN field: Indicates that the digest of the author key is present in AUTHOR_KEY_DIGEST
+    pub author_key_en, _: 0;
+    /// MASK_CHIP_KEY field: The value of MaskChipKey
+    /// (0) Firmware signs the attestation report with either the VCEK OR VLEK.
+    /// (1) The firmware writes 0s into the SIGNATURE field instead of signing the report.
+    pub mask_chip_key, _: 1,1;
+    /// SIGNING_KEY field: Encodes the key used to sign this report.
+    /// (0) VCEK
+    /// (1) VLEK
+    /// (2-6) RESERVED
+    /// (7) NONE
+    pub signing_key, _: 4,2;
+    /// reserved
+    reserved, _: 5, 31;
+}
+
+impl Display for KeyInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let signing_key = match self.signing_key() {
+            0 => "vcek",
+            1 => "vlek",
+            7 => "none",
+            _ => "unkown",
+        };
+
+        write!(
+            f,
+            r#"
+Key Information:
+    author key enabled: {}
+    mask chip key:      {}
+    signing key:        {}
+"#,
+            self.author_key_en(),
+            self.mask_chip_key(),
+            signing_key
         )
     }
 }
