@@ -2,7 +2,15 @@
 
 //! For operating on OCA certificates.
 
+#[deprecated(
+    since = "5.0.0",
+    note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+)]
 mod cert;
+#[deprecated(
+    since = "5.0.0",
+    note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+)]
 mod chain;
 
 pub use cert::Certificate;
