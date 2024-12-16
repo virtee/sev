@@ -473,7 +473,8 @@ bitfield! {
     /// Bit 2 indicates if ECC memory is used.
     /// Bit 3 indicates if RAPL is disabled.
     /// Bit 4 indicates if ciphertext hiding is enabled
-    /// Bits 5-63 are reserved.
+    /// Bit 5 indicates if DRAM alias check is complete (CVE-2024-21944)
+    /// Bits 6-63 are reserved.
     #[repr(C)]
     #[derive(Default, Deserialize, Clone, Copy, Serialize)]
     pub struct PlatformInfo(u64);
@@ -488,8 +489,10 @@ bitfield! {
     pub rapl_disabled, _: 3, 3;
     /// Indicates that ciphertext hiding is enabled
     pub ciphertext_hiding_enabled, _: 4, 4;
+    /// Indicates that DRAM alias check is complete
+    pub dram_alias_check_complete, _: 5, 5;
     /// reserved
-    reserved, _: 5, 63;
+    reserved, _: 6, 63;
 }
 
 impl Display for PlatformInfo {
@@ -503,6 +506,7 @@ Platform Info ({}):
   ECC Enabled:               {}
   RAPL Disabled:             {}
   Ciphertext Hiding Enabled: {}
+  DRAM Alias Check Complete: {}
 "#,
             self.0,
             self.smt_enabled(),
@@ -510,6 +514,7 @@ Platform Info ({}):
             self.ecc_enabled(),
             self.rapl_disabled(),
             self.ciphertext_hiding_enabled(),
+            self.dram_alias_check_complete(),
         )
     }
 }
