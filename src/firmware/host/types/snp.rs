@@ -225,6 +225,24 @@ pub struct Build {
     pub build: u32,
 }
 
+bitflags::bitflags! {
+    /// Various platform initialization configuration data. Byte 0x3 in SEV-SNP's
+    /// STRUCT_PLATFORM_STATUS.
+    #[derive(Default)]
+    pub struct PlatformInit: u8 {
+        /// Indicates if RMP is initialized.
+        const IS_RMP_INIT           = 1 << 0;
+        /// Indicates that alias detection has completed since the last system reset
+        /// and there are no aliasing addresses. Resets to 0.
+        /// Added in firmware version:
+        ///     Milan family: 1.55.22
+        ///     Genoa family: 1.55.38
+        const ALIAS_CHECK_COMPLETE  = 1 << 1;
+        /// Indicates TIO is enabled. Present if SevTio feature bit is set.
+        const IS_TIO_EN             = 1 << 3;
+    }
+}
+
 /// Query the SEV-SNP platform status.
 ///
 /// (Chapter 8.3; Table 38)
@@ -238,7 +256,7 @@ pub struct SnpPlatformStatus {
     pub state: u8,
 
     /// IsRmpInitiailzied
-    pub is_rmp_init: u8,
+    pub is_rmp_init: PlatformInit,
 
     /// The platform build ID.
     pub build_id: u32,
