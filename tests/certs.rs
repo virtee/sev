@@ -24,6 +24,8 @@ mod sev {
 
 #[cfg(all(feature = "snp", any(feature = "openssl", feature = "crypto_nossl")))]
 mod snp {
+    use std::convert::TryFrom;
+
     use sev::certs::snp::{builtin::milan, ca, Certificate, Chain, Verifiable};
 
     const TEST_MILAN_VCEK_DER: &[u8] = include_bytes!("certs_data/vcek_milan.der");
@@ -85,8 +87,8 @@ mod snp {
         let chain = Chain { ca, vek: vcek };
 
         let report_bytes = hex::decode(TEST_MILAN_ATTESTATION_REPORT).unwrap();
-        let report: AttestationReport =
-            unsafe { std::ptr::read(report_bytes.as_ptr() as *const _) };
+
+        let report = AttestationReport::try_from(report_bytes.as_slice()).unwrap();
 
         assert_eq!((&chain, &report).verify().ok(), Some(()));
     }
@@ -104,9 +106,8 @@ mod snp {
         let chain = Chain { ca, vek: vcek };
 
         let mut report_bytes = hex::decode(TEST_MILAN_ATTESTATION_REPORT).unwrap();
-        report_bytes[0] ^= 0x80;
-        let report: AttestationReport =
-            unsafe { std::ptr::read(report_bytes.as_ptr() as *const _) };
+        report_bytes[21] ^= 0x80;
+        let report = AttestationReport::try_from(report_bytes.as_slice()).unwrap();
 
         assert_eq!((&chain, &report).verify().ok(), None);
     }
