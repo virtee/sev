@@ -21,6 +21,7 @@ use crate::firmware::{
     },
 };
 
+use std::convert::TryFrom;
 #[cfg(target_os = "linux")]
 use std::fs::{File, OpenOptions};
 
@@ -107,7 +108,9 @@ impl Firmware {
             Err(FirmwareError::from(response.status))?
         }
 
-        Ok(response.report)
+        let raw_report = response.report.as_array();
+
+        Ok(AttestationReport::try_from(raw_report.as_slice())?)
     }
 
     /// Request an extended attestation report from the AMD Secure Processor.
@@ -179,8 +182,12 @@ impl Firmware {
             Err(FirmwareError::from(report_response.status))?
         }
 
+        let raw_report = report_response.report.as_array();
+
+        let report = AttestationReport::try_from(raw_report.as_slice())?;
+
         if ext_report_request.certs_len == 0 {
-            return Ok((report_response.report, None));
+            return Ok((report, None));
         }
 
         let mut certificates: Vec<CertTableEntry>;
@@ -194,7 +201,7 @@ impl Firmware {
         }
 
         // Return both the Attestation Report, as well as the Cert Table.
-        Ok((report_response.report, Some(certificates)))
+        Ok((report, Some(certificates)))
     }
 
     /// Fetches a derived key from the AMD Secure Processor. The `message_version` will default to `1` if `None` is specified.
