@@ -1,25 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::error::AttestationReportError;
 use crate::{certs::snp::ecdsa::Signature, firmware::host::TcbVersion, util::hexdump};
+use bitfield::bitfield;
+use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
+use std::convert::{TryFrom, TryInto};
+use std::fmt::Display;
 
 #[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
 use crate::certs::snp::{Chain, Verifiable};
 
-use std::fmt::Display;
-
 #[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
-use std::{
-    convert::TryFrom,
-    io::{self, Error, ErrorKind},
-};
-
-use bitfield::bitfield;
+use std::io::{self, Error, ErrorKind};
 
 #[cfg(feature = "openssl")]
 use openssl::{ecdsa::EcdsaSig, sha::Sha384};
-
-use serde::{Deserialize, Serialize};
-use serde_big_array::BigArray;
 
 /// Structure of required data for fetching the derived key.
 #[derive(Copy, Clone, Debug)]
@@ -103,6 +99,23 @@ bitfield! {
     pub get_tcb_version, set_tcb_version: 5, 5;
 }
 
+/// Trait shared between attestation reports to be able to verify them against the VEK.
+#[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
+pub(crate) trait Attestable: Serialize {
+    /// Serialize the provided Attestation Report and get the measurable bytes from it
+    fn measurable_bytes(&self) -> io::Result<Vec<u8>> {
+        let measurable_bytes: &[u8] = &bincode::serialize(self).map_err(|e| {
+            Error::new(
+                ErrorKind::Other,
+                format!("Unable to serialize bytes: {}", e),
+            )
+        })?;
+        Ok(measurable_bytes[..0x2a0].to_vec())
+    }
+    /// Get the attestation report signature
+    fn signature(&self) -> &Signature;
+}
+
 /// The guest can request that the firmware construct an attestation report. External entities can use an
 /// attestation report to assure the identity and security configuration of the guest.
 ///
@@ -117,14 +130,286 @@ bitfield! {
 /// migration agent associated with it, the REPORT_ID_MA is filled in with the report ID of the
 /// migration agent.
 ///
-/// The firmware signs the attestation report with its VCEK. The firmware uses the system wide
+/// The firmware signs the attestation report with its VEK (VCEK or VLEK). The firmware uses the system wide
 /// ReportedTcb value as the TCB version to derive the VCEK. This value is set by the hypervisor.
+/// The VLEK is generated externally and has to be loaded into the machine.
 ///
 /// The firmware guarantees that the ReportedTcb value is never greater than the installed TCB
 /// version
+///
+/// Since the release of the 1.56 ABI, the Attestation Report was bumped from version 2 to 3.
+/// Due to content differences, both versions are kept separately in order to provide backwards compatibility and most reliable security.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+pub enum AttestationReport {
+    /// Version 2 of the Attestation Report
+    V2(AttestationReportV2),
+    /// Version 3 of the Attestation Report
+    V3(AttestationReportV3),
+}
+
+impl TryFrom<&[u8]> for AttestationReport {
+    type Error = AttestationReportError;
+
+    fn try_from(raw_report: &[u8]) -> Result<Self, Self::Error> {
+        let version =
+            u32::from_le_bytes([raw_report[0], raw_report[1], raw_report[2], raw_report[3]]);
+        // Return the appropriate report version
+        match version {
+            2 => {
+                let report_v2: AttestationReportV2 = raw_report.try_into()?;
+                Ok(AttestationReport::V2(report_v2))
+            }
+            3 => {
+                let report_v3: AttestationReportV3 = raw_report.try_into()?;
+                Ok(AttestationReport::V3(report_v3))
+            }
+            _ => Err(AttestationReportError::UnsupportedReportVersion(version))?,
+        }
+    }
+}
+
+#[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
+impl Attestable for AttestationReport {
+    fn measurable_bytes(&self) -> io::Result<Vec<u8>> {
+        //Return measurable bytes for the report
+        match self {
+            Self::V2(v2) => Ok(v2.measurable_bytes()?),
+
+            Self::V3(v3) => Ok(v3.measurable_bytes()?),
+        }
+    }
+    fn signature(&self) -> &Signature {
+        match self {
+            Self::V2(v2) => v2.signature(),
+            Self::V3(v3) => v3.signature(),
+        }
+    }
+}
+
+impl AttestationReport {
+    /// Get Attestation Report Version
+    pub fn version(&self) -> u32 {
+        match self {
+            Self::V2(report) => report.version,
+            Self::V3(report) => report.version,
+        }
+    }
+
+    /// Get the guest SVN
+    pub fn guest_svn(&self) -> u32 {
+        match self {
+            Self::V2(report) => report.guest_svn,
+            Self::V3(report) => report.guest_svn,
+        }
+    }
+    /// Get the guest policy.
+    pub fn policy(&self) -> GuestPolicy {
+        match self {
+            Self::V2(report) => report.policy,
+            Self::V3(report) => report.policy,
+        }
+    }
+
+    /// Get Family ID
+    pub fn family_id(&self) -> [u8; 16] {
+        match self {
+            Self::V2(report) => report.family_id,
+            Self::V3(report) => report.family_id,
+        }
+    }
+    /// Get Image ID
+    pub fn image_id(&self) -> [u8; 16] {
+        match self {
+            Self::V2(report) => report.image_id,
+            Self::V3(report) => report.image_id,
+        }
+    }
+
+    /// Get request VMPL for the attestation report.
+    pub fn vmpl(&self) -> u32 {
+        match self {
+            Self::V2(report) => report.vmpl,
+            Self::V3(report) => report.vmpl,
+        }
+    }
+    /// Get signature alorithm used to sign this report
+    pub fn sig_algo(&self) -> u32 {
+        match self {
+            Self::V2(report) => report.sig_algo,
+            Self::V3(report) => report.sig_algo,
+        }
+    }
+
+    /// Get current TCB
+    pub fn current_tcb(&self) -> TcbVersion {
+        match self {
+            Self::V2(report) => report.current_tcb,
+            Self::V3(report) => report.current_tcb,
+        }
+    }
+
+    /// Get Platform Info
+    pub fn plat_info(&self) -> PlatformInfo {
+        match self {
+            Self::V2(report) => PlatformInfo::V1(report.plat_info),
+            Self::V3(report) => PlatformInfo::V2(report.plat_info),
+        }
+    }
+
+    /// Get Key Information
+    pub fn key_info(&self) -> KeyInfo {
+        match self {
+            Self::V2(report) => report.key_info,
+            Self::V3(report) => report.key_info,
+        }
+    }
+
+    /// Get the guest provided report data
+    pub fn report_data(&self) -> [u8; 64] {
+        match self {
+            Self::V2(report) => report.report_data,
+            Self::V3(report) => report.report_data,
+        }
+    }
+
+    /// Get the measurement calculated at launch.
+    pub fn measurement(&self) -> [u8; 48] {
+        match self {
+            Self::V2(report) => report.measurement,
+            Self::V3(report) => report.measurement,
+        }
+    }
+
+    /// Get data provided by the hypervisor at launch.
+    pub fn host_data(&self) -> [u8; 32] {
+        match self {
+            Self::V2(report) => report.host_data,
+            Self::V3(report) => report.host_data,
+        }
+    }
+
+    /// Get the SHA-384 digest of the ID public key that signed the ID block.
+    pub fn id_key_digest(&self) -> [u8; 48] {
+        match self {
+            Self::V2(report) => report.id_key_digest,
+            Self::V3(report) => report.id_key_digest,
+        }
+    }
+
+    /// Get the SHA-384 digest of the author public key that certified the ID key,.
+    pub fn author_key_digest(&self) -> [u8; 48] {
+        match self {
+            Self::V2(report) => report.author_key_digest,
+            Self::V3(report) => report.author_key_digest,
+        }
+    }
+
+    /// Get report ID of this guest
+    pub fn report_id(&self) -> [u8; 32] {
+        match self {
+            Self::V2(report) => report.report_id,
+            Self::V3(report) => report.report_id,
+        }
+    }
+
+    /// Get report ID of this guest's migration agent (if applicable).
+    pub fn report_id_ma(&self) -> [u8; 32] {
+        match self {
+            Self::V2(report) => report.report_id_ma,
+            Self::V3(report) => report.report_id_ma,
+        }
+    }
+
+    /// Get the Reported TCB of the report
+    pub fn reported_tcb(&self) -> TcbVersion {
+        match self {
+            Self::V2(report) => report.reported_tcb,
+            Self::V3(report) => report.reported_tcb,
+        }
+    }
+
+    /// Get the CPUID info from the report (V3 only)
+    pub fn cpuid(&self) -> Result<(u8, u8, u8), AttestationReportError> {
+        match self {
+            Self::V2(_) => Err(AttestationReportError::UnsupportedField(
+                "cpuid information".to_string(),
+            )),
+            Self::V3(report) => Ok((report.cpuid_fam_id, report.cpuid_mod_id, report.cpuid_step)),
+        }
+    }
+
+    /// Get the CHIP ID of the attestation report
+    pub fn chip_id(&self) -> [u8; 64] {
+        match self {
+            Self::V2(report) => report.chip_id,
+            Self::V3(report) => report.chip_id,
+        }
+    }
+
+    /// Get commited TCB
+    pub fn commited_tcb(&self) -> TcbVersion {
+        match self {
+            Self::V2(report) => report.committed_tcb,
+            Self::V3(report) => report.committed_tcb,
+        }
+    }
+
+    /// Get the current version in the report (major,minor,build)
+    pub fn current_version(&self) -> (u8, u8, u8) {
+        match self {
+            Self::V2(report) => (
+                report.current_major,
+                report.current_minor,
+                report.current_build,
+            ),
+            Self::V3(report) => (
+                report.current_major,
+                report.current_minor,
+                report.current_build,
+            ),
+        }
+    }
+
+    /// Get the committed version in the report (major,minor,build)
+    pub fn commited_version(&self) -> (u8, u8, u8) {
+        match self {
+            Self::V2(report) => (
+                report.committed_major,
+                report.committed_minor,
+                report.committed_build,
+            ),
+            Self::V3(report) => (
+                report.committed_major,
+                report.committed_minor,
+                report.committed_build,
+            ),
+        }
+    }
+
+    /// Get launch TCB
+    pub fn launch_tcb(&self) -> TcbVersion {
+        match self {
+            Self::V2(report) => report.launch_tcb,
+            Self::V3(report) => report.launch_tcb,
+        }
+    }
+}
+
+impl Display for AttestationReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AttestationReport::V2(report) => write!(f, "{}", report),
+            AttestationReport::V3(report) => write!(f, "{}", report),
+        }
+    }
+}
+
+/// Version 2 of the attestation report
+/// The first upstream supported attestation report
+/// Systems that contain firmware prior to the spec release 1.56 will use this attestation report.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
-pub struct AttestationReport {
+pub struct AttestationReportV2 {
     /// Version number of this attestation report. Set to 2h for this specification.
     pub version: u32,
     /// The guest SVN.
@@ -142,7 +427,7 @@ pub struct AttestationReport {
     /// Current TCB. See SNPTcbVersion
     pub current_tcb: TcbVersion,
     /// Information about the platform. See PlatformInfo
-    pub plat_info: PlatformInfo,
+    pub plat_info: PlatformInfoV1,
     /// Information related to signing keys in the report. See KeyInfo
     pub key_info: KeyInfo,
     _reserved_0: u32,
@@ -198,7 +483,7 @@ pub struct AttestationReport {
     pub signature: Signature,
 }
 
-impl Default for AttestationReport {
+impl Default for AttestationReportV2 {
     fn default() -> Self {
         Self {
             version: Default::default(),
@@ -238,7 +523,7 @@ impl Default for AttestationReport {
     }
 }
 
-impl Display for AttestationReport {
+impl Display for AttestationReportV2 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -309,23 +594,258 @@ Launch TCB:
     }
 }
 
+#[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
+impl Attestable for AttestationReportV2 {
+    fn signature(&self) -> &Signature {
+        &self.signature
+    }
+}
+
+impl TryFrom<&[u8]> for AttestationReportV2 {
+    type Error = AttestationReportError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        bincode::deserialize(bytes).map_err(|e| AttestationReportError::BincodeError(*e))
+    }
+}
+
+/// Version 3 of the attestation report
+/// Systems that contain firmware starting from the spec release 1.56 will use this attestation report.
+/// This version adds:
+/// The CPUID Family, Model and Stepping fields
+/// The Alias_Check_Complete field in the PlatformInfo field
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+pub struct AttestationReportV3 {
+    /// Version number of this attestation report. Set to 2h for this specification.
+    pub version: u32,
+    /// The guest SVN.
+    pub guest_svn: u32,
+    /// The guest policy.
+    pub policy: GuestPolicy,
+    /// The family ID provided at launch.
+    pub family_id: [u8; 16],
+    /// The image ID provided at launch.
+    pub image_id: [u8; 16],
+    /// The request VMPL for the attestation report.
+    pub vmpl: u32,
+    /// The signature algorithm used to sign this report.
+    pub sig_algo: u32,
+    /// Current TCB. See SNPTcbVersion
+    pub current_tcb: TcbVersion,
+    /// Information about the platform. See PlatformInfo
+    pub plat_info: PlatformInfoV2,
+    /// Information related to signing keys in the report. See KeyInfo
+    pub key_info: KeyInfo,
+    _reserved_0: u32,
+    #[serde(with = "BigArray")]
+    /// Guest-provided 512 Bits of Data
+    pub report_data: [u8; 64],
+    #[serde(with = "BigArray")]
+    /// The measurement calculated at launch.
+    pub measurement: [u8; 48],
+    /// Data provided by the hypervisor at launch.
+    pub host_data: [u8; 32],
+    #[serde(with = "BigArray")]
+    /// SHA-384 digest of the ID public key that signed the ID block provided
+    /// in SNP_LANUNCH_FINISH.
+    pub id_key_digest: [u8; 48],
+    #[serde(with = "BigArray")]
+    /// SHA-384 digest of the Author public key that certified the ID key,
+    /// if provided in SNP_LAUNCH_FINSIH. Zeroes if AUTHOR_KEY_EN is 1.
+    pub author_key_digest: [u8; 48],
+    /// Report ID of this guest.
+    pub report_id: [u8; 32],
+    /// Report ID of this guest's migration agent (if applicable).
+    pub report_id_ma: [u8; 32],
+    /// Reported TCB version used to derive the VCEK that signed this report.
+    pub reported_tcb: TcbVersion,
+    /// CPUID Familiy ID (Combined Extended Family ID and Family ID)
+    pub cpuid_fam_id: u8,
+    /// CPUID Model (Combined Extended Model and Model fields)
+    pub cpuid_mod_id: u8,
+    /// CPUID Stepping
+    pub cpuid_step: u8,
+    _reserved_1: [u8; 21],
+    #[serde(with = "BigArray")]
+    /// If MaskChipId is set to 0, Identifier unique to the chip.
+    /// Otherwise set to 0h.
+    pub chip_id: [u8; 64],
+    /// CommittedTCB
+    pub committed_tcb: TcbVersion,
+    /// The build number of CurrentVersion
+    pub current_build: u8,
+    /// The minor number of CurrentVersion
+    pub current_minor: u8,
+    /// The major number of CurrentVersion
+    pub current_major: u8,
+    _reserved_2: u8,
+    /// The build number of CommittedVersion
+    pub committed_build: u8,
+    /// The minor number of CommittedVersion
+    pub committed_minor: u8,
+    /// The major number of CommittedVersion
+    pub committed_major: u8,
+    _reserved_3: u8,
+    /// The CurrentTcb at the time the guest was launched or imported.
+    pub launch_tcb: TcbVersion,
+    #[serde(with = "BigArray")]
+    _reserved_4: [u8; 168],
+    /// Signature of bytes 0 to 0x29F inclusive of this report.
+    /// The format of the signature is found within Signature.
+    pub signature: Signature,
+}
+
+impl Default for AttestationReportV3 {
+    fn default() -> Self {
+        Self {
+            version: Default::default(),
+            guest_svn: Default::default(),
+            policy: Default::default(),
+            family_id: Default::default(),
+            image_id: Default::default(),
+            vmpl: Default::default(),
+            sig_algo: Default::default(),
+            current_tcb: Default::default(),
+            plat_info: Default::default(),
+            key_info: Default::default(),
+            _reserved_0: Default::default(),
+            report_data: [0; 64],
+            measurement: [0; 48],
+            host_data: Default::default(),
+            id_key_digest: [0; 48],
+            author_key_digest: [0; 48],
+            report_id: Default::default(),
+            report_id_ma: Default::default(),
+            reported_tcb: Default::default(),
+            cpuid_fam_id: Default::default(),
+            cpuid_mod_id: Default::default(),
+            cpuid_step: Default::default(),
+            _reserved_1: Default::default(),
+            chip_id: [0; 64],
+            committed_tcb: Default::default(),
+            current_build: Default::default(),
+            current_minor: Default::default(),
+            current_major: Default::default(),
+            _reserved_2: Default::default(),
+            committed_build: Default::default(),
+            committed_minor: Default::default(),
+            committed_major: Default::default(),
+            _reserved_3: Default::default(),
+            launch_tcb: Default::default(),
+            _reserved_4: [0; 168],
+            signature: Default::default(),
+        }
+    }
+}
+
+impl Display for AttestationReportV3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            r#"
+Attestation Report ({} bytes):
+Version:                      {}
+Guest SVN:                    {}
+{}
+Family ID:                    {}
+Image ID:                     {}
+VMPL:                         {}
+Signature Algorithm:          {}
+Current TCB:
+{}
+{}
+{}
+Report Data:                  {}
+Measurement:                  {}
+Host Data:                    {}
+ID Key Digest:                {}
+Author Key Digest:            {}
+Report ID:                    {}
+Report ID Migration Agent:    {}
+Reported TCB:                 {}
+CPUID Family ID:              {}
+CPUID Model ID:               {}
+CPUID Stepping:               {}
+Chip ID:                      {}
+Committed TCB:
+{}
+Current Build:                {}
+Current Minor:                {}
+Current Major:                {}
+Committed Build:              {}
+Committed Minor:              {}
+Committed Major:              {}
+Launch TCB:
+{}
+{}
+"#,
+            std::mem::size_of_val(self),
+            self.version,
+            self.guest_svn,
+            self.policy,
+            hexdump(&self.family_id),
+            hexdump(&self.image_id),
+            self.vmpl,
+            self.sig_algo,
+            self.current_tcb,
+            self.plat_info,
+            self.key_info,
+            hexdump(&self.report_data),
+            hexdump(&self.measurement),
+            hexdump(&self.host_data),
+            hexdump(&self.id_key_digest),
+            hexdump(&self.author_key_digest),
+            hexdump(&self.report_id),
+            hexdump(&self.report_id_ma),
+            self.reported_tcb,
+            self.cpuid_fam_id,
+            self.cpuid_mod_id,
+            self.cpuid_step,
+            hexdump(&self.chip_id),
+            self.committed_tcb,
+            self.current_build,
+            self.current_minor,
+            self.current_major,
+            self.committed_build,
+            self.committed_minor,
+            self.committed_major,
+            self.launch_tcb,
+            self.signature
+        )
+    }
+}
+
+#[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
+impl Attestable for AttestationReportV3 {
+    fn signature(&self) -> &Signature {
+        &self.signature
+    }
+}
+
+impl TryFrom<&[u8]> for AttestationReportV3 {
+    type Error = AttestationReportError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        bincode::deserialize(bytes).map_err(|e| AttestationReportError::BincodeError(*e))
+    }
+}
+
 #[cfg(feature = "openssl")]
-impl Verifiable for (&Chain, &AttestationReport) {
+impl<T> Verifiable for (&Chain, &T)
+where
+    T: Attestable,
+{
     type Output = ();
 
     fn verify(self) -> io::Result<Self::Output> {
         let vcek = self.0.verify()?;
 
-        let sig = EcdsaSig::try_from(&self.1.signature)?;
-        let measurable_bytes: &[u8] = &bincode::serialize(self.1).map_err(|e| {
-            Error::new(
-                ErrorKind::Other,
-                format!("Unable to serialize bytes: {}", e),
-            )
-        })?[..0x2a0];
+        let sig = EcdsaSig::try_from(self.1.signature())?;
+        let measurable_bytes = self.1.measurable_bytes()?;
 
         let mut hasher = Sha384::new();
-        hasher.update(measurable_bytes);
+        hasher.update(&measurable_bytes);
         let base_digest = hasher.finish();
 
         let ec = vcek.public_key()?.ec_key()?;
@@ -342,7 +862,10 @@ impl Verifiable for (&Chain, &AttestationReport) {
 }
 
 #[cfg(feature = "crypto_nossl")]
-impl Verifiable for (&Chain, &AttestationReport) {
+impl<T> Verifiable for (&Chain, &T)
+where
+    T: Attestable,
+{
     type Output = ();
 
     fn verify(self) -> io::Result<Self::Output> {
@@ -353,14 +876,9 @@ impl Verifiable for (&Chain, &AttestationReport) {
 
         let vcek = self.0.verify()?;
 
-        let sig = p384::ecdsa::Signature::try_from(&self.1.signature)?;
+        let sig = p384::ecdsa::Signature::try_from(self.1.signature())?;
 
-        let measurable_bytes: &[u8] = &bincode::serialize(self.1).map_err(|e| {
-            Error::new(
-                ErrorKind::Other,
-                format!("Unable to serialize bytes: {}", e),
-            )
-        })?[..0x2a0];
+        let measurable_bytes = self.1.measurable_bytes()?;
 
         use sha2::Digest;
         let base_digest = sha2::Sha384::new_with_prefix(measurable_bytes);
@@ -466,7 +984,67 @@ impl From<GuestPolicy> for u64 {
     }
 }
 
+/// Enum Containing the different versions of the Platform Info Bitfield
+pub enum PlatformInfo {
+    /// Version 1 of Platform Info
+    V1(PlatformInfoV1),
+    /// Version 2 of Platform Info
+    V2(PlatformInfoV2),
+}
+
+impl PlatformInfo {
+    /// Get SMT enablement status
+    pub fn smt_enabled(&self) -> u64 {
+        match self {
+            Self::V1(field) => field.smt_enabled(),
+            Self::V2(field) => field.smt_enabled(),
+        }
+    }
+
+    /// Get TSME enablement status
+    pub fn tsme_enabled(&self) -> u64 {
+        match self {
+            Self::V1(field) => field.tsme_enabled(),
+            Self::V2(field) => field.tsme_enabled(),
+        }
+    }
+    /// Get ECC memory status
+    pub fn ecc_enabled(&self) -> u64 {
+        match self {
+            Self::V1(field) => field.ecc_enabled(),
+            Self::V2(field) => field.ecc_enabled(),
+        }
+    }
+
+    /// Get RAPL enablement status
+    pub fn rapl_disabled(&self) -> u64 {
+        match self {
+            Self::V1(field) => field.rapl_disabled(),
+            Self::V2(field) => field.rapl_disabled(),
+        }
+    }
+
+    /// Get cyphertext hiding status
+    pub fn cypertext_hiding_enabled(&self) -> u64 {
+        match self {
+            Self::V1(field) => field.ciphertext_hiding_enabled(),
+            Self::V2(field) => field.ciphertext_hiding_enabled(),
+        }
+    }
+
+    /// Get alias check complete
+    pub fn alias_check_complete(&self) -> Result<u64, AttestationReportError> {
+        match self {
+            Self::V1(_) => Err(AttestationReportError::UnsupportedField(
+                "Alias Check Complete".to_string(),
+            )),
+            Self::V2(field) => Ok(field.alias_check_complete()),
+        }
+    }
+}
+
 bitfield! {
+    /// Version 1 PlatformInfo bitfield
     /// A structure with a bit-field unsigned 64 bit integer:
     /// Bit 0 representing the status of SMT enablement.
     /// Bit 1 representing the status of TSME enablement.
@@ -476,7 +1054,7 @@ bitfield! {
     /// Bits 5-63 are reserved.
     #[repr(C)]
     #[derive(Default, Deserialize, Clone, Copy, Serialize)]
-    pub struct PlatformInfo(u64);
+    pub struct PlatformInfoV1(u64);
     impl Debug;
     /// Returns the bit state of SMT
     pub smt_enabled, _: 0, 0;
@@ -492,7 +1070,7 @@ bitfield! {
     reserved, _: 5, 63;
 }
 
-impl Display for PlatformInfo {
+impl Display for PlatformInfoV1 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -510,6 +1088,60 @@ Platform Info ({}):
             self.ecc_enabled(),
             self.rapl_disabled(),
             self.ciphertext_hiding_enabled(),
+        )
+    }
+}
+
+bitfield! {
+    /// Version 2 PlatformInfo bitfield
+    /// A structure with a bit-field unsigned 64 bit integer:
+    /// Bit 0 representing the status of SMT enablement.
+    /// Bit 1 representing the status of TSME enablement.
+    /// Bit 2 indicates if ECC memory is used.
+    /// Bit 3 indicates if RAPL is disabled.
+    /// Bit 4 indicates if ciphertext hiding is enabled
+    /// Bit 5 indicates that alias detection has completed since the last system reset and there are no aliasing addresses. Resets to 0.
+    /// Bits 5-63 are reserved.
+    #[repr(C)]
+    #[derive(Default, Deserialize, Clone, Copy, Serialize)]
+    pub struct PlatformInfoV2(u64);
+    impl Debug;
+    /// Returns the bit state of SMT
+    pub smt_enabled, _: 0, 0;
+    /// Returns the bit state of TSME.
+    pub tsme_enabled, _: 1, 1;
+    /// Indicates that the platform is currently using ECC memory
+    pub ecc_enabled, _: 2, 2;
+    /// Indicates that the RAPL feature is disabled
+    pub rapl_disabled, _: 3, 3;
+    /// Indicates that ciphertext hiding is enabled
+    pub ciphertext_hiding_enabled, _: 4, 4;
+    /// Indicates that alias detection has completed since the last system reset and there are no aliasing addresses. Resets to 0.
+    pub alias_check_complete, _: 5, 5;
+    /// reserved
+    reserved, _: 6, 63;
+}
+
+impl Display for PlatformInfoV2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            r#"
+Platform Info ({}):
+  SMT Enabled:               {}
+  TSME Enabled:              {}
+  ECC Enabled:               {}
+  RAPL Disabled:             {}
+  Ciphertext Hiding Enabled: {}
+  Alias Check Complete:      {}
+"#,
+            self.0,
+            self.smt_enabled(),
+            self.tsme_enabled(),
+            self.ecc_enabled(),
+            self.rapl_disabled(),
+            self.ciphertext_hiding_enabled(),
+            self.alias_check_complete()
         )
     }
 }
