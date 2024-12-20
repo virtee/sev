@@ -2,8 +2,7 @@
 
 //! Operations to build and interact with an SEV-ES VMSA
 use crate::{
-    error::MeasurementError,
-    measurement::{large_array::LargeArray, vcpu_types::CpuType},
+    error::MeasurementError, measurement::vcpu_types::CpuType, util::large_array::LargeArray,
 };
 use bitfield::bitfield;
 use serde::{Deserialize, Serialize};

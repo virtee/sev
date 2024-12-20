@@ -536,6 +536,9 @@ pub enum UserApiError {
     /// Invalid VMPL.
     VmplError,
 
+    /// Attestation Report Error
+    AttestationReportError(AttestationReportError),
+
     /// Unknown error
     Unknown,
 }
@@ -550,6 +553,7 @@ impl error::Error for UserApiError {
             Self::VmmError(vmm_error) => Some(vmm_error),
             Self::HashstickError(hashstick_error) => Some(hashstick_error),
             Self::VmplError => None,
+            Self::AttestationReportError(attestation_error) => Some(attestation_error),
             Self::Unknown => None,
         }
     }
@@ -565,6 +569,9 @@ impl std::fmt::Display for UserApiError {
             Self::VmmError(error) => format!("VMM Error Encountered: {error}"),
             Self::HashstickError(error) => format!("VLEK Hashstick Error Encountered: {error}"),
             Self::VmplError => "Invalid VM Permission Level (VMPL)".to_string(),
+            Self::AttestationReportError(error) => {
+                format!("Attestation Report Error Encountered: {error}")
+            }
             Self::Unknown => "Unknown Error Encountered!".to_string(),
         };
         write!(f, "{err_msg}")
@@ -616,6 +623,12 @@ impl From<UserApiError> for io::Error {
 impl std::convert::From<CertError> for UserApiError {
     fn from(cert_error: CertError) -> Self {
         Self::ApiError(cert_error)
+    }
+}
+
+impl std::convert::From<AttestationReportError> for UserApiError {
+    fn from(attestation_error: AttestationReportError) -> Self {
+        Self::AttestationReportError(attestation_error)
     }
 }
 
@@ -698,6 +711,37 @@ impl std::fmt::Display for CertError {
 }
 
 impl error::Error for CertError {}
+
+#[derive(Debug)]
+/// Errors which may be encountered when handling attestation reports
+pub enum AttestationReportError {
+    /// Bincode Error Handling
+    BincodeError(bincode::ErrorKind),
+
+    /// Unsuported Attestation Report Version
+    UnsupportedReportVersion(u32),
+
+    /// Field is not supported in the current version of the Attestation Report
+    UnsupportedField(String),
+}
+
+impl std::fmt::Display for AttestationReportError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            AttestationReportError::BincodeError(e) => write!(f, "Bincode error encountered: {e}"),
+            AttestationReportError::UnsupportedReportVersion(version) => write!(f, "The encountered Attestation Report version {version} is not supported by the library yet."),
+            AttestationReportError::UnsupportedField(field) => write!(f,"The field {field} is not supported in the provided Attestation Report version"),
+        }
+    }
+}
+
+impl std::convert::From<bincode::ErrorKind> for AttestationReportError {
+    fn from(value: bincode::ErrorKind) -> Self {
+        Self::BincodeError(value)
+    }
+}
+
+impl error::Error for AttestationReportError {}
 
 #[derive(Debug)]
 /// Errors which may be encountered when building custom guest context.

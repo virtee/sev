@@ -15,9 +15,8 @@ use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 
 use crate::{
-    error::IdBlockError,
-    firmware::guest::GuestPolicy,
-    measurement::{large_array::LargeArray, snp::SnpLaunchDigest},
+    error::IdBlockError, firmware::guest::GuestPolicy, measurement::snp::SnpLaunchDigest,
+    util::large_array::LargeArray,
 };
 
 pub(crate) const DEFAULT_ID_VERSION: u32 = 1;
