@@ -10,7 +10,6 @@ use std::mem::size_of;
 
 use serde::{de, ser};
 use serde_bytes::{ByteBuf, Bytes};
-
 /// An OCA certificate.
 #[derive(Clone, Copy)]
 #[repr(C)]

@@ -13,6 +13,10 @@ use std::{convert::TryFrom, fmt, str::FromStr};
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SevMode {
     /// SEV
+    #[deprecated(
+        since = "5.0.0",
+        note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+    )]
     Sev,
     /// SEV-ES
     SevEs,

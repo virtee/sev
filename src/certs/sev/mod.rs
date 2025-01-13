@@ -1,19 +1,39 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Everything needed for working with AMD SEV certificate chains.
-
+#[deprecated(
+    since = "5.0.0",
+    note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+)]
 pub mod builtin;
+#[deprecated(
+    since = "5.0.0",
+    note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+)]
 pub mod ca;
+#[deprecated(
+    since = "5.0.0",
+    note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+)]
 mod chain;
-
-#[allow(clippy::module_inception)]
-pub mod sev;
-
-#[cfg(feature = "openssl")]
-mod util;
-
+#[deprecated(
+    since = "5.0.0",
+    note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+)]
 #[cfg(feature = "openssl")]
 mod crypto;
+#[deprecated(
+    since = "5.0.0",
+    note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+)]
+#[allow(clippy::module_inception)]
+pub mod sev;
+#[deprecated(
+    since = "5.0.0",
+    note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+)]
+#[cfg(feature = "openssl")]
+mod util;
 
 pub use chain::Chain;
 
