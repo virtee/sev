@@ -3,7 +3,7 @@
 use crate::{certs::snp::ecdsa::Signature, firmware::host::TcbVersion, util::hexdump};
 
 #[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
-use crate::certs::snp::{Chain, Verifiable};
+use crate::certs::snp::{Certificate, Chain, Verifiable};
 
 use std::fmt::Display;
 
@@ -314,7 +314,7 @@ impl Verifiable for (&Chain, &AttestationReport) {
     type Output = ();
 
     fn verify(self) -> io::Result<Self::Output> {
-        let vcek = self.0.verify()?;
+        let vek = self.0.verify()?;
 
         let sig = EcdsaSig::try_from(&self.1.signature)?;
         let measurable_bytes: &[u8] = &bincode::serialize(self.1).map_err(|e| {
@@ -328,14 +328,46 @@ impl Verifiable for (&Chain, &AttestationReport) {
         hasher.update(measurable_bytes);
         let base_digest = hasher.finish();
 
-        let ec = vcek.public_key()?.ec_key()?;
+        let ec = vek.public_key()?.ec_key()?;
         let signed = sig.verify(&base_digest, &ec)?;
 
         match signed {
             true => Ok(()),
             false => Err(Error::new(
                 ErrorKind::Other,
-                "VCEK does not sign the attestation report",
+                "VEK does not sign the attestation report",
+            )),
+        }
+    }
+}
+
+#[cfg(feature = "openssl")]
+impl Verifiable for (&Certificate, &AttestationReport) {
+    type Output = ();
+
+    fn verify(self) -> io::Result<Self::Output> {
+        let vek = self.0;
+
+        let sig = EcdsaSig::try_from(&self.1.signature)?;
+        let measurable_bytes: &[u8] = &bincode::serialize(self.1).map_err(|e| {
+            Error::new(
+                ErrorKind::Other,
+                format!("Unable to serialize bytes: {}", e),
+            )
+        })?[..0x2a0];
+
+        let mut hasher = Sha384::new();
+        hasher.update(measurable_bytes);
+        let base_digest = hasher.finish();
+
+        let ec = vek.public_key()?.ec_key()?;
+        let signed = sig.verify(&base_digest, &ec)?;
+
+        match signed {
+            true => Ok(()),
+            false => Err(Error::new(
+                ErrorKind::Other,
+                "VEK does not sign the attestation report",
             )),
         }
     }
@@ -346,12 +378,10 @@ impl Verifiable for (&Chain, &AttestationReport) {
     type Output = ();
 
     fn verify(self) -> io::Result<Self::Output> {
-        // According to Chapter 3 of the [Versioned Chip Endorsement Key (VCEK) Certificate and
-        // KDS Interface Specification][spec], the VCEK certificate certifies an ECDSA public key on curve P-384,
-        // and the signature hash algorithm is sha384.
-        // [spec]: https://www.amd.com/content/dam/amd/en/documents/epyc-technical-docs/specifications/57230.pdf
-
-        let vcek = self.0.verify()?;
+        // According to Chapter 3 of the Versioned Chip Endorsement Key (VCEK) Certificate and the Versioned Loaded Endorsement Key (VLEK)
+        // Certificate specifications, both Versioned Endorsement Key certificates certify an ECDSA public key on curve P-384,
+        // with the signature hash algorithm being SHA-384.
+        let vek = self.0.verify()?;
 
         let sig = p384::ecdsa::Signature::try_from(&self.1.signature)?;
 
@@ -365,7 +395,49 @@ impl Verifiable for (&Chain, &AttestationReport) {
         use sha2::Digest;
         let base_digest = sha2::Sha384::new_with_prefix(measurable_bytes);
 
-        let verifying_key = p384::ecdsa::VerifyingKey::from_sec1_bytes(vcek.public_key_sec1())
+        let verifying_key = p384::ecdsa::VerifyingKey::from_sec1_bytes(vek.public_key_sec1())
+            .map_err(|e| {
+                io::Error::new(
+                    ErrorKind::Other,
+                    format!("failed to deserialize public key from sec1 bytes: {e:?}"),
+                )
+            })?;
+
+        use p384::ecdsa::signature::DigestVerifier;
+        verifying_key.verify_digest(base_digest, &sig).map_err(|e| {
+            io::Error::new(
+                ErrorKind::Other,
+                format!("VCEK does not sign the attestation report: {e:?}"),
+            )
+        })
+    }
+}
+
+#[cfg(feature = "crypto_nossl")]
+impl Verifiable for (&Certificate, &AttestationReport) {
+    type Output = ();
+
+    fn verify(self) -> io::Result<Self::Output> {
+        // According to Chapter 3 of the [Versioned Chip Endorsement Key (VCEK) Certificate and
+        // KDS Interface Specification][spec], the VCEK certificate certifies an ECDSA public key on curve P-384,
+        // and the signature hash algorithm is sha384.
+        // [spec]: https://www.amd.com/content/dam/amd/en/documents/epyc-technical-docs/specifications/57230.pdf
+
+        let vek = self.0;
+
+        let sig = p384::ecdsa::Signature::try_from(&self.1.signature)?;
+
+        let measurable_bytes: &[u8] = &bincode::serialize(self.1).map_err(|e| {
+            Error::new(
+                ErrorKind::Other,
+                format!("Unable to serialize bytes: {}", e),
+            )
+        })?[..0x2a0];
+
+        use sha2::Digest;
+        let base_digest = sha2::Sha384::new_with_prefix(measurable_bytes);
+
+        let verifying_key = p384::ecdsa::VerifyingKey::from_sec1_bytes(vek.public_key_sec1())
             .map_err(|e| {
                 io::Error::new(
                     ErrorKind::Other,
