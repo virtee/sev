@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#![cfg(feature = "openssl")]
+#![cfg(any(feature = "openssl", feature = "crypto_nossl"))]
 
 #[cfg(all(target_os = "linux", feature = "snp"))]
 mod snp_tests {
