@@ -4,6 +4,7 @@
 
 pub mod cached_chain;
 mod impl_const_id;
+pub mod large_array;
 
 use std::{
     io::{Read, Result, Write},
