@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 
 /// Structure of required data for fetching the derived key.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DerivedKey {
     /// Selects the root key to derive the key from.
     /// 0: Indicates VCEK.
@@ -86,7 +86,7 @@ bitfield! {
     /// |5|TCB_VERSION|Indicates that the guest-provided TCB_VERSION will be mixed into the key.|
     /// |63:6|\-|Reserved. Must be zero.|
     #[repr(C)]
-    #[derive(Default, Copy, Clone)]
+    #[derive(Default, Copy, Clone,PartialEq, Eq, PartialOrd, Ord)]
     pub struct GuestFieldSelect(u64);
     impl Debug;
     /// Check/Set guest policy inclusion in derived key.
@@ -123,7 +123,7 @@ bitfield! {
 /// The firmware guarantees that the ReportedTcb value is never greater than the installed TCB
 /// version
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AttestationReport {
     /// Version number of this attestation report. Set to 2h for this specification.
     pub version: u32,
@@ -408,7 +408,7 @@ bitfield! {
     /// | 63:25  | -                 | Reserved. MBZ.                                                                                                     >
     ///
     #[repr(C)]
-    #[derive(Default, Deserialize, Clone, Copy, Eq, PartialEq, Serialize)]
+    #[derive(Default, Deserialize, Clone, Copy, Eq, PartialEq, Serialize, PartialOrd, Ord)]
     pub struct GuestPolicy(u64);
     impl Debug;
     /// ABI_MINOR field: Indicates the minor API version.
@@ -475,7 +475,7 @@ bitfield! {
     /// Bit 4 indicates if ciphertext hiding is enabled
     /// Bits 5-63 are reserved.
     #[repr(C)]
-    #[derive(Default, Deserialize, Clone, Copy, Serialize)]
+    #[derive(Default, Deserialize, Clone, Copy, Serialize, PartialEq, Eq, PartialOrd, Ord)]
     pub struct PlatformInfo(u64);
     impl Debug;
     /// Returns the bit state of SMT
@@ -525,7 +525,7 @@ bitfield! {
     /// | 4:2    | SIGNING_KEY       | Encodes the key used to sign this report.                                                                          >
     /// | 5:31   | -                 | Reserved. Must be zero.                                                                                            >
     #[repr(C)]
-    #[derive(Default, Deserialize, Clone, Copy, Eq, PartialEq, Serialize)]
+    #[derive(Default, Deserialize, Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Serialize)]
     pub struct KeyInfo(u32);
     impl Debug;
     /// AUTHOR_KEY_EN field: Indicates that the digest of the author key is present in AUTHOR_KEY_DIGEST
@@ -565,5 +565,480 @@ Key Information:
             self.mask_chip_key(),
             signing_key
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_derive_key_new() {
+        let expected: DerivedKey = DerivedKey {
+            root_key_select: 0,
+            _reserved_0: 0,
+            guest_field_select: GuestFieldSelect(0),
+            vmpl: 0,
+            guest_svn: 0,
+            tcb_version: 0,
+        };
+
+        let guest_field: GuestFieldSelect = GuestFieldSelect(0);
+
+        let actual: DerivedKey = DerivedKey::new(false, guest_field, 0, 0, 0);
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_derive_key_get_root_key_select() {
+        let dk_struct: DerivedKey = DerivedKey {
+            root_key_select: 0,
+            _reserved_0: 0,
+            guest_field_select: GuestFieldSelect(0),
+            vmpl: 0,
+            guest_svn: 0,
+            tcb_version: 0,
+        };
+
+        let expected: u32 = 0;
+        let actual: u32 = dk_struct.get_root_key_select();
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_guest_field_select_all_on() {
+        let actual: GuestFieldSelect = GuestFieldSelect(0b111111);
+
+        assert_eq!(actual.get_guest_policy(), 1);
+        assert_eq!(actual.get_image_id(), 1);
+        assert_eq!(actual.get_family_id(), 1);
+        assert_eq!(actual.get_measurement(), 1);
+        assert_eq!(actual.get_svn(), 1);
+        assert_eq!(actual.get_tcb_version(), 1);
+    }
+
+    #[test]
+    fn test_guest_field_select_all_off() {
+        let actual: GuestFieldSelect = GuestFieldSelect(0);
+
+        assert_eq!(actual.get_guest_policy(), 0);
+        assert_eq!(actual.get_image_id(), 0);
+        assert_eq!(actual.get_family_id(), 0);
+        assert_eq!(actual.get_measurement(), 0);
+        assert_eq!(actual.get_svn(), 0);
+        assert_eq!(actual.get_tcb_version(), 0);
+    }
+
+    #[test]
+    fn test_attestation_report() {
+        let expected: AttestationReport = AttestationReport {
+            version: 0,
+            guest_svn: 0,
+            policy: GuestPolicy(0),
+            family_id: [0; 16],
+            image_id: [0; 16],
+            vmpl: 0,
+            sig_algo: 0,
+            current_tcb: TcbVersion::default(),
+            plat_info: PlatformInfo::default(),
+            key_info: KeyInfo::default(),
+            _reserved_0: 0,
+            report_data: [0; 64],
+            measurement: [0; 48],
+            host_data: [0; 32],
+            id_key_digest: [0; 48],
+            author_key_digest: [0; 48],
+            report_id: [0; 32],
+            report_id_ma: [0; 32],
+            reported_tcb: TcbVersion::default(),
+            _reserved_1: [0; 24],
+            chip_id: [0; 64],
+            committed_tcb: TcbVersion::default(),
+            current_build: 0,
+            current_minor: 0,
+            current_major: 0,
+            _reserved_2: 0,
+            committed_build: 0,
+            committed_minor: 0,
+            committed_major: 0,
+            _reserved_3: 0,
+            launch_tcb: TcbVersion::default(),
+            _reserved_4: [0; 168],
+            signature: Signature::default(),
+        };
+
+        assert_eq!(AttestationReport::default(), expected);
+    }
+
+    #[test]
+    fn test_attestation_report_default() {
+        let expected: AttestationReport = AttestationReport {
+            version: Default::default(),
+            guest_svn: Default::default(),
+            policy: GuestPolicy::default(),
+            family_id: Default::default(),
+            image_id: Default::default(),
+            vmpl: Default::default(),
+            sig_algo: Default::default(),
+            current_tcb: TcbVersion::default(),
+            plat_info: PlatformInfo::default(),
+            key_info: KeyInfo::default(),
+            _reserved_0: Default::default(),
+            report_data: [0; 64],
+            measurement: [0; 48],
+            host_data: Default::default(),
+            id_key_digest: [0; 48],
+            author_key_digest: [0; 48],
+            report_id: Default::default(),
+            report_id_ma: Default::default(),
+            reported_tcb: TcbVersion::default(),
+            _reserved_1: Default::default(),
+            chip_id: [0; 64],
+            committed_tcb: TcbVersion::default(),
+            current_build: Default::default(),
+            current_minor: Default::default(),
+            current_major: Default::default(),
+            _reserved_2: Default::default(),
+            committed_build: Default::default(),
+            committed_minor: Default::default(),
+            committed_major: Default::default(),
+            _reserved_3: Default::default(),
+            launch_tcb: TcbVersion::default(),
+            _reserved_4: [0; 168],
+            signature: Signature::default(),
+        };
+
+        assert_eq!(AttestationReport::default(), expected);
+    }
+
+    #[test]
+    fn test_attestation_report_fmt() {
+        let expected: &str = r#"
+Attestation Report (1184 bytes):
+Version:                      0
+Guest SVN:                    0
+
+    Guest Policy (0x0):
+    ABI Major:     0
+    ABI Minor:     0
+    SMT Allowed:   0
+    Migrate MA:    0
+    Debug Allowed: 0
+    Single Socket: 0
+Family ID:                    
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+
+Image ID:                     
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+
+VMPL:                         0
+Signature Algorithm:          0
+Current TCB:
+
+TCB Version:
+  Microcode:   0
+  SNP:         0
+  TEE:         0
+  Boot Loader: 0
+  
+
+Platform Info (0):
+  SMT Enabled:               0
+  TSME Enabled:              0
+  ECC Enabled:               0
+  RAPL Disabled:             0
+  Ciphertext Hiding Enabled: 0
+
+
+Key Information:
+    author key enabled: false
+    mask chip key:      0
+    signing key:        vcek
+
+Report Data:                  
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+
+Measurement:                  
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+
+Host Data:                    
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+
+ID Key Digest:                
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+
+Author Key Digest:            
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+
+Report ID:                    
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+
+Report ID Migration Agent:    
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+
+Reported TCB:                 
+TCB Version:
+  Microcode:   0
+  SNP:         0
+  TEE:         0
+  Boot Loader: 0
+  
+Chip ID:                      
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+
+Committed TCB:
+
+TCB Version:
+  Microcode:   0
+  SNP:         0
+  TEE:         0
+  Boot Loader: 0
+  
+Current Build:                0
+Current Minor:                0
+Current Major:                0
+Committed Build:              0
+Committed Minor:              0
+Committed Major:              0
+Launch TCB:
+
+TCB Version:
+  Microcode:   0
+  SNP:         0
+  TEE:         0
+  Boot Loader: 0
+  
+
+Signature:
+  R: 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 
+
+  S: 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 00 00 
+
+            
+"#;
+
+        assert_eq!(expected, AttestationReport::default().to_string())
+    }
+
+    #[test]
+    fn test_guest_policy_zeroed() {
+        let gp: GuestPolicy = GuestPolicy(0);
+
+        assert_eq!(gp.abi_minor(), 0);
+        assert_eq!(gp.abi_major(), 0);
+        assert_eq!(gp.smt_allowed(), 0);
+        assert_eq!(gp.migrate_ma_allowed(), 0);
+        assert_eq!(gp.debug_allowed(), 0);
+        assert_eq!(gp.single_socket_required(), 0);
+        assert_eq!(gp.cxl_allowed(), 0);
+        assert_eq!(gp.mem_aes_256_xts(), 0);
+        assert_eq!(gp.rapl_dis(), 0);
+        assert_eq!(gp.ciphertext_hiding(), 0);
+    }
+
+    #[test]
+    fn test_guest_policy_max() {
+        let gp: GuestPolicy = GuestPolicy(0b1111111111111111111111111);
+
+        assert_eq!(gp.abi_minor(), 0b11111111);
+        assert_eq!(gp.abi_major(), 0b11111111);
+        assert_eq!(gp.smt_allowed(), 1);
+        assert_eq!(gp.migrate_ma_allowed(), 1);
+        assert_eq!(gp.debug_allowed(), 1);
+        assert_eq!(gp.single_socket_required(), 1);
+        assert_eq!(gp.cxl_allowed(), 1);
+        assert_eq!(gp.mem_aes_256_xts(), 1);
+        assert_eq!(gp.rapl_dis(), 1);
+        assert_eq!(gp.ciphertext_hiding(), 1);
+    }
+
+    #[test]
+    fn test_set_guest_policy_max() {
+        let mut gp: GuestPolicy = GuestPolicy::default();
+
+        assert_eq!(gp.abi_minor(), 0);
+        gp.set_abi_minor(1);
+        assert_eq!(gp.abi_minor(), 0b1);
+
+        assert_eq!(gp.abi_major(), 0);
+        gp.set_abi_major(1);
+        assert_eq!(gp.abi_major(), 0b1);
+
+        assert_eq!(gp.smt_allowed(), 0);
+        gp.set_smt_allowed(1);
+        assert_eq!(gp.smt_allowed(), 1);
+
+        assert_eq!(gp.migrate_ma_allowed(), 0);
+        gp.set_migrate_ma_allowed(1);
+        assert_eq!(gp.migrate_ma_allowed(), 1);
+
+        assert_eq!(gp.debug_allowed(), 0);
+        gp.set_debug_allowed(1);
+        assert_eq!(gp.debug_allowed(), 1);
+
+        assert_eq!(gp.single_socket_required(), 0);
+        gp.set_single_socket_required(1);
+        assert_eq!(gp.single_socket_required(), 1);
+
+        assert_eq!(gp.cxl_allowed(), 0);
+        gp.set_cxl_allowed(1);
+        assert_eq!(gp.cxl_allowed(), 1);
+
+        assert_eq!(gp.mem_aes_256_xts(), 0);
+        gp.set_mem_aes_256_xts(1);
+        assert_eq!(gp.mem_aes_256_xts(), 1);
+
+        assert_eq!(gp.rapl_dis(), 0);
+        gp.set_rapl_dis(1);
+        assert_eq!(gp.rapl_dis(), 1);
+
+        assert_eq!(gp.ciphertext_hiding(), 0);
+        gp.set_ciphertext_hiding(1);
+        assert_eq!(gp.ciphertext_hiding(), 1);
+    }
+
+    #[test]
+    fn test_guest_policy_from_u64() {
+        let gp: GuestPolicy = GuestPolicy(5);
+
+        // Bit 17 of the guest policy is reserved and must always be set to 1.
+        let expected: u64 = (1 << 17) | 5;
+
+        assert_eq!(u64::from(gp), expected);
+    }
+
+    #[test]
+    fn test_platform_info_zeroed() {
+        let expected: PlatformInfo = PlatformInfo(0);
+
+        assert_eq!(expected.smt_enabled(), 0);
+        assert_eq!(expected.tsme_enabled(), 0);
+        assert_eq!(expected.ecc_enabled(), 0);
+        assert_eq!(expected.rapl_disabled(), 0);
+        assert_eq!(expected.ciphertext_hiding_enabled(), 0);
+    }
+
+    #[test]
+    fn test_platform_info_full() {
+        let expected: PlatformInfo = PlatformInfo(0b11111);
+
+        assert_eq!(expected.smt_enabled(), 1);
+        assert_eq!(expected.tsme_enabled(), 1);
+        assert_eq!(expected.ecc_enabled(), 1);
+        assert_eq!(expected.rapl_disabled(), 1);
+        assert_eq!(expected.ciphertext_hiding_enabled(), 1);
+    }
+
+    #[test]
+    fn test_platform_info_fmt() {
+        let expected: &str = r#"
+Platform Info (0):
+  SMT Enabled:               0
+  TSME Enabled:              0
+  ECC Enabled:               0
+  RAPL Disabled:             0
+  Ciphertext Hiding Enabled: 0
+"#;
+        let actual: PlatformInfo = PlatformInfo(0);
+
+        assert_eq!(expected, actual.to_string());
+    }
+
+    #[test]
+    fn test_key_info_zeroed() {
+        let expected: KeyInfo = KeyInfo(0);
+
+        assert!(!expected.author_key_en());
+        assert_eq!(expected.mask_chip_key(), 0);
+
+        assert_eq!(expected.signing_key(), 0);
+    }
+
+    #[test]
+    fn test_key_info_max() {
+        let expected: KeyInfo = KeyInfo(0b11111);
+
+        assert!(expected.author_key_en());
+        assert_eq!(expected.mask_chip_key(), 1);
+        assert_eq!(expected.signing_key(), 0b111);
+    }
+
+    #[test]
+    fn test_key_info_fmt_vcek() {
+        let expected: &str = r#"
+Key Information:
+    author key enabled: false
+    mask chip key:      0
+    signing key:        vcek
+"#;
+        let actual: KeyInfo = KeyInfo(0);
+
+        assert_eq!(expected, actual.to_string());
+    }
+
+    #[test]
+    fn test_key_info_fmt_vlek() {
+        let expected: &str = r#"
+Key Information:
+    author key enabled: false
+    mask chip key:      0
+    signing key:        vlek
+"#;
+        let actual: KeyInfo = KeyInfo(0b100);
+
+        assert_eq!(expected, actual.to_string());
+    }
+
+    #[test]
+    fn test_key_info_fmt_none() {
+        let expected: &str = r#"
+Key Information:
+    author key enabled: false
+    mask chip key:      0
+    signing key:        none
+"#;
+        let actual: KeyInfo = KeyInfo(0b11100);
+
+        assert_eq!(expected, actual.to_string());
+    }
+
+    #[test]
+    fn test_key_info_fmt_unknown() {
+        let expected: &str = r#"
+Key Information:
+    author key enabled: false
+    mask chip key:      0
+    signing key:        unkown
+"#;
+        let actual: KeyInfo = KeyInfo(0b11000);
+
+        assert_eq!(expected, actual.to_string());
     }
 }

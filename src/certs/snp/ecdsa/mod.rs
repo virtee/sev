@@ -21,7 +21,7 @@ const SIG_PIECE_SIZE: usize = std::mem::size_of::<[u8; 72]>();
 const R_S_SIZE: usize = SIG_PIECE_SIZE * 2usize;
 
 #[repr(C)]
-#[derive(Copy, Clone, Deserialize, Serialize)]
+#[derive(Copy, Clone, Deserialize, Serialize, PartialOrd, Ord)]
 /// ECDSA signature.
 pub struct Signature {
     #[serde(with = "BigArray")]
