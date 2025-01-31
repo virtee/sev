@@ -340,7 +340,7 @@ impl TryFrom<FFI::types::SnpSetConfig> for Config {
 /// TcbVersion represents the version of the firmware.
 ///
 /// (Chapter 2.2; Table 3)
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[repr(C)]
 pub struct TcbVersion {
     /// Current bootloader version.
@@ -420,7 +420,7 @@ impl Display for MaskId {
 
 #[cfg(test)]
 mod tests {
-    use super::CertType;
+    use super::{CertType, SnpPlatformStatusFlags};
     use uuid::Uuid;
 
     #[test]
@@ -475,5 +475,60 @@ mod tests {
         ];
         certs.sort();
         assert_eq!(certs, sorted_certs);
+    }
+
+    #[test]
+    fn test_snp_platform_status_flags_zeroed() {
+        let actual: SnpPlatformStatusFlags = SnpPlatformStatusFlags { bits: 0 };
+
+        assert_eq!((actual & SnpPlatformStatusFlags::OWNED).bits(), 0);
+        assert_eq!((actual & SnpPlatformStatusFlags::ENCRYPTED_STATE).bits(), 0);
+    }
+
+    #[test]
+    fn test_snp_platform_status_flags_full() {
+        let mut actual: SnpPlatformStatusFlags = SnpPlatformStatusFlags { bits: 0 };
+
+        actual |= SnpPlatformStatusFlags::OWNED;
+        actual |= SnpPlatformStatusFlags::ENCRYPTED_STATE;
+
+        assert_eq!((actual & SnpPlatformStatusFlags::OWNED).bits(), 1);
+        assert_eq!(
+            (actual & SnpPlatformStatusFlags::ENCRYPTED_STATE).bits(),
+            1 << 8
+        );
+    }
+
+    #[test]
+    fn test_cert_type_fmt() {
+        let mut cert_type: CertType = CertType::Empty;
+        let mut expected: &str = "00000000-0000-0000-0000-000000000000";
+
+        assert_eq!(cert_type.to_string(), expected.to_string());
+
+        cert_type = CertType::ARK;
+        expected = "c0b406a4-a803-4952-9743-3fb6014cd0ae";
+
+        assert_eq!(cert_type.to_string(), expected.to_string());
+
+        cert_type = CertType::ASK;
+        expected = "4ab7b379-bbac-4fe4-a02f-05aef327c782";
+
+        assert_eq!(cert_type.to_string(), expected.to_string());
+
+        cert_type = CertType::VCEK;
+        expected = "63da758d-e664-4564-adc5-f4b93be8accd";
+
+        assert_eq!(cert_type.to_string(), expected.to_string());
+
+        cert_type = CertType::VLEK;
+        expected = "a8074bc2-a25a-483e-aae6-39c045a0b8a1";
+
+        assert_eq!(cert_type.to_string(), expected.to_string());
+
+        cert_type = CertType::CRL;
+        expected = "92f81bc3-5811-4d3d-97ff-d19f88dc67ea";
+
+        assert_eq!(cert_type.to_string(), expected.to_string());
     }
 }
