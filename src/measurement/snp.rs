@@ -11,7 +11,7 @@ use crate::{
         vcpu_types::CpuType,
         vmsa::{GuestFeatures, VMMType, VMSA},
     },
-    util::large_array::LargeArray,
+    util::array::Array,
 };
 use hex::FromHex;
 use serde::{Deserialize, Serialize};
@@ -27,7 +27,7 @@ pub(crate) const LD_BYTES: usize = LD_BITS / 8;
 /// The expected launch digest of the guest
 #[repr(C)]
 #[derive(Debug, Default, Serialize, Deserialize, Clone, Copy)]
-pub struct SnpLaunchDigest(LargeArray<u8, LD_BYTES>);
+pub struct SnpLaunchDigest(Array<u8, LD_BYTES>);
 
 // Try from slice
 impl TryFrom<&[u8]> for SnpLaunchDigest {
@@ -43,21 +43,19 @@ impl TryInto<Vec<u8>> for SnpLaunchDigest {
     type Error = MeasurementError;
 
     fn try_into(self) -> Result<Vec<u8>, MeasurementError> {
-        let array = self.0.as_array();
-        let vec: Vec<u8> = array.to_vec(); // Convert the array into a Vec<u8>
-        Ok(vec)
+        Ok((*self.0).to_vec())
     }
 }
 
 impl SnpLaunchDigest {
     /// Create Launch Digest from large array
-    pub fn new(data: LargeArray<u8, LD_BYTES>) -> Self {
+    pub fn new(data: Array<u8, LD_BYTES>) -> Self {
         Self(data)
     }
 
     /// Get the launch digest as a hex string
     pub fn get_hex_ld(self) -> String {
-        hex::encode::<&[u8]>(self.0.as_slice())
+        format!("{:x}", self.0)
     }
 }
 
@@ -82,7 +80,7 @@ fn snp_update_kernel_hashes(
                 None,
             )?
         }
-        None => gctx.update_page(PageType::Zero, gpa, None, Some(size))?,
+        _ => gctx.update_page(PageType::Zero, gpa, None, Some(size))?,
     }
 
     Ok(())
@@ -197,7 +195,7 @@ pub fn snp_calc_launch_digest(
             let ovmf_hash = Vec::from_hex(hash)?;
             Gctx::new(ovmf_hash.as_slice())?
         }
-        None => {
+        _ => {
             let mut gctx = Gctx::default();
 
             gctx.update_page(PageType::Normal, ovmf.gpa(), Some(ovmf.data()), None)?;
@@ -212,12 +210,12 @@ pub fn snp_calc_launch_digest(
             snp_measurement.initrd_file,
             snp_measurement.append,
         )?),
-        None => None,
+        _ => None,
     };
 
     let official_vmm_type = match snp_measurement.vmm_type {
         Some(vmm) => vmm,
-        None => VMMType::QEMU,
+        _ => VMMType::QEMU,
     };
 
     snp_update_metadata_pages(&mut gctx, &ovmf, sev_hashes.as_ref(), official_vmm_type)?;

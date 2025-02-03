@@ -112,7 +112,6 @@ pub mod error;
 
 #[cfg(all(feature = "sev", feature = "dangerous_hw_tests"))]
 pub use util::cached_chain;
-use util::{TypeLoad, TypeSave};
 
 #[cfg(all(feature = "openssl", feature = "sev"))]
 use certs::sev::sev;
@@ -135,65 +134,6 @@ use std::convert::TryFrom;
 use std::io::{Read, Write};
 
 use serde::{Deserialize, Serialize};
-
-/// Information about the SEV platform version.
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct Version {
-    /// The major version number.
-    pub major: u8,
-
-    /// The minor version number.
-    pub minor: u8,
-}
-
-impl std::fmt::Display for Version {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}.{}", self.major, self.minor)
-    }
-}
-
-impl From<u16> for Version {
-    fn from(v: u16) -> Self {
-        Self {
-            major: ((v & 0xF0) >> 4) as u8,
-            minor: (v & 0x0F) as u8,
-        }
-    }
-}
-
-/// A description of the SEV platform's build information.
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct Build {
-    /// The version information.
-    pub version: Version,
-
-    /// The build number.
-    pub build: u8,
-}
-
-impl std::fmt::Display for Build {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}.{}", self.version, self.build)
-    }
-}
-
-impl codicon::Decoder<()> for Build {
-    type Error = std::io::Error;
-
-    fn decode(mut reader: impl Read, _: ()) -> std::io::Result<Self> {
-        reader.load()
-    }
-}
-
-impl codicon::Encoder<()> for Build {
-    type Error = std::io::Error;
-
-    fn encode(&self, mut writer: impl Write, _: ()) -> std::io::Result<()> {
-        writer.save(self)
-    }
-}
 
 /// A representation for EPYC generational product lines.
 ///

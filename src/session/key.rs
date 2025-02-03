@@ -86,10 +86,10 @@ impl Key {
         let _ = u32::try_from(hbytes * 8).or(Err(ErrorKind::InvalidInput))?;
         let lbits = u32::try_from(size * 8).or(Err(ErrorKind::InvalidInput))?;
 
-        let mut out = Key::zeroed((size + hbytes - 1) / hbytes * hbytes);
+        let mut out = Key::zeroed(size.div_ceil(hbytes) * hbytes);
         let mut buf = &mut out[..];
 
-        for i in 1..=((size + hbytes - 1) / hbytes) as u32 {
+        for i in 1..=size.div_ceil(hbytes) as u32 {
             let mut sig = sign::Signer::new(hsh, &key)?;
 
             sig.update(&i.to_le_bytes())?;
