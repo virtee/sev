@@ -18,10 +18,7 @@ use crate::error::*;
 
 #[cfg(feature = "sev")]
 #[cfg(target_os = "linux")]
-use crate::{
-    certs::sev::sev::{Certificate, Chain},
-    Build as CertBuild, Version as CertVersion,
-};
+use crate::certs::sev::sev::{Certificate, Chain};
 
 #[cfg(target_os = "linux")]
 use std::{
@@ -94,8 +91,8 @@ impl Firmware {
             .map_err(|_| cmd_buf.encapsulate())?;
 
         Ok(Status {
-            build: CertBuild {
-                version: CertVersion {
+            build: crate::firmware::host::types::Build {
+                version: crate::firmware::host::types::Version {
                     major: info.version.major,
                     minor: info.version.minor,
                 },

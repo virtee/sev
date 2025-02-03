@@ -147,7 +147,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
 }
 
 /// Encapsulates the various data needed to begin the launch process.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Default, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Start {
     /// Describes a policy that the AMD Secure Processor will enforce.
     pub(crate) policy: GuestPolicy,

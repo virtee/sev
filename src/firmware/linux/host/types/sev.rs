@@ -3,7 +3,7 @@
 #[cfg(target_os = "linux")]
 use crate::certs::sev::sev;
 
-use crate::Version;
+use crate::firmware::host::Version;
 
 #[cfg(target_os = "linux")]
 use std::marker::PhantomData;

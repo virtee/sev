@@ -7,7 +7,7 @@ use super::*;
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Data {
-    pub firmware: crate::Version,
+    pub firmware: crate::firmware::host::Version,
     pub reserved: u16,
     pub key: key::PubKey,
 }

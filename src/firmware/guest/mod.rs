@@ -43,6 +43,7 @@ fn map_fw_err(raw_error: RawFwError) -> UserApiError {
 
 /// A handle to the SEV-SNP guest device.
 #[cfg(target_os = "linux")]
+#[derive(Debug)]
 pub struct Firmware(File);
 
 #[cfg(target_os = "linux")]
@@ -232,5 +233,28 @@ impl Firmware {
         }
 
         Ok(ffi_derived_key_response.key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_firmware_error_mapping() {
+        let raw_error = RawFwError(1); // Lower byte error
+        let error = map_fw_err(raw_error);
+        assert!(matches!(error, UserApiError::FirmwareError(_)));
+
+        let raw_error = RawFwError(0x100000000u64); // Upper byte error
+        let error = map_fw_err(raw_error);
+        assert!(matches!(error, UserApiError::VmmError(_)));
+
+        let raw_error = RawFwError(0x0u64); // lower byte error
+        let error = map_fw_err(raw_error);
+        assert!(matches!(
+            error,
+            UserApiError::FirmwareError(FirmwareError::UnknownSevError(0))
+        ));
     }
 }

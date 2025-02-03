@@ -3,7 +3,7 @@
 #[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
 use super::*;
 
-use crate::util::hexdump;
+use crate::{firmware::parser::ByteParser, util::hexdump};
 
 #[cfg(feature = "openssl")]
 use crate::certs::snp::{AsLeBytes, FromLe};
@@ -17,8 +17,8 @@ use serde_big_array::BigArray;
 #[cfg(feature = "openssl")]
 use openssl::{bn, ecdsa};
 
-const SIG_PIECE_SIZE: usize = std::mem::size_of::<[u8; 72]>();
-const R_S_SIZE: usize = SIG_PIECE_SIZE * 2usize;
+pub(crate) const SIG_PIECE_SIZE: usize = std::mem::size_of::<[u8; 72]>();
+pub(crate) const R_S_SIZE: usize = SIG_PIECE_SIZE * 2usize;
 
 #[repr(C)]
 #[derive(Copy, Clone, Deserialize, Serialize, PartialOrd, Ord)]
@@ -33,6 +33,14 @@ pub struct Signature {
 }
 
 impl Signature {
+    /// Creates a new signature from the values specified
+    pub fn new(r: [u8; 72], s: [u8; 72]) -> Self {
+        Self {
+            r,
+            s,
+            ..Default::default()
+        }
+    }
     /// Returns the signatures `r` component
     pub fn r(&self) -> &[u8; 72] {
         &self.r
@@ -55,20 +63,43 @@ impl std::fmt::Debug for Signature {
     }
 }
 
+impl Default for Signature {
+    fn default() -> Self {
+        ByteParser::default()
+    }
+}
+
+impl ByteParser for Signature {
+    type Bytes = [u8; 512];
+    #[inline(always)]
+    fn from_bytes(bytes: Self::Bytes) -> Self {
+        let mut r = [0; 72];
+        let mut s = [0; 72];
+        r.copy_from_slice(&bytes[0..72]);
+        s.copy_from_slice(&bytes[72..144]);
+        Self::new(r, s)
+    }
+    #[inline(always)]
+    fn to_bytes(&self) -> Self::Bytes {
+        let mut bytes = [0u8; 512];
+        bytes[0..72].copy_from_slice(&self.r);
+        bytes[72..144].copy_from_slice(&self.s);
+        bytes
+    }
+    #[inline(always)]
+    fn default() -> Self {
+        Self {
+            r: [0; 72],
+            s: [0; 72],
+            _reserved: [0; 512 - R_S_SIZE],
+        }
+    }
+}
+
 impl Eq for Signature {}
 impl PartialEq for Signature {
     fn eq(&self, other: &Signature) -> bool {
         self.r[..] == other.r[..] && self.s[..] == other.s[..]
-    }
-}
-
-impl Default for Signature {
-    fn default() -> Self {
-        Signature {
-            r: [0u8; 72],
-            s: [0u8; 72],
-            _reserved: [0u8; (512 - (SIG_PIECE_SIZE * 2))],
-        }
     }
 }
 
@@ -159,7 +190,7 @@ mod tests {
 
     #[test]
     fn test_signature_default() {
-        let sig: Signature = Signature::default();
+        let sig: Signature = Default::default();
         assert_eq!(sig.r(), &[0u8; 72]);
         assert_eq!(sig.s(), &[0u8; 72]);
     }
@@ -177,8 +208,8 @@ mod tests {
 
     #[test]
     fn test_signature_eq() {
-        let sig1: Signature = Signature::default();
-        let sig2: Signature = Signature::default();
+        let sig1: Signature = Default::default();
+        let sig2: Signature = Default::default();
         let sig3: Signature = Signature {
             r: [1u8; 72],
             s: [0u8; 72],
@@ -191,7 +222,7 @@ mod tests {
 
     #[test]
     fn test_signature_ord() {
-        let sig1: Signature = Signature::default();
+        let sig1: Signature = Default::default();
         let sig2: Signature = Signature {
             r: [1u8; 72],
             s: [0u8; 72],
@@ -203,7 +234,7 @@ mod tests {
 
     #[test]
     fn test_signature_debug() {
-        let sig: Signature = Signature::default();
+        let sig: Signature = Default::default();
         let debug_str: String = format!("{:?}", sig);
         assert!(debug_str.starts_with("Signature { r: "));
         assert!(debug_str.contains(", s: "));
@@ -211,7 +242,7 @@ mod tests {
 
     #[test]
     fn test_signature_display() {
-        let sig: Signature = Signature::default();
+        let sig: Signature = Default::default();
         let display_str: String = format!("{}", sig);
         assert!(display_str.contains("Signature:"));
         assert!(display_str.contains("R:"));
@@ -247,7 +278,7 @@ mod tests {
 
         #[test]
         fn test_try_into_ecdsa_sig() {
-            let sig = Signature::default();
+            let sig: Signature = Default::default();
             let ecdsa_sig: ecdsa::EcdsaSig = (&sig).try_into().unwrap();
             assert_eq!(ecdsa_sig.r().to_vec(), vec![]);
             assert_eq!(ecdsa_sig.s().to_vec(), vec![]);
@@ -255,7 +286,7 @@ mod tests {
 
         #[test]
         fn test_try_into_vec() {
-            let sig = Signature::default();
+            let sig: Signature = Default::default();
             let der: Vec<u8> = (&sig).try_into().unwrap();
             assert!(!der.is_empty());
         }
@@ -269,7 +300,7 @@ mod tests {
         #[test]
         #[should_panic]
         fn test_try_into_p384_signature_failure() {
-            let signature: Signature = Signature::default();
+            let signature: Signature = Default::default();
 
             let _p384_sig: p384::ecdsa::Signature = (&signature).try_into().unwrap();
         }
@@ -290,7 +321,7 @@ mod tests {
 
     #[test]
     fn test_signature_serde() {
-        let sig: Signature = Signature::default();
+        let sig: Signature = Default::default();
         let serialized: Vec<u8> = bincode::serialize(&sig).unwrap();
         let deserialized: Signature = bincode::deserialize(&serialized).unwrap();
         assert_eq!(sig, deserialized);
