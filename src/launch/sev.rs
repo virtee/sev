@@ -4,7 +4,11 @@
 //! This ensures (at compile time) that the right steps are called in the
 //! right order.
 
-use crate::error::{FirmwareError, SevError};
+use crate::{
+    error::{FirmwareError, SevError},
+    firmware::host::Version,
+    util::{TypeLoad, TypeSave},
+};
 
 #[cfg(target_os = "linux")]
 use crate::launch::linux::ioctl::*;
