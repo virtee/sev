@@ -71,7 +71,7 @@ fn snp_launch_test() {
     let launcher = Launcher::new(vm_fd, sev).unwrap();
 
     let mut policy = GuestPolicy(0);
-    policy.set_smt_allowed(1);
+    policy.set_smt_allowed(true);
     let start = Start::new(policy, [0; 16]);
 
     let mut launcher = launcher.start(start).unwrap();

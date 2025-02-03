@@ -2,29 +2,15 @@
 
 //! Helpful primitives for developing the crate.
 
+pub mod array;
 pub mod cached_chain;
 mod impl_const_id;
-pub mod large_array;
-pub(crate) mod sealed;
 
 use std::{
     io::{Read, Result, Write},
     mem::{size_of, MaybeUninit},
     slice::{from_raw_parts, from_raw_parts_mut},
 };
-
-#[cfg(any(feature = "sev", feature = "snp"))]
-pub fn hexdump(bytes: &[u8]) -> String {
-    let mut retval: String = String::new();
-    for (i, byte) in bytes.iter().enumerate() {
-        if (i % 16) == 0 {
-            retval.push('\n');
-        }
-        retval.push_str(&format!("{byte:02x} "));
-    }
-    retval.push('\n');
-    retval
-}
 
 pub trait TypeLoad: Read {
     fn load<T: Sized + Copy>(&mut self) -> Result<T> {
