@@ -4,12 +4,16 @@
 
 #![allow(dead_code)]
 
-use super::*;
+use codicon::{Decoder, Encoder};
+
+use crate::util::array::Array;
+
+use super::{
+    util::{TypeLoad, TypeSave},
+    *,
+};
 
 use std::{fs, io, mem::size_of};
-
-use codicon::{Decoder, Encoder};
-use serde_big_array::BigArray;
 
 const ATTR_G_SHIFT: usize = 23;
 const ATTR_B_SHIFT: usize = 22;
@@ -66,7 +70,7 @@ pub struct VmcbSegment {
 /// The layout of a VMCB struct is documented in Table B-4 of the
 /// AMD64 Architecture Programmer’s Manual, Volume 2: System Programming
 #[repr(C, packed)]
-#[derive(Copy, Clone, Serialize, Deserialize)]
+#[derive(Default, Copy, Clone, Serialize, Deserialize)]
 pub struct Vmsa {
     /// Extra segment.
     es: VmcbSegment,
@@ -99,8 +103,7 @@ pub struct Vmsa {
     tr: VmcbSegment,
 
     /// Reserved.
-    #[serde(with = "BigArray")]
-    reserved_1: [u8; 43],
+    reserved_1: Array<u8, 43>,
 
     /// Current privilege level.
     cpl: u8,
@@ -112,8 +115,7 @@ pub struct Vmsa {
     efer: u64,
 
     /// Reserved.
-    #[serde(with = "BigArray")]
-    reserved_3: [u8; 104],
+    reserved_3: Array<u8, 104>,
 
     /// Bitmap of supervisor-level state components. System software sets bits
     /// in the XSS register bitmap to enable management of corresponding state
@@ -143,8 +145,7 @@ pub struct Vmsa {
     rip: u64,
 
     /// Reserved.
-    #[serde(with = "BigArray")]
-    reserved_4: [u8; 88],
+    reserved_4: Array<u8, 88>,
 
     /// Stack pointer.
     rsp: u64,
@@ -210,8 +211,7 @@ pub struct Vmsa {
     last_excp_to: u64,
 
     /// Reserved.
-    #[serde(with = "BigArray")]
-    reserved_7: [u8; 72],
+    reserved_7: Array<u8, 72>,
 
     /// Speculation Control of MSRs. Documented in Section 3.2.9 of the
     /// AMD64 Architecture Programmer’s Manual, Volume 2: System Programming
@@ -292,8 +292,7 @@ pub struct Vmsa {
     sw_scratch: u64,
 
     /// Reserved.
-    #[serde(with = "BigArray")]
-    reserved_11: [u8; 56],
+    reserved_11: Array<u8, 56>,
 
     /// XCR0 register.
     xcr0: u64,
@@ -470,11 +469,5 @@ impl Vmsa {
 
         fs::write(filename, buf)?;
         Ok(())
-    }
-}
-
-impl Default for Vmsa {
-    fn default() -> Self {
-        unsafe { std::mem::zeroed() }
     }
 }
