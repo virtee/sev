@@ -9,6 +9,7 @@ use static_assertions::const_assert;
 const MAX_VMPL: u32 = 3;
 
 #[repr(C)]
+#[derive(Debug, Default)]
 pub struct DerivedKeyReq {
     /// Selects the root key to derive the key from.
     /// 0: Indicates VCEK.
@@ -255,5 +256,92 @@ mod test {
 
             assert_eq!(expected, actual);
         }
+    }
+
+    use super::*;
+
+    #[test]
+    fn test_derived_key_req_conversion() {
+        // Create a mock DerivedKey
+        let derived_key = DerivedKey::new(false, GuestFieldSelect(0x1234), 2, 1, 100);
+
+        // Test From<DerivedKey>
+        let req: DerivedKeyReq = derived_key.into();
+        assert_eq!(req.root_key_select, 0);
+        assert_eq!(req.reserved_0, 0);
+        assert_eq!(req.guest_field_select, 0x1234);
+        assert_eq!(req.vmpl, 2);
+        assert_eq!(req.guest_svn, 1);
+        assert_eq!(req.tcb_version, 100);
+
+        // Test From<&mut DerivedKey>
+        let mut derived_key = derived_key;
+        let req: DerivedKeyReq = (&mut derived_key).into();
+        assert_eq!(req.root_key_select, 0);
+        assert_eq!(req.reserved_0, 0);
+        assert_eq!(req.guest_field_select, 0x1234);
+        assert_eq!(req.vmpl, 2);
+        assert_eq!(req.guest_svn, 1);
+        assert_eq!(req.tcb_version, 100);
+    }
+
+    #[test]
+    fn test_ext_report_req() {
+        let report_req = ReportReq::default();
+        let ext_report = ExtReportReq::new(&report_req);
+
+        assert_eq!(ext_report.data, report_req);
+        assert_eq!(ext_report.certs_address, u64::MAX);
+        assert_eq!(ext_report.certs_len, 0);
+
+        // Test Default
+        let default_ext = ExtReportReq::default();
+        assert_eq!(default_ext.certs_address, 0);
+        assert_eq!(default_ext.certs_len, 0);
+    }
+
+    #[test]
+    fn test_report_req() {
+        // Test default values
+        let default_req = ReportReq::default();
+        assert_eq!(default_req.report_data, [0; 64]);
+        assert_eq!(default_req.vmpl, 1);
+        assert_eq!(default_req._reserved, [0; 28]);
+
+        // Test successful creation with Some values
+        let report_data = [42u8; 64];
+        let req = ReportReq::new(Some(report_data), Some(2)).unwrap();
+        assert_eq!(req.report_data, report_data);
+        assert_eq!(req.vmpl, 2);
+
+        // Test successful creation with None values
+        let req = ReportReq::new(None, None).unwrap();
+        assert_eq!(req.report_data, [0; 64]);
+        assert_eq!(req.vmpl, 1);
+
+        // Test VMPL validation
+        assert!(ReportReq::new(None, Some(4)).is_err());
+        assert!(ReportReq::new(None, Some(MAX_VMPL)).is_ok());
+    }
+
+    #[test]
+    fn test_report_rsp() {
+        let rsp = ReportRsp::default();
+
+        assert_eq!(rsp.status, 0);
+        assert_eq!(rsp.report_size, 0);
+        assert_eq!(rsp.reserved_0, [0; 24]);
+
+        // Verify size is exactly 4000 bytes
+        assert_eq!(std::mem::size_of::<ReportRsp>(), 4000);
+    }
+
+    #[test]
+    fn test_derived_key_rsp() {
+        let rsp = DerivedKeyRsp::default();
+
+        assert_eq!(rsp.status, 0);
+        assert_eq!(rsp.reserved_0, [0; 28]);
+        assert_eq!(rsp.key, [0; 32]);
     }
 }
