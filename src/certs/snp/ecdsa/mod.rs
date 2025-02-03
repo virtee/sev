@@ -153,3 +153,157 @@ impl TryFrom<&Signature> for Vec<u8> {
         Ok(ecdsa::EcdsaSig::try_from(value)?.to_der()?)
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_signature_default() {
+        let sig: Signature = Signature::default();
+        assert_eq!(sig.r(), &[0u8; 72]);
+        assert_eq!(sig.s(), &[0u8; 72]);
+    }
+
+    #[test]
+    fn test_signature_getters() {
+        let sig: Signature = Signature {
+            r: [1u8; 72],
+            s: [2u8; 72],
+            _reserved: [0u8; 512 - (SIG_PIECE_SIZE * 2)],
+        };
+        assert_eq!(sig.r(), &[1u8; 72]);
+        assert_eq!(sig.s(), &[2u8; 72]);
+    }
+
+    #[test]
+    fn test_signature_eq() {
+        let sig1: Signature = Signature::default();
+        let sig2: Signature = Signature::default();
+        let sig3: Signature = Signature {
+            r: [1u8; 72],
+            s: [0u8; 72],
+            _reserved: [0u8; 512 - (SIG_PIECE_SIZE * 2)],
+        };
+
+        assert_eq!(sig1, sig2);
+        assert_ne!(sig1, sig3);
+    }
+
+    #[test]
+    fn test_signature_ord() {
+        let sig1: Signature = Signature::default();
+        let sig2: Signature = Signature {
+            r: [1u8; 72],
+            s: [0u8; 72],
+            _reserved: [0u8; 512 - (SIG_PIECE_SIZE * 2)],
+        };
+
+        assert!(sig1 < sig2);
+    }
+
+    #[test]
+    fn test_signature_debug() {
+        let sig: Signature = Signature::default();
+        let debug_str: String = format!("{:?}", sig);
+        assert!(debug_str.starts_with("Signature { r: "));
+        assert!(debug_str.contains(", s: "));
+    }
+
+    #[test]
+    fn test_signature_display() {
+        let sig: Signature = Signature::default();
+        let display_str: String = format!("{}", sig);
+        assert!(display_str.contains("Signature:"));
+        assert!(display_str.contains("R:"));
+        assert!(display_str.contains("S:"));
+    }
+
+    #[cfg(feature = "openssl")]
+    mod openssl_tests {
+        use super::*;
+        use openssl::bn::BigNum;
+        use std::convert::TryInto;
+
+        #[test]
+        fn test_from_ecdsa_sig() {
+            let r = BigNum::from_dec_str("123").unwrap();
+            let s = BigNum::from_dec_str("456").unwrap();
+            let ecdsa_sig = ecdsa::EcdsaSig::from_private_components(r, s).unwrap();
+            let sig: Signature = ecdsa_sig.into();
+            assert_ne!(sig.r(), &[0u8; 72]);
+            assert_ne!(sig.s(), &[0u8; 72]);
+        }
+
+        #[test]
+        fn test_try_from_bytes() {
+            let r = BigNum::from_dec_str("123").unwrap();
+            let s = BigNum::from_dec_str("456").unwrap();
+            let ecdsa_sig = ecdsa::EcdsaSig::from_private_components(r, s).unwrap();
+            let der = ecdsa_sig.to_der().unwrap();
+            let sig = Signature::try_from(der.as_slice()).unwrap();
+            assert_ne!(sig.r(), &[0u8; 72]);
+            assert_ne!(sig.s(), &[0u8; 72]);
+        }
+
+        #[test]
+        fn test_try_into_ecdsa_sig() {
+            let sig = Signature::default();
+            let ecdsa_sig: ecdsa::EcdsaSig = (&sig).try_into().unwrap();
+            assert_eq!(ecdsa_sig.r().to_vec(), vec![]);
+            assert_eq!(ecdsa_sig.s().to_vec(), vec![]);
+        }
+
+        #[test]
+        fn test_try_into_vec() {
+            let sig = Signature::default();
+            let der: Vec<u8> = (&sig).try_into().unwrap();
+            assert!(!der.is_empty());
+        }
+    }
+
+    #[cfg(feature = "crypto_nossl")]
+    mod crypto_nossl_tests {
+        use super::*;
+        use std::convert::TryInto;
+
+        #[test]
+        #[should_panic]
+        fn test_try_into_p384_signature_failure() {
+            let signature: Signature = Signature::default();
+
+            let _p384_sig: p384::ecdsa::Signature = (&signature).try_into().unwrap();
+        }
+
+        #[test]
+        fn test_try_into_p384_signature() {
+            // Test with non-zero values
+            let sig = Signature {
+                r: [1u8; 72],
+                s: [2u8; 72],
+                _reserved: [0u8; 512 - (SIG_PIECE_SIZE * 2)],
+            };
+            let p384_sig: p384::ecdsa::Signature = (&sig).try_into().unwrap();
+            assert_eq!(p384_sig.r().to_bytes().as_slice(), &[1u8; 48]);
+            assert_eq!(p384_sig.s().to_bytes().as_slice(), &[2u8; 48]);
+        }
+    }
+
+    #[test]
+    fn test_signature_serde() {
+        let sig: Signature = Signature::default();
+        let serialized: Vec<u8> = bincode::serialize(&sig).unwrap();
+        let deserialized: Signature = bincode::deserialize(&serialized).unwrap();
+        assert_eq!(sig, deserialized);
+    }
+
+    #[test]
+    fn test_signature_max_values() {
+        let sig: Signature = Signature {
+            r: [0xFF; 72],
+            s: [0xFF; 72],
+            _reserved: [0u8; 512 - (SIG_PIECE_SIZE * 2)],
+        };
+        assert_eq!(sig.r(), &[0xFF; 72]);
+        assert_eq!(sig.s(), &[0xFF; 72]);
+    }
+}

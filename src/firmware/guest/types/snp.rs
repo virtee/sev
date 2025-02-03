@@ -489,7 +489,7 @@ bitfield! {
     /// Indicates that ciphertext hiding is enabled
     pub ciphertext_hiding_enabled, _: 4, 4;
     /// reserved
-    reserved, _: 5, 63;
+    reserved, _: 63, 5;
 }
 
 impl Display for PlatformInfo {
@@ -541,7 +541,7 @@ bitfield! {
     /// (7) NONE
     pub signing_key, _: 4,2;
     /// reserved
-    reserved, _: 5, 31;
+    reserved, _: 31, 5;
 }
 
 impl Display for KeyInfo {
@@ -570,6 +570,7 @@ Key Information:
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     #[test]
@@ -848,6 +849,24 @@ Signature:
     }
 
     #[test]
+    fn test_attestation_report_clone() {
+        let expected: AttestationReport = AttestationReport::default();
+
+        let copy: AttestationReport = expected;
+
+        assert_eq!(expected, copy);
+    }
+
+    #[test]
+    fn test_attestation_report_copy() {
+        let expected: AttestationReport = AttestationReport::default();
+
+        let copy: AttestationReport = expected;
+
+        assert_eq!(expected, copy);
+    }
+
+    #[test]
     fn test_guest_policy_zeroed() {
         let gp: GuestPolicy = GuestPolicy(0);
 
@@ -1040,5 +1059,162 @@ Key Information:
         let actual: KeyInfo = KeyInfo(0b11000);
 
         assert_eq!(expected, actual.to_string());
+    }
+
+    #[test]
+    fn test_platform_info_serialization() {
+        let original = PlatformInfo(0b11111);
+
+        // Test bincode
+        let binary = bincode::serialize(&original).unwrap();
+        let from_binary: PlatformInfo = bincode::deserialize(&binary).unwrap();
+        assert_eq!(original, from_binary);
+    }
+
+    #[test]
+    fn test_key_info_serialization() {
+        let original = KeyInfo(0b11111);
+
+        // Test bincode
+        let binary = bincode::serialize(&original).unwrap();
+        let from_binary: KeyInfo = bincode::deserialize(&binary).unwrap();
+        assert_eq!(original, from_binary);
+        assert!(from_binary.author_key_en());
+        assert_eq!(from_binary.mask_chip_key(), 1);
+        assert_eq!(from_binary.signing_key(), 0b111);
+    }
+
+    #[test]
+    fn test_guest_policy_serialization() {
+        let mut original = GuestPolicy::default();
+        original.set_abi_major(2);
+        original.set_abi_minor(1);
+        original.set_smt_allowed(1);
+        original.set_debug_allowed(1);
+
+        // Test bincode
+        let binary = bincode::serialize(&original).unwrap();
+        let from_binary: GuestPolicy = bincode::deserialize(&binary).unwrap();
+        assert_eq!(original, from_binary);
+    }
+
+    #[test]
+    fn test_attestation_report_serialization() {
+        let original: AttestationReport = AttestationReport {
+            version: 2,
+            guest_svn: 1,
+            policy: GuestPolicy(3),
+            family_id: [1; 16],
+            image_id: [2; 16],
+            ..Default::default()
+        };
+
+        // Test bincode
+        let binary = bincode::serialize(&original).unwrap();
+        let from_binary: AttestationReport = bincode::deserialize(&binary).unwrap();
+        assert_eq!(original, from_binary);
+    }
+
+    #[test]
+    fn test_boundary_value_serialization() {
+        // Test max values
+        let platform_info = PlatformInfo(u64::MAX);
+        let key_info = KeyInfo(u32::MAX);
+        let guest_policy = GuestPolicy(u64::MAX);
+
+        // Verify serialization/deserialization preserves max values
+        assert_eq!(
+            platform_info,
+            bincode::deserialize(&bincode::serialize(&platform_info).unwrap()).unwrap()
+        );
+        assert_eq!(
+            key_info,
+            bincode::deserialize(&bincode::serialize(&key_info).unwrap()).unwrap()
+        );
+        assert_eq!(
+            guest_policy,
+            bincode::deserialize(&bincode::serialize(&guest_policy).unwrap()).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_guest_field_select_operations() {
+        let mut field = GuestFieldSelect::default();
+
+        field.set_guest_policy(1);
+        assert_eq!(field.get_guest_policy(), 1);
+
+        field.set_image_id(1);
+        assert_eq!(field.get_image_id(), 1);
+
+        field.set_family_id(1);
+        assert_eq!(field.get_family_id(), 1);
+
+        field.set_measurement(1);
+        assert_eq!(field.get_measurement(), 1);
+    }
+
+    #[test]
+    fn test_derived_key_fields() {
+        let key = DerivedKey::new(true, GuestFieldSelect(0xFF), 2, 3, 0x1234);
+        assert_eq!(key.get_root_key_select(), 1);
+        assert_eq!(key.vmpl, 2);
+        assert_eq!(key.guest_svn, 3);
+        assert_eq!(key.tcb_version, 0x1234);
+    }
+
+    #[test]
+    fn test_key_info_all_combinations() {
+        let mut info = KeyInfo(0);
+
+        // Test VCEK
+        assert_eq!(info.signing_key(), 0);
+        assert!(!info.author_key_en());
+
+        // Test VLEK
+        info = KeyInfo(0b100);
+        assert_eq!(info.signing_key(), 1);
+
+        // Test None
+        info = KeyInfo(0b11100);
+        assert_eq!(info.signing_key(), 7);
+    }
+
+    #[test]
+    fn test_attestation_report_fields() {
+        let report: AttestationReport = AttestationReport {
+            version: 2,
+            guest_svn: 1,
+            vmpl: 3,
+            ..Default::default()
+        };
+        assert_eq!(report.version, 2);
+        assert_eq!(report.guest_svn, 1);
+        assert_eq!(report.vmpl, 3);
+        assert_eq!(report.measurement, [0; 48]);
+    }
+
+    #[test]
+    fn test_platform_info_reserved() {
+        let info = PlatformInfo(0xFF);
+        assert_eq!(info.reserved(), 0x7);
+    }
+
+    #[test]
+    fn test_guest_policy_combined_fields() {
+        let mut policy = GuestPolicy::default();
+
+        policy.set_abi_major(2);
+        policy.set_abi_minor(1);
+        policy.set_smt_allowed(1);
+        policy.set_debug_allowed(1);
+
+        assert_eq!(policy.abi_major(), 2);
+        assert_eq!(policy.abi_minor(), 1);
+        assert_eq!(policy.smt_allowed(), 1);
+        assert_eq!(policy.debug_allowed(), 1);
+
+        let policy_u64: u64 = policy.into();
+        assert_eq!(policy_u64 & (1 << 17), 1 << 17); // Reserved bit 17 must be 1
     }
 }

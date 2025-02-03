@@ -316,6 +316,19 @@ impl<'a> std::convert::From<&WrappedVlekHashstick<'a>> for SnpVlekLoad {
 
 #[cfg(test)]
 mod test {
+    use crate::firmware::host::FFI::types::SnpSetConfig;
+
+    #[test]
+    fn test_snp_set_config_default() {
+        let expected: SnpSetConfig = SnpSetConfig {
+            reported_tcb: Default::default(),
+            mask_id: Default::default(),
+            reserved: [0; 52],
+        };
+        let actual: SnpSetConfig = Default::default();
+        assert_eq!(expected, actual);
+    }
+
     mod raw_data {
 
         use crate::firmware::linux::host::types::RawData;

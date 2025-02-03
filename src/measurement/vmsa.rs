@@ -171,7 +171,7 @@ bitfield! {
     ///SmtProtection
     pub smt_protection, _: 15,15;
     /// Reserved, SBZ
-    reserved_3, sbz: 16, 63;
+    reserved_3, sbz: 63, 16;
 }
 
 impl Default for GuestFeatures {

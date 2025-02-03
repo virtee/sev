@@ -141,7 +141,7 @@ impl From<RawFwError> for (u32, u32) {
 
 impl From<RawFwError> for (VmmError, SevError) {
     fn from(value: RawFwError) -> Self {
-        ((value.0 >> 0x20).into(), value.0.into())
+        (((value.0 >> 0x20) as u32).into(), (value.0 as u32).into())
     }
 }
 
@@ -655,7 +655,7 @@ impl std::fmt::Display for HashstickError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 /// Errors which may be encountered through misuse of the User API.
 pub enum CertError {
     /// Malformed GUID.
@@ -1115,5 +1115,377 @@ impl From<std::io::Error> for SessionError {
 impl From<ErrorStack> for SessionError {
     fn from(value: ErrorStack) -> Self {
         Self::OpenSSLStack(value)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bincode::ErrorKind;
+
+    use super::*;
+    use std::{
+        convert::{TryFrom, TryInto},
+        error::Error,
+    };
+
+    #[test]
+    fn test_vmm_error_complete() {
+        // Test all variants
+        let variants = vec![
+            (1u32, VmmError::InvalidCertificatePageLength),
+            (2u32, VmmError::RateLimitRetryRequest),
+            (999u32, VmmError::Unknown),
+        ];
+
+        for (code, expected) in variants {
+            // Test u32 conversion
+            assert_eq!(VmmError::from(code), expected);
+            // Test u64 conversion
+            assert_eq!(VmmError::from((code as u64) << 32), expected);
+            // Test display
+            assert!(!expected.to_string().is_empty());
+            // Test error trait
+            assert!(std::error::Error::source(&expected).is_none());
+        }
+    }
+
+    #[test]
+    fn test_sev_error_complete() {
+        // Test all valid codes
+        for code in 0x01..=0x27u32 {
+            if code == 0x1E {
+                continue;
+            } // Skip gap
+            let err = SevError::from(code);
+            assert!(!matches!(err, SevError::UnknownError));
+
+            // Test u64 conversion
+            let err64 = SevError::from(code as u64);
+            assert_eq!(err, err64);
+
+            // Test display
+            assert!(!err.to_string().is_empty());
+
+            // Test c_int conversion
+            let c_val: c_int = err.into();
+            assert_eq!(c_val as u32, code);
+        }
+
+        // Test invalid codes
+        assert_eq!(SevError::from(0u32), SevError::UnknownError);
+        assert_eq!(SevError::from(0x28u32), SevError::UnknownError);
+        assert!(!SevError::from(0u32).to_string().is_empty());
+        assert!(!SevError::from(0x28u32).to_string().is_empty());
+        let err: SevError = SevError::UnknownError;
+        let c_val: c_int = err.into();
+        assert_eq!(c_val as u32, u32::MAX);
+    }
+
+    #[test]
+    fn test_raw_fw_error_complete() {
+        let raw = RawFwError(0x100000000u64);
+
+        // Test display and debug
+        assert!(raw.to_string().contains("RawFwError: 4294967296"));
+        assert!(format!("{:?}", raw).contains("RawFwError"));
+
+        // Test From<u64>
+        assert_eq!(RawFwError::from(0x100000000u64), raw);
+
+        // Test tuple conversions
+        let (upper, lower): (u32, u32) = raw.into();
+        assert_eq!(upper, 1);
+        assert_eq!(lower, 0);
+
+        let raw2 = RawFwError(0x100000000u64);
+        let (vmm, _sev): (VmmError, SevError) = raw2.into();
+        assert_eq!(vmm, VmmError::InvalidCertificatePageLength);
+    }
+
+    #[test]
+    fn test_firmware_error_complete() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::Other, "test");
+        let variants = vec![
+            FirmwareError::IoError(io_err),
+            FirmwareError::KnownSevError(SevError::InvalidPlatformState),
+            FirmwareError::UnknownSevError(999),
+        ];
+
+        for err in variants {
+            // Test display
+            assert!(!err.to_string().is_empty());
+
+            // Test c_int conversion
+            let c_val: c_int = err.into();
+            assert!(c_val == -1 || c_val > 0);
+        }
+
+        // Test conversions
+        let from_u32: FirmwareError = 0x0u32.into();
+        assert!(matches!(from_u32, FirmwareError::IoError(_)));
+        let from_u32: FirmwareError = 0x1u32.into();
+        assert!(matches!(from_u32, FirmwareError::KnownSevError(_)));
+        let from_u32: FirmwareError = 0x28u32.into();
+        assert!(matches!(from_u32, FirmwareError::UnknownSevError(_)));
+        let from_u64: FirmwareError = 0x1u64.into();
+        assert!(matches!(from_u64, FirmwareError::KnownSevError(_)));
+    }
+
+    #[test]
+    fn test_firmware_error_conversions() {
+        // Test From<SevError>
+        let sev_err = SevError::InvalidPlatformState;
+        let fw_err = FirmwareError::from(sev_err);
+        assert!(matches!(
+            fw_err,
+            FirmwareError::KnownSevError(SevError::InvalidPlatformState)
+        ));
+
+        let unknown_sev = SevError::UnknownError;
+        let fw_err = FirmwareError::from(unknown_sev);
+        assert!(matches!(fw_err, FirmwareError::UnknownSevError(_)));
+
+        // Test From<io::Error>
+        let io_err = std::io::Error::new(std::io::ErrorKind::Other, "test");
+        let fw_err = FirmwareError::from(io_err);
+        assert!(matches!(fw_err, FirmwareError::IoError(_)));
+    }
+
+    #[test]
+    fn test_user_api_error_complete() {
+        let variants = vec![
+            FirmwareError::UnknownSevError(0).into(),
+            std::io::Error::new(std::io::ErrorKind::Other, "test").into(),
+            CertError::UnknownError.into(),
+            VmmError::Unknown.into(),
+            uuid::Uuid::try_from("").unwrap_err().into(),
+            HashstickError::UnknownError.into(),
+            UserApiError::VmplError, // No From impl
+            UserApiError::Unknown,   // No From impl
+        ];
+
+        for err in variants {
+            // Test display
+            assert!(!err.to_string().is_empty());
+            // Test error source
+            match &err {
+                UserApiError::VmplError | UserApiError::Unknown => assert!(err.source().is_none()),
+                _ => assert!(err.source().is_some()),
+            }
+            // Test io::Error conversion
+            let _: std::io::Error = err.into();
+        }
+
+        let sev_error: SevError = SevError::InvalidPlatformState;
+        let uapi_error: UserApiError = sev_error.into();
+        assert!(matches!(uapi_error, UserApiError::FirmwareError(_)));
+    }
+
+    #[test]
+    fn test_hashstick_error_complete() {
+        let variants = vec![
+            HashstickError::InvalidLength,
+            HashstickError::EmptyHashstickBuffer,
+            HashstickError::UnknownError,
+        ];
+
+        for err in variants {
+            assert!(!err.to_string().is_empty());
+            assert!(std::error::Error::source(&err).is_none());
+        }
+    }
+
+    #[test]
+    fn test_cert_error_complete() {
+        let variants = vec![
+            CertError::InvalidGUID,
+            CertError::PageMisalignment,
+            CertError::BufferOverflow,
+            CertError::EmptyCertBuffer,
+            CertError::UnknownError,
+        ];
+
+        for err in variants {
+            assert!(!err.to_string().is_empty());
+            assert!(std::error::Error::source(&err).is_none());
+        }
+    }
+
+    #[test]
+    fn test_gctx_error_complete() {
+        let variants = vec![
+            GCTXError::InvalidPageSize(100, 200),
+            GCTXError::InvalidBlockSize,
+            GCTXError::MissingData,
+            GCTXError::MissingBlockSize,
+            GCTXError::UnknownError,
+        ];
+
+        for err in variants {
+            assert!(!err.to_string().is_empty());
+            assert!(std::error::Error::source(&err).is_none());
+        }
+    }
+
+    #[test]
+    fn test_ovmf_error_complete() {
+        let variants = vec![
+            OVMFError::InvalidSectionType,
+            OVMFError::SEVMetadataVerification("test".into()),
+            OVMFError::EntryMissingInTable("test".into()),
+            OVMFError::GetTableItemError,
+            OVMFError::InvalidSize("test".into(), 1, 2),
+            OVMFError::MismatchingGUID,
+            OVMFError::UnknownError,
+        ];
+
+        for err in variants {
+            assert!(!err.to_string().is_empty());
+            assert!(std::error::Error::source(&err).is_none());
+        }
+    }
+
+    #[test]
+    fn test_sev_hash_error_complete() {
+        let variants = vec![
+            SevHashError::InvalidSize(1, 2),
+            SevHashError::InvalidOffset(1, 2),
+            SevHashError::UnknownError,
+        ];
+
+        for err in variants {
+            assert!(!err.to_string().is_empty());
+            assert!(std::error::Error::source(&err).is_none());
+        }
+    }
+
+    #[test]
+    fn test_large_array_error_complete() {
+        let slice_err: Result<[u8; 2], TryFromSliceError> = vec![1u8].as_slice().try_into();
+        let variants = vec![
+            slice_err.unwrap_err().into(),
+            LargeArrayError::VectorError("test".into()),
+        ];
+
+        for err in variants {
+            assert!(!err.to_string().is_empty());
+            assert!(std::error::Error::source(&err).is_none());
+        }
+    }
+
+    #[test]
+    fn test_id_block_error_complete() {
+        let slice_err: Result<[u8; 2], TryFromSliceError> = vec![1u8].as_slice().try_into();
+        let bincode_err: ErrorKind = bincode::ErrorKind::Custom("test".into());
+
+        let variants = vec![
+            LargeArrayError::VectorError("test".into()).into(),
+            std::io::Error::new(std::io::ErrorKind::Other, "test").into(),
+            bincode_err.into(),
+            slice_err.unwrap_err().into(),
+            IdBlockError::SevCurveError(),
+            IdBlockError::SevEcsdsaSigError("test".into()),
+        ];
+
+        for err in variants {
+            assert!(!err.to_string().is_empty());
+            assert!(std::error::Error::source(&err).is_none());
+        }
+
+        // Test conversions
+        let arr_err = LargeArrayError::VectorError("test".into());
+        assert!(matches!(
+            IdBlockError::from(arr_err),
+            IdBlockError::LargeArrayError(_)
+        ));
+    }
+
+    #[test]
+    fn test_measurement_error_complete() {
+        let slice_err: Result<[u8; 2], TryFromSliceError> = vec![1u8].as_slice().try_into();
+        let bincode_err: ErrorKind = bincode::ErrorKind::Custom("test".into());
+
+        let uuid_err = uuid::Uuid::try_from("").unwrap_err();
+
+        let variants = vec![
+            slice_err.unwrap_err().into(),
+            uuid_err.into(),
+            bincode_err.into(),
+            std::io::Error::new(std::io::ErrorKind::Other, "test").into(),
+            hex::FromHexError::OddLength.into(),
+            GCTXError::UnknownError.into(),
+            OVMFError::UnknownError.into(),
+            SevHashError::UnknownError.into(),
+            IdBlockError::SevCurveError().into(),
+            LargeArrayError::VectorError("test".into()).into(),
+            MeasurementError::InvalidVcpuTypeError("test".into()),
+            MeasurementError::InvalidVcpuSignatureError("test".into()),
+            MeasurementError::InvalidVmmError("test".into()),
+            MeasurementError::InvalidSevModeError("test".into()),
+            MeasurementError::InvalidOvmfKernelError,
+            MeasurementError::MissingSection("test".into()),
+        ];
+
+        for err in variants {
+            assert!(!err.to_string().is_empty());
+            assert!(
+                err.source().is_some()
+                    || matches!(
+                        err,
+                        MeasurementError::FromSliceError(_)
+                            | MeasurementError::UUIDError(_)
+                            | MeasurementError::BincodeError(_)
+                            | MeasurementError::FileError(_)
+                            | MeasurementError::FromHexError(_)
+                            | MeasurementError::GCTXError(_)
+                            | MeasurementError::OVMFError(_)
+                            | MeasurementError::SevHashError(_)
+                            | MeasurementError::IdBlockError(_)
+                            | MeasurementError::LargeArrayError(_)
+                            | MeasurementError::InvalidVcpuTypeError(_)
+                            | MeasurementError::InvalidVcpuSignatureError(_)
+                            | MeasurementError::InvalidVmmError(_)
+                            | MeasurementError::InvalidSevModeError(_)
+                            | MeasurementError::InvalidOvmfKernelError
+                            | MeasurementError::MissingSection(_)
+                    )
+            );
+        }
+    }
+
+    #[cfg(feature = "openssl")]
+    #[test]
+    fn test_openssl_features_complete() {
+        // Test CertFormatError
+        let cert_err = CertFormatError::UnknownFormat;
+        assert!(!cert_err.to_string().is_empty());
+        assert!(std::error::Error::source(&cert_err).is_none());
+
+        // Test SessionError
+        let io_err = std::io::Error::new(std::io::ErrorKind::Other, "test");
+        let variants = vec![
+            SessionError::RandError(ErrorCode::HardwareFailure),
+            SessionError::IOError(io_err),
+            SessionError::OpenSSLStack(ErrorStack::get()),
+        ];
+
+        for err in variants {
+            let debug_str = format!("{:?}", err);
+            match err {
+                SessionError::RandError(_) => assert!(debug_str.contains("RandError")),
+                SessionError::IOError(_) => assert!(debug_str.contains("IOError")),
+                SessionError::OpenSSLStack(_) => assert!(debug_str.contains("OpenSSLStack")),
+            }
+        }
+
+        // Test conversions
+        let from_io = SessionError::from(std::io::Error::new(std::io::ErrorKind::Other, "test"));
+        assert!(matches!(from_io, SessionError::IOError(_)));
+
+        let from_code = SessionError::from(ErrorCode::HardwareFailure);
+        assert!(matches!(from_code, SessionError::RandError(_)));
+
+        let from_stack = SessionError::from(ErrorStack::get());
+        assert!(matches!(from_stack, SessionError::OpenSSLStack(_)));
     }
 }

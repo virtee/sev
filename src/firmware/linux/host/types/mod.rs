@@ -51,3 +51,38 @@ impl<'a> GetId<'a> {
 #[cfg(feature = "sev")]
 #[cfg(target_os = "linux")]
 pub struct PlatformReset;
+
+#[cfg(target_os = "linux")]
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_id_new() {
+        let mut id = [0u8; 64];
+        let get_id = GetId::new(&mut id);
+
+        assert_eq!(
+            unsafe { std::ptr::addr_of!(get_id.id_len).read_unaligned() },
+            64
+        );
+        assert_eq!(get_id.id_addr as *const u8, id.as_ptr());
+    }
+
+    #[test]
+    fn test_get_id_slice() {
+        let mut id = [42u8; 64];
+        let get_id = GetId::new(&mut id);
+
+        assert_eq!(get_id.as_slice(), &[42u8; 64]);
+    }
+
+    #[test]
+    fn test_get_id_phantom() {
+        let mut id = [0u8; 64];
+        let get_id = GetId::new(&mut id);
+
+        // Verify PhantomData is working as expected
+        assert_eq!(std::mem::size_of_val(&get_id._phantom), 0);
+    }
+}
