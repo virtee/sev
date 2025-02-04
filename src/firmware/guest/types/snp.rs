@@ -8,7 +8,7 @@ use crate::certs::snp::{Certificate, Chain, Verifiable};
 
 use crate::util::sealed;
 use bitfield::bitfield;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use serde_big_array::BigArray;
 use std::convert::{TryFrom, TryInto};
 
@@ -141,7 +141,7 @@ pub trait Attestable: Serialize + sealed::Sealed {
 ///
 /// Since the release of the 1.56 ABI, the Attestation Report was bumped from version 2 to 3.
 /// Due to content differences, both versions are kept separately in order to provide backwards compatibility and most reliable security.
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy)]
 pub enum AttestationReport {
     /// Version 2 of the Attestation Report
     V2(AttestationReportV2),
@@ -170,6 +170,21 @@ impl TryFrom<&[u8]> for AttestationReport {
     }
 }
 
+/// Implement custom serialization for AttestationReport
+/// This will ensure that the Attestation Report enum gets serialized into raw bytes,
+/// not the serde default that tags the enum with 4 extra bytes for its own tagging mechanism.
+impl Serialize for AttestationReport {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            AttestationReport::V2(report) => report.serialize(serializer),
+            AttestationReport::V3(report) => report.serialize(serializer),
+        }
+    }
+}
+
 impl sealed::Sealed for AttestationReport {}
 
 impl Attestable for AttestationReport {
@@ -190,6 +205,15 @@ impl Attestable for AttestationReport {
 }
 
 impl AttestationReport {
+    /// Convert bytes to an Attestation Report Enum
+    pub fn from_bytes(bytes: &[u8]) -> Result<AttestationReport, AttestationReportError> {
+        AttestationReport::try_from(bytes)
+    }
+
+    /// Serialize the Attestation Report enum to raw bytes
+    pub fn to_bytes(&self) -> Result<Vec<u8>, AttestationReportError> {
+        bincode::serialize(self).map_err(|e| AttestationReportError::BincodeError(*e))
+    }
     /// Get Attestation Report Version
     pub fn version(&self) -> u32 {
         match self {
