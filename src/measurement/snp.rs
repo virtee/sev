@@ -6,12 +6,12 @@ use crate::{
     launch::snp::PageType,
     measurement::{
         gctx::{Gctx, Updating, VMSA_GPA},
-        large_array::LargeArray,
         ovmf::{OvmfSevMetadataSectionDesc, SectionType, OVMF},
         sev_hashes::SevHashes,
         vcpu_types::CpuType,
         vmsa::{GuestFeatures, VMMType, VMSA},
     },
+    util::large_array::LargeArray,
 };
 use hex::FromHex;
 use serde::{Deserialize, Serialize};
