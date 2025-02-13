@@ -80,6 +80,10 @@ pub fn seves_calc_launch_digest(
     Ok(launch_hash.finish())
 }
 
+#[deprecated(
+    since = "5.0.0",
+    note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+)]
 /// Arguments required to calculate the SEV measurement
 pub struct SevMeasurementArgs<'a> {
     /// Path to OVMF file
@@ -92,6 +96,10 @@ pub struct SevMeasurementArgs<'a> {
     pub append: Option<&'a str>,
 }
 
+#[deprecated(
+    since = "5.0.0",
+    note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+)]
 /// Calculate an SEV launch digest
 pub fn sev_calc_launch_digest(
     sev_measurement: SevMeasurementArgs,
