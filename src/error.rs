@@ -117,7 +117,7 @@ impl Display for VmmError {
 
 /// The raw firmware error.
 #[derive(Debug)]
-pub(crate) struct RawFwError(u64);
+pub(crate) struct RawFwError(pub(crate) u64);
 
 impl std::error::Error for RawFwError {}
 

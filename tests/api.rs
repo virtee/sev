@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[cfg(all(feature = "sev", target_os = "linux"))]
-
 mod sev {
     #[cfg(feature = "dangerous_hw_tests")]
     use serial_test::serial;
     #[cfg(feature = "dangerous_hw_tests")]
     use sev::cached_chain;
-    use sev::{certs::sev::sev::Usage, firmware::host::Firmware, Build, Version};
+    use sev::{
+        certs::sev::sev::Usage,
+        firmware::host::{Build, Firmware, Version},
+    };
 
     #[cfg(feature = "dangerous_hw_tests")]
     #[cfg_attr(not(host), ignore)]
@@ -147,8 +149,8 @@ mod snp {
               reported tcb tee version: {}
               reported tcb bootloader version: {}
               state: {}",
-            status.version.major,
-            status.version.minor,
+            status.version.0,
+            status.version.1,
             status.build_id,
             status.guest_count,
             status.platform_tcb_version.microcode,

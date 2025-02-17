@@ -74,7 +74,7 @@ tokio = {version = "1.29.1", features =["rt-multi-thread"], optional = true }
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 kvm-ioctls = ">=0.16"
+kvm-bindings = ">=0.9.1"
 
 [dev-dependencies]
-kvm-bindings = ">=0.9.1"
 serial_test = "3.0"

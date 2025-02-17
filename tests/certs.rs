@@ -85,8 +85,7 @@ mod snp {
         let chain = Chain { ca, vek: vcek };
 
         let report_bytes = hex::decode(TEST_MILAN_ATTESTATION_REPORT).unwrap();
-        let report: AttestationReport =
-            unsafe { std::ptr::read(report_bytes.as_ptr() as *const _) };
+        let report: AttestationReport = AttestationReport::from_bytes(&report_bytes).unwrap();
 
         assert_eq!((&chain, &report).verify().ok(), Some(()));
     }
