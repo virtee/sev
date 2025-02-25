@@ -21,6 +21,10 @@ pub mod vcpu_types;
 #[cfg(all(feature = "snp", feature = "openssl"))]
 pub mod snp;
 
+#[deprecated(
+    since = "5.0.0",
+    note = "Legacy SEV features will no longer be included/supported in library versions past 5"
+)]
 #[cfg(all(feature = "sev", feature = "openssl"))]
 pub mod sev;
 
