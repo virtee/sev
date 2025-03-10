@@ -797,9 +797,9 @@ dependencies = [
 
 [[package]]
 name = "kvm-bindings"
-version = "0.11.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "501bc0717c6a9fc409f29047ebeb6040a4d304344698abb268c4c6a440e6a09a"
+checksum = "3b13baf7bdfda2e10bcb109fcb099ef40cff82374eb6b7cdcf4695bdec4e522c"
 dependencies = [
  "vmm-sys-util",
 ]
