@@ -9,8 +9,5 @@ pub mod host;
 #[cfg(feature = "snp")]
 pub mod guest;
 
-#[cfg(feature = "snp")]
-pub(crate) mod parser;
-
 #[cfg(any(feature = "sev", feature = "snp"))]
 pub(crate) mod linux;

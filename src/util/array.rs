@@ -2,7 +2,11 @@
 
 //! Helpful structure to deal with arrays with a size larger than  32 bytes
 
-use crate::{error::LargeArrayError, firmware::parser::ByteParser};
+use crate::error::ArrayError;
+
+#[cfg(feature = "snp")]
+use crate::util::parser::ByteParser;
+
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 use std::{
@@ -74,6 +78,7 @@ where
     }
 }
 
+#[cfg(feature = "snp")]
 impl<const N: usize> ByteParser for Array<u8, N> {
     type Bytes = [u8; N];
 
@@ -106,11 +111,11 @@ impl<T, const N: usize> TryFrom<Vec<T>> for Array<T, N>
 where
     T: std::marker::Copy + std::default::Default + for<'a> Deserialize<'a> + Serialize,
 {
-    type Error = LargeArrayError;
+    type Error = ArrayError;
 
     fn try_from(vec: Vec<T>) -> Result<Self, Self::Error> {
         Ok(Array(vec.try_into().map_err(|_| {
-            LargeArrayError::VectorError("Vector is the wrong size".to_string())
+            ArrayError::VectorError("Vector is the wrong size".to_string())
         })?))
     }
 }
@@ -119,7 +124,7 @@ impl<T, const N: usize> TryFrom<[T; N]> for Array<T, N>
 where
     T: std::marker::Copy + std::default::Default + for<'a> Deserialize<'a> + Serialize,
 {
-    type Error = LargeArrayError;
+    type Error = ArrayError;
 
     fn try_from(array: [T; N]) -> Result<Self, Self::Error> {
         Ok(Array(array))
@@ -135,22 +140,13 @@ where
         + Debug
         + LowerHex,
 {
-    type Error = LargeArrayError;
+    type Error = ArrayError;
 
     fn try_from(slice: &[T]) -> Result<Self, Self::Error> {
         Ok(Array(slice.try_into()?))
     }
 }
 
-impl<T, const N: usize> Array<T, N>
-where
-    T: std::marker::Copy + std::default::Default + for<'a> Deserialize<'a> + Serialize,
-{
-    /// Get the large array as a regular array format
-    pub fn as_array(&self) -> [T; N] {
-        self.0
-    }
-}
 impl<T, const N: usize> AsRef<[T]> for Array<T, N>
 where
     T: std::marker::Copy + std::default::Default + for<'a> Deserialize<'a> + Serialize,

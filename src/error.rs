@@ -867,7 +867,7 @@ impl std::error::Error for SevHashError {}
 
 /// Possible errors when working with the large array type
 #[derive(Debug)]
-pub enum LargeArrayError {
+pub enum ArrayError {
     /// Error when trying from slice
     SliceError(TryFromSliceError),
 
@@ -875,22 +875,22 @@ pub enum LargeArrayError {
     VectorError(String),
 }
 
-impl std::fmt::Display for LargeArrayError {
+impl std::fmt::Display for ArrayError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            LargeArrayError::SliceError(error) => {
+            ArrayError::SliceError(error) => {
                 write!(f, "Error when trying from slice: {error}")
             }
-            LargeArrayError::VectorError(error) => {
+            ArrayError::VectorError(error) => {
                 write!(f, "Error when trying from vector: {error}")
             }
         }
     }
 }
 
-impl std::error::Error for LargeArrayError {}
+impl std::error::Error for ArrayError {}
 
-impl std::convert::From<TryFromSliceError> for LargeArrayError {
+impl std::convert::From<TryFromSliceError> for ArrayError {
     fn from(value: TryFromSliceError) -> Self {
         Self::SliceError(value)
     }
@@ -904,7 +904,7 @@ pub enum IdBlockError {
     CryptoErrorStack(openssl::error::ErrorStack),
 
     /// Large Array Error handling
-    LargeArrayError(LargeArrayError),
+    LargeArrayError(ArrayError),
 
     /// File Error Handling
     FileError(std::io::Error),
@@ -950,8 +950,8 @@ impl std::convert::From<openssl::error::ErrorStack> for IdBlockError {
     }
 }
 
-impl std::convert::From<LargeArrayError> for IdBlockError {
-    fn from(value: LargeArrayError) -> Self {
+impl std::convert::From<ArrayError> for IdBlockError {
+    fn from(value: ArrayError) -> Self {
         Self::LargeArrayError(value)
     }
 }
@@ -1005,7 +1005,7 @@ pub enum MeasurementError {
     IdBlockError(IdBlockError),
 
     /// Large Array Error handling
-    LargeArrayError(LargeArrayError),
+    LargeArrayError(ArrayError),
 
     /// Invalid VCPU provided
     InvalidVcpuTypeError(String),
@@ -1121,8 +1121,8 @@ impl std::convert::From<IdBlockError> for MeasurementError {
     }
 }
 
-impl std::convert::From<LargeArrayError> for MeasurementError {
-    fn from(value: LargeArrayError) -> Self {
+impl std::convert::From<ArrayError> for MeasurementError {
+    fn from(value: ArrayError) -> Self {
         Self::LargeArrayError(value)
     }
 }
@@ -1408,7 +1408,7 @@ mod tests {
         let slice_err: Result<[u8; 2], TryFromSliceError> = vec![1u8].as_slice().try_into();
         let variants = vec![
             slice_err.unwrap_err().into(),
-            LargeArrayError::VectorError("test".into()),
+            ArrayError::VectorError("test".into()),
         ];
 
         for err in variants {
@@ -1423,7 +1423,7 @@ mod tests {
         let bincode_err: ErrorKind = bincode::ErrorKind::Custom("test".into());
 
         let variants = vec![
-            LargeArrayError::VectorError("test".into()).into(),
+            ArrayError::VectorError("test".into()).into(),
             std::io::Error::new(std::io::ErrorKind::Other, "test").into(),
             bincode_err.into(),
             slice_err.unwrap_err().into(),
@@ -1437,7 +1437,7 @@ mod tests {
         }
 
         // Test conversions
-        let arr_err = LargeArrayError::VectorError("test".into());
+        let arr_err = ArrayError::VectorError("test".into());
         assert!(matches!(
             IdBlockError::from(arr_err),
             IdBlockError::LargeArrayError(_)
@@ -1461,7 +1461,7 @@ mod tests {
             OVMFError::UnknownError.into(),
             SevHashError::UnknownError.into(),
             IdBlockError::SevCurveError().into(),
-            LargeArrayError::VectorError("test".into()).into(),
+            ArrayError::VectorError("test".into()).into(),
             MeasurementError::InvalidVcpuTypeError("test".into()),
             MeasurementError::InvalidVcpuSignatureError("test".into()),
             MeasurementError::InvalidVmmError("test".into()),

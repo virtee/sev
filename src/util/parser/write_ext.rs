@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-use super::ByteParser;
+use super::byte_parser::ByteParser;
 use std::io::Write;
 
-pub(crate) trait WriteExt {
+pub trait WriteExt {
     fn write_bytes<T: ByteParser, const SKIP: usize>(
         &mut self,
         value: T,
