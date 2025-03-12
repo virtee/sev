@@ -1,6 +1,167 @@
 on: [push, pull_request]
 name: test
 jobs:
+  
+  sw-sev-only:
+    name: sw sev only ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - run: cargo test ${{ matrix.profile.flag }} --no-default-features --features=${{ matrix.features }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-latest
+          - macos-13
+        toolchain:
+          - 1.80.0
+          - stable
+        profile:
+          - name: debug
+          - name: release
+            flag: --release
+        features:
+          - sev
+
+  sw-sev-openssl-only:
+    name: sw sev openssl only ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - run: cargo test ${{ matrix.profile.flag }} --no-default-features --features=${{ matrix.features }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-latest
+          - macos-13
+        toolchain:
+          - 1.80.0
+          - stable
+        profile:
+          - name: debug
+          - name: release
+            flag: --release
+        features:
+          - sev
+          - openssl
+
+  sw-sev-crypto_nossl-only:
+    name: sw sev crypto_nossl only ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - run: cargo test ${{ matrix.profile.flag }} --no-default-features --features=${{ matrix.features }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-latest
+          - macos-13
+          - windows-latest
+        toolchain:
+          - 1.80.0
+          - stable
+        profile:
+          - name: debug
+          - name: release
+            flag: --release
+        features:
+          - sev
+          - crypto_nossl
+
+  sw-snp-only:
+    name: sw snp-only ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - run: cargo test ${{ matrix.profile.flag }} --no-default-features --features=${{ matrix.features }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-latest
+          - macos-13
+        toolchain:
+          - 1.80.0
+          - stable
+        profile:
+          - name: debug
+          - name: release
+            flag: --release
+        features:
+          - snp    
+
+  sw-snp-openssl-only:
+    name: sw snp openssl only ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - run: cargo test ${{ matrix.profile.flag }} --no-default-features --features=${{ matrix.features }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-latest
+          - macos-13
+        toolchain:
+          - 1.80.0
+          - stable
+        profile:
+          - name: debug
+          - name: release
+            flag: --release
+        features:
+          - snp
+          - openssl
+
+  sw-snp-crypto_nossl-only:
+    name: sw snp crypto_nossl only ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - run: cargo test ${{ matrix.profile.flag }} --no-default-features --features=${{ matrix.features }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-latest
+          - macos-13
+          - windows-latest
+        toolchain:
+          - 1.80.0
+          - stable
+        profile:
+          - name: debug
+          - name: release
+            flag: --release
+        features:
+          - snp
+          - crypto_nossl
+
   sw-openssl:
     name: sw openssl ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
     runs-on: ${{ matrix.runner }}

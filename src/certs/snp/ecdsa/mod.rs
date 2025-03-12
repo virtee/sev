@@ -3,7 +3,7 @@
 #[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
 use super::*;
 
-use crate::{firmware::parser::ByteParser, util::array::Array};
+use crate::{util::array::Array, util::parser::ByteParser};
 
 #[cfg(feature = "openssl")]
 use crate::certs::snp::{AsLeBytes, FromLe};

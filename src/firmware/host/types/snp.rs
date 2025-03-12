@@ -7,7 +7,7 @@ pub(crate) use crate::firmware::linux::host as FFI;
 
 #[cfg(target_os = "linux")]
 use crate::error::CertError;
-use crate::firmware::parser::ByteParser;
+use crate::util::parser::ByteParser;
 
 use std::{
     convert::{TryFrom, TryInto},

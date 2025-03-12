@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-pub(crate) trait ByteParser {
+pub trait ByteParser {
     type Bytes: AsRef<[u8]>;
 
     fn from_bytes(bytes: Self::Bytes) -> Self;

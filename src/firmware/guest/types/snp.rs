@@ -5,11 +5,11 @@ use crate::certs::snp::{Certificate, Chain, Verifiable};
 
 use crate::{
     certs::snp::ecdsa::Signature,
-    firmware::{
-        host::TcbVersion,
+    firmware::host::TcbVersion,
+    util::{
+        array::Array,
         parser::{ByteParser, ReadExt, WriteExt},
     },
-    util::array::Array,
 };
 
 use serde::{Deserialize, Serialize};
