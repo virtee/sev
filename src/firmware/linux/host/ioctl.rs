@@ -183,37 +183,40 @@ mod tests {
         assert_eq!(error, 0);
     }
 
-    #[test]
-    fn test_command_platform_id() {
-        let mut data = PlatformStatus::default();
-        let cmd = Command::<PlatformStatus>::from_mut(&mut data);
-        let code = cmd.code;
-        let error = cmd.error;
-        assert_eq!(code, PlatformStatus::ID);
-        assert_eq!(error, 0);
-    }
+    #[cfg(feature = "sev")]
+    mod sev_specific_tests {
+        use super::super::*;
 
-    #[test]
-    fn test_command_platform_id_non_mut() {
-        let data = PlatformStatus::default();
-        let cmd = Command::<PlatformStatus>::from(&data);
-        let code = cmd.code;
-        let error = cmd.error;
-        assert_eq!(code, PlatformStatus::ID);
-        assert_eq!(error, 0);
-    }
+        #[test]
+        fn test_command_platform_status() {
+            let mut data = PlatformStatus::default();
+            let cmd = Command::<PlatformStatus>::from_mut(&mut data);
+            let code = cmd.code;
+            let error = cmd.error;
+            assert_eq!(code, PlatformStatus::ID);
+            assert_eq!(error, 0);
+        }
+        #[test]
+        fn test_command_platform_status_non_mut() {
+            let data = PlatformStatus::default();
+            let cmd = Command::<PlatformStatus>::from(&data);
+            let code = cmd.code;
+            let error = cmd.error;
+            assert_eq!(code, PlatformStatus::ID);
+            assert_eq!(error, 0);
+        }
+        #[test]
+        fn test_command_error_encapsulation() {
+            // Test with success (0)
+            let cmd = Command::<PlatformStatus> {
+                code: PlatformStatus::ID,
+                error: 0,
+                data: 0,
+                _phantom: PhantomData,
+            };
 
-    #[test]
-    fn test_command_error_encapsulation() {
-        // Test with success (0)
-        let cmd = Command::<PlatformStatus> {
-            code: PlatformStatus::ID,
-            error: 0,
-            data: 0,
-            _phantom: PhantomData,
-        };
-
-        let error = cmd.encapsulate();
-        assert!(matches!(error, FirmwareError::IoError(_)));
+            let error = cmd.encapsulate();
+            assert!(matches!(error, FirmwareError::IoError(_)));
+        }
     }
 }

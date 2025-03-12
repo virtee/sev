@@ -2,7 +2,7 @@
 use super::byte_parser::ByteParser;
 use std::io::Read;
 
-pub(crate) trait ReadExt {
+pub trait ReadExt {
     fn parse_bytes<T, const SKIP: usize>(&mut self) -> Result<T, std::io::Error>
     where
         T: ByteParser<Bytes: AsMut<[u8]>>;
