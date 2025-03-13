@@ -385,7 +385,7 @@ impl TcbVersion {
         ]
     }
 
-    pub(crate) fn from_v4_bytes(bytes: &[u8; 8]) -> Self {
+    pub(crate) fn from_turin_bytes(bytes: &[u8; 8]) -> Self {
         Self {
             fmc: Some(bytes[0]),
             bootloader: bytes[1],
@@ -395,7 +395,7 @@ impl TcbVersion {
         }
     }
 
-    pub(crate) fn to_v4_bytes(self) -> [u8; 8] {
+    pub(crate) fn to_turin_bytes(self) -> [u8; 8] {
         [
             self.fmc.unwrap_or(0),
             self.bootloader,

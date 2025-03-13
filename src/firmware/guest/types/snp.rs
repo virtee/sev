@@ -179,14 +179,11 @@ pub enum ReportVariant {
     /// Version 2 of the Attestation Report.
     V2,
 
-    /// Version 3 of the Attestation Report.
-    V3,
+    /// Version 3 of the Attestation Report for PreTurin CPUs.
+    V3PreTurin,
 
-    /// Version 4 of the Attestation Report for Pre-turin CPUs.
-    V4PreTurin,
-
-    /// Version 4 of the Attestation Report for Turin+ CPUs.
-    V4Turin,
+    /// Version 3 of the Attestation Report for Turin+ CPUs.
+    V3Turin,
 }
 
 impl ReportVariant {
@@ -197,14 +194,16 @@ impl ReportVariant {
         let version: u32 = u32::from_le_bytes(version_bytes);
 
         Ok(match version {
-            0 => return Err(std::io::ErrorKind::Unsupported)?,
-            1 => return Err(std::io::ErrorKind::Unsupported)?,
+            0 | 1 => return Err(std::io::ErrorKind::Unsupported.into()),
             2 => Self::V2,
-            3 => Self::V3,
-            _ => match bytes[388] {
-                0x0..=0xAF => Self::V4PreTurin,
-                _ => Self::V4Turin,
-            },
+            _ => {
+                let family: u8 = bytes[388];
+                if family >= 0xB0 {
+                    Self::V3Turin
+                } else {
+                    Self::V3PreTurin
+                }
+            }
         })
     }
 }
@@ -319,7 +318,7 @@ impl AttestationReport {
                 launch_tcb: TcbVersion::from_legacy_bytes(&stepper.parse_bytes::<[u8; 8], 1>()?),
                 signature: stepper.parse_bytes::<_, 168>()?,
             },
-            ReportVariant::V3 | ReportVariant::V4PreTurin => AttestationReport {
+            ReportVariant::V3PreTurin => AttestationReport {
                 version: stepper.parse_bytes::<_, 0>()?,
                 guest_svn: stepper.parse_bytes::<_, 0>()?,
                 policy: stepper.parse_bytes::<_, 0>()?,
@@ -348,7 +347,7 @@ impl AttestationReport {
                 launch_tcb: TcbVersion::from_legacy_bytes(&stepper.parse_bytes::<[u8; 8], 1>()?),
                 signature: stepper.parse_bytes::<_, 168>()?,
             },
-            ReportVariant::V4Turin => AttestationReport {
+            ReportVariant::V3Turin => AttestationReport {
                 version: stepper.parse_bytes::<_, 0>()?,
                 guest_svn: stepper.parse_bytes::<_, 0>()?,
                 policy: stepper.parse_bytes::<_, 0>()?,
@@ -356,7 +355,7 @@ impl AttestationReport {
                 image_id: stepper.parse_bytes::<_, 0>()?,
                 vmpl: stepper.parse_bytes::<_, 0>()?,
                 sig_algo: stepper.parse_bytes::<_, 0>()?,
-                current_tcb: TcbVersion::from_v4_bytes(&stepper.parse_bytes::<[u8; 8], 0>()?),
+                current_tcb: TcbVersion::from_turin_bytes(&stepper.parse_bytes::<[u8; 8], 0>()?),
                 plat_info: stepper.parse_bytes::<_, 0>()?,
                 key_info: stepper.parse_bytes::<_, 0>()?,
                 report_data: stepper.parse_bytes::<_, 4>()?,
@@ -366,15 +365,15 @@ impl AttestationReport {
                 author_key_digest: stepper.parse_bytes::<_, 0>()?,
                 report_id: stepper.parse_bytes::<_, 0>()?,
                 report_id_ma: stepper.parse_bytes::<_, 0>()?,
-                reported_tcb: TcbVersion::from_v4_bytes(&stepper.parse_bytes::<[u8; 8], 0>()?),
+                reported_tcb: TcbVersion::from_turin_bytes(&stepper.parse_bytes::<[u8; 8], 0>()?),
                 cpuid_fam_id: Some(stepper.parse_bytes::<_, 0>()?),
                 cpuid_mod_id: Some(stepper.parse_bytes::<_, 0>()?),
                 cpuid_step: Some(stepper.parse_bytes::<_, 0>()?),
                 chip_id: stepper.parse_bytes::<_, 21>()?,
-                committed_tcb: TcbVersion::from_v4_bytes(&stepper.parse_bytes::<[u8; 8], 0>()?),
+                committed_tcb: TcbVersion::from_turin_bytes(&stepper.parse_bytes::<[u8; 8], 0>()?),
                 current: stepper.parse_bytes::<_, 0>()?,
                 committed: stepper.parse_bytes::<_, 1>()?,
-                launch_tcb: TcbVersion::from_v4_bytes(&stepper.parse_bytes::<[u8; 8], 1>()?),
+                launch_tcb: TcbVersion::from_turin_bytes(&stepper.parse_bytes::<[u8; 8], 1>()?),
                 signature: stepper.parse_bytes::<_, 168>()?,
             },
         })
@@ -385,12 +384,10 @@ impl AttestationReport {
         // Determine the variant based on version and CPUID step
         let variant = if self.version == 2 {
             ReportVariant::V2
-        } else if self.version == 3
-            || (self.version == 4 && (self.cpuid_fam_id.unwrap_or(0) < 0x1A))
-        {
-            ReportVariant::V3
+        } else if self.version == 3 && (self.cpuid_fam_id.unwrap_or(0) < 0x1A) {
+            ReportVariant::V3PreTurin
         } else {
-            ReportVariant::V4Turin
+            ReportVariant::V3Turin
         };
 
         // Write version (common to all variants)
@@ -404,8 +401,8 @@ impl AttestationReport {
 
         // Write TCB based on variant
         match variant {
-            ReportVariant::V4Turin => {
-                handle.write_bytes::<_, 0>(self.current_tcb.to_v4_bytes())?;
+            ReportVariant::V3Turin => {
+                handle.write_bytes::<_, 0>(self.current_tcb.to_turin_bytes())?;
             }
             _ => {
                 handle.write_bytes::<_, 0>(self.current_tcb.to_legacy_bytes())?;
@@ -424,8 +421,8 @@ impl AttestationReport {
 
         // Write reported TCB based on variant
         match variant {
-            ReportVariant::V4Turin => {
-                handle.write_bytes::<_, 0>(self.reported_tcb.to_v4_bytes())?;
+            ReportVariant::V3Turin => {
+                handle.write_bytes::<_, 0>(self.reported_tcb.to_turin_bytes())?;
             }
             _ => {
                 handle.write_bytes::<_, 0>(self.reported_tcb.to_legacy_bytes())?;
@@ -457,8 +454,8 @@ impl AttestationReport {
 
         // Write committed TCB based on variant
         match variant {
-            ReportVariant::V4Turin => {
-                handle.write_bytes::<_, 0>(self.committed_tcb.to_v4_bytes())?;
+            ReportVariant::V3Turin => {
+                handle.write_bytes::<_, 0>(self.committed_tcb.to_turin_bytes())?;
             }
             _ => {
                 handle.write_bytes::<_, 0>(self.committed_tcb.to_legacy_bytes())?;
@@ -470,8 +467,8 @@ impl AttestationReport {
 
         // Write launch TCB based on variant
         match variant {
-            ReportVariant::V4Turin => {
-                handle.write_bytes::<_, 1>(self.launch_tcb.to_v4_bytes())?;
+            ReportVariant::V3Turin => {
+                handle.write_bytes::<_, 1>(self.launch_tcb.to_turin_bytes())?;
             }
             _ => {
                 handle.write_bytes::<_, 1>(self.launch_tcb.to_legacy_bytes())?;
