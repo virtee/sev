@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Operations to handle OVMF SEV-HASHES
+#[cfg(feature = "openssl")]
 use openssl::sha::sha256;
+
 use serde::Serialize;
 use std::fs::File;
 use std::{
@@ -17,6 +19,14 @@ use uuid::{uuid, Uuid};
 use crate::error::*;
 
 type Sha256Hash = [u8; 32];
+
+#[cfg(all(not(feature = "openssl"), feature = "crypto_nossl"))]
+fn sha256(data: &[u8]) -> Sha256Hash {
+    use sha2::Digest as _;
+    let mut sha = sha2::Sha256::default();
+    sha.update(data);
+    sha.finalize().into()
+}
 
 /// GUID stored as little endian
 #[derive(Debug, Clone, Copy, Serialize, Default)]

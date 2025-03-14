@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+
 //! Operations for a Certificate Authority (CA) chain.
 
 #[cfg(feature = "openssl")]
