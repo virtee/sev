@@ -61,3 +61,35 @@ impl<'a, 'b, Req, Rsp> GuestRequest<'a, 'b, Req, Rsp> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_guest_request_new() {
+        let mut req = ReportReq::default();
+        let mut rsp = ReportRsp::default();
+
+        // Test with explicit version
+        let guest_req = GuestRequest::new(Some(2), &mut req, &mut rsp);
+        assert_eq!(guest_req.message_version, 2);
+        assert_ne!(guest_req.request_data, 0);
+        assert_ne!(guest_req.response_data, 0);
+        assert_eq!(guest_req.fw_err, 0);
+
+        // Test with default version
+        let guest_req = GuestRequest::new(None, &mut req, &mut rsp);
+        assert_eq!(guest_req.message_version, 1);
+        assert_ne!(guest_req.request_data, 0);
+        assert_ne!(guest_req.response_data, 0);
+        assert_eq!(guest_req.fw_err, 0);
+    }
+
+    #[test]
+    fn test_guest_ioctl_values() {
+        assert_eq!(GuestIoctl::GetReport as u8, 0x0);
+        assert_eq!(GuestIoctl::GetDerivedKey as u8, 0x1);
+        assert_eq!(GuestIoctl::GetExtReport as u8, 0x2);
+    }
+}

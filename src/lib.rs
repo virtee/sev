@@ -110,8 +110,8 @@ pub mod vmsa;
 /// Error module.
 pub mod error;
 
+#[cfg(all(feature = "sev", feature = "dangerous_hw_tests"))]
 pub use util::cached_chain;
-use util::{TypeLoad, TypeSave};
 
 #[cfg(all(feature = "openssl", feature = "sev"))]
 use certs::sev::sev;
@@ -128,89 +128,12 @@ use certs::sev::builtin as SevBuiltin;
 #[cfg(all(not(feature = "sev"), feature = "snp", feature = "openssl"))]
 use certs::snp::builtin as SnpBuiltin;
 
-#[cfg(all(feature = "sev", target_os = "linux"))]
-use crate::{certs::sev::sev::Certificate as SevCertificate, error::FirmwareError, launch::sev::*};
-
 #[cfg(any(feature = "sev", feature = "snp"))]
 use std::convert::TryFrom;
 
 use std::io::{Read, Write};
 
-#[cfg(all(feature = "sev", target_os = "linux"))]
-use std::{
-    collections::HashMap,
-    mem::size_of,
-    os::{
-        fd::RawFd,
-        raw::{c_int, c_uchar, c_uint, c_void},
-    },
-    slice::{from_raw_parts, from_raw_parts_mut},
-    sync::Mutex,
-};
-
-#[cfg(all(feature = "sev", target_os = "linux"))]
-use lazy_static::lazy_static;
-
 use serde::{Deserialize, Serialize};
-
-/// Information about the SEV platform version.
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct Version {
-    /// The major version number.
-    pub major: u8,
-
-    /// The minor version number.
-    pub minor: u8,
-}
-
-impl std::fmt::Display for Version {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}.{}", self.major, self.minor)
-    }
-}
-
-impl From<u16> for Version {
-    fn from(v: u16) -> Self {
-        Self {
-            major: ((v & 0xF0) >> 4) as u8,
-            minor: (v & 0x0F) as u8,
-        }
-    }
-}
-
-/// A description of the SEV platform's build information.
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct Build {
-    /// The version information.
-    pub version: Version,
-
-    /// The build number.
-    pub build: u8,
-}
-
-impl std::fmt::Display for Build {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}.{}", self.version, self.build)
-    }
-}
-
-impl codicon::Decoder<()> for Build {
-    type Error = std::io::Error;
-
-    fn decode(mut reader: impl Read, _: ()) -> std::io::Result<Self> {
-        reader.load()
-    }
-}
-
-impl codicon::Encoder<()> for Build {
-    type Error = std::io::Error;
-
-    fn encode(&self, mut writer: impl Write, _: ()) -> std::io::Result<()> {
-        writer.save(self)
-    }
-}
 
 /// A representation for EPYC generational product lines.
 ///
@@ -269,6 +192,10 @@ pub enum Generation {
     /// Fourth generation EPYC (SEV, SEV-ES, SEV-SNP).
     #[cfg(any(feature = "sev", feature = "snp"))]
     Genoa,
+
+    /// Fifth generation EPYC (SEV, SEV-ES, SEV-SNP).
+    #[cfg(any(feature = "sev", feature = "snp"))]
+    Turin,
 }
 
 #[cfg(all(feature = "sev", feature = "openssl"))]
@@ -285,6 +212,8 @@ impl From<Generation> for CertSevCaChain {
             Generation::Milan => (SevBuiltin::milan::ARK, SevBuiltin::milan::ASK),
             #[cfg(any(feature = "sev", feature = "snp"))]
             Generation::Genoa => (SevBuiltin::genoa::ARK, SevBuiltin::genoa::ASK),
+            #[cfg(any(feature = "sev", feature = "snp"))]
+            Generation::Turin => (SevBuiltin::turin::ARK, SevBuiltin::turin::ASK),
         };
 
         CertSevCaChain {
@@ -306,6 +235,10 @@ impl From<Generation> for CertSnpCaChain {
                 SnpBuiltin::genoa::ark().unwrap(),
                 SnpBuiltin::genoa::ask().unwrap(),
             ),
+            Generation::Turin => (
+                SnpBuiltin::turin::ark().unwrap(),
+                SnpBuiltin::turin::ask().unwrap(),
+            ),
         };
 
         CertSnpCaChain { ark, ask }
@@ -323,6 +256,7 @@ impl TryFrom<&sev::Chain> for Generation {
         let rome: CertSevCaChain = Generation::Rome.into();
         let milan: CertSevCaChain = Generation::Milan.into();
         let genoa: CertSevCaChain = Generation::Genoa.into();
+        let turin: CertSevCaChain = Generation::Turin.into();
 
         Ok(if (&naples.ask, &schain.cek).verify().is_ok() {
             Generation::Naples
@@ -332,6 +266,8 @@ impl TryFrom<&sev::Chain> for Generation {
             Generation::Milan
         } else if (&genoa.ask, &schain.cek).verify().is_ok() {
             Generation::Genoa
+        } else if (&turin.ask, &schain.cek).verify().is_ok() {
+            Generation::Turin
         } else {
             return Err(());
         })
@@ -362,6 +298,9 @@ impl TryFrom<String> for Generation {
             #[cfg(any(feature = "sev", feature = "snp"))]
             "siena" => Ok(Self::Genoa),
 
+            #[cfg(any(feature = "sev", feature = "snp"))]
+            "turin" => Ok(Self::Turin),
+
             _ => Err(()),
         }
     }
@@ -383,350 +322,9 @@ impl Generation {
 
             #[cfg(any(feature = "sev", feature = "snp"))]
             Self::Genoa => "Genoa".to_string(),
+
+            #[cfg(any(feature = "sev", feature = "snp"))]
+            Self::Turin => "Turin".to_string(),
         }
     }
-}
-
-// The C FFI interface to the library.
-
-#[cfg(all(feature = "sev", target_os = "linux"))]
-lazy_static! {
-    static ref INIT_MAP: Mutex<HashMap<RawFd, Launcher<New, RawFd, RawFd>>> =
-        Mutex::new(HashMap::new());
-    static ref STARTED_MAP: Mutex<HashMap<RawFd, Launcher<Started, RawFd, RawFd>>> =
-        Mutex::new(HashMap::new());
-    static ref MEASURED_MAP: Mutex<HashMap<RawFd, Launcher<Measured, RawFd, RawFd>>> =
-        Mutex::new(HashMap::new());
-    static ref FINISHED_MAP: Mutex<HashMap<RawFd, Launcher<Finished, RawFd, RawFd>>> =
-        Mutex::new(HashMap::new());
-}
-
-#[cfg(all(feature = "sev", target_os = "linux"))]
-fn set_fw_err(ptr: *mut c_int, err: FirmwareError) {
-    unsafe { *ptr = err.into() };
-}
-
-/// A C FFI interface to the SEV_INIT ioctl.
-///
-/// # Safety
-///
-/// The caller of this function is responsible for ensuring that the pointer arguments are
-/// valid.
-#[cfg(all(feature = "sev", target_os = "linux"))]
-#[no_mangle]
-pub unsafe extern "C" fn sev_init(vm_fd: c_int, sev_fd: c_int, fw_err: *mut c_int) -> c_int {
-    let vm: RawFd = vm_fd;
-    let sev: RawFd = sev_fd;
-
-    match Launcher::new(vm, sev) {
-        Ok(launcher) => {
-            let mut map = INIT_MAP.lock().unwrap();
-            map.insert(vm_fd, launcher);
-
-            0
-        }
-        Err(e) => {
-            set_fw_err(fw_err, e);
-            -1
-        }
-    }
-}
-
-/// A C FFI interface to the SEV_ES_INIT ioctl.
-///
-/// # Safety
-///
-/// The caller of this function is responsible for ensuring that the pointer arguments are
-/// valid.
-#[cfg(all(feature = "sev", target_os = "linux"))]
-#[no_mangle]
-pub unsafe extern "C" fn sev_es_init(vm_fd: c_int, sev_fd: c_int, fw_err: *mut c_int) -> c_int {
-    let vm: RawFd = vm_fd;
-    let sev: RawFd = sev_fd;
-
-    match Launcher::new_es(vm, sev) {
-        Ok(launcher) => {
-            let mut map = INIT_MAP.lock().unwrap();
-            map.insert(vm_fd, launcher);
-
-            0
-        }
-        Err(e) => {
-            set_fw_err(fw_err, e);
-            -1
-        }
-    }
-}
-
-/// A C FFI interface to the SEV_LAUNCH_START ioctl.
-///
-/// # Safety
-///
-/// The caller of this function is responsible for ensuring that the pointer arguments are
-/// valid.
-#[cfg(all(feature = "sev", target_os = "linux"))]
-#[no_mangle]
-pub unsafe extern "C" fn sev_launch_start(
-    vm_fd: c_int,
-    policy: u32,
-    cert_bytes: *const c_void,
-    session_bytes: *const c_void,
-    fw_err: *mut c_int,
-) -> c_int {
-    let mut map = INIT_MAP.lock().unwrap();
-    let launcher = match map.remove(&vm_fd) {
-        Some(l) => l,
-        None => return -1,
-    };
-
-    let policy = Policy::from(policy);
-    let cert: SevCertificate = unsafe { *(cert_bytes as *const SevCertificate) };
-    let session: Session = unsafe { *(session_bytes as *const Session) };
-
-    let start = Start {
-        policy,
-        cert,
-        session,
-    };
-
-    match launcher.start(start) {
-        Ok(started) => {
-            let mut map = STARTED_MAP.lock().unwrap();
-            if map.insert(vm_fd, started).is_none() {
-                return 0;
-            }
-            -1
-        }
-        Err(e) => {
-            set_fw_err(fw_err, e);
-            -1
-        }
-    }
-}
-
-/// A C FFI interface to the SEV_LAUNCH_UPDATE ioctl.
-///
-/// # Safety
-///
-/// The caller of this function is responsible for ensuring that the pointer arguments are
-/// valid.
-#[cfg(all(feature = "sev", target_os = "linux"))]
-#[no_mangle]
-pub unsafe extern "C" fn sev_launch_update_data(
-    vm_fd: c_int,
-    uaddr: u64,
-    len: u64,
-    fw_err: *mut c_int,
-) -> c_int {
-    let mut map = STARTED_MAP.lock().unwrap();
-    let launcher = match map.get_mut(&vm_fd) {
-        Some(l) => l,
-        None => return -1,
-    };
-
-    let slice: &[u8] = unsafe { from_raw_parts(uaddr as *const u8, len as usize) };
-    if let Err(e) = launcher.update_data(slice) {
-        set_fw_err(fw_err, e);
-        return -1;
-    }
-
-    0
-}
-
-/// A C FFI interface to the SEV_LAUNCH_UPDATE_VMSA ioctl.
-///
-/// # Safety
-///
-/// The caller of this function is responsible for ensuring that the pointer arguments are
-/// valid.
-#[cfg(all(feature = "sev", target_os = "linux"))]
-#[no_mangle]
-pub unsafe extern "C" fn sev_launch_update_vmsa(vm_fd: c_int, fw_err: *mut c_int) -> c_int {
-    let mut map = STARTED_MAP.lock().unwrap();
-    let launcher = match map.get_mut(&vm_fd) {
-        Some(l) => l,
-        None => return -1,
-    };
-
-    if let Err(e) = launcher.update_vmsa() {
-        set_fw_err(fw_err, e);
-        return -1;
-    }
-
-    0
-}
-
-/// A C FFI interface to the SEV_LAUNCH_MEASURE ioctl.
-///
-/// # Safety
-///
-/// The caller of this function is responsible for ensuring that the pointer arguments are
-/// valid.
-///
-/// The "measurement_data" argument should be a valid pointer able to hold the meausurement's
-/// bytes. The measurement is 48 bytes in size.
-#[cfg(all(feature = "sev", target_os = "linux"))]
-#[no_mangle]
-pub unsafe extern "C" fn sev_launch_measure(
-    vm_fd: c_int,
-    measurement_data: *mut c_uchar,
-    fw_err: &mut c_int,
-) -> c_int {
-    let mut map = STARTED_MAP.lock().unwrap();
-    let launcher = match map.remove(&vm_fd) {
-        Some(l) => l,
-        None => return -1,
-    };
-
-    match launcher.measure() {
-        Ok(m) => {
-            let mut map = MEASURED_MAP.lock().unwrap();
-            let measure = m.measurement();
-            let slice: &mut [u8] = unsafe {
-                from_raw_parts_mut(
-                    (&measure as *const Measurement) as *mut u8,
-                    size_of::<Measurement>(),
-                )
-            };
-            map.insert(vm_fd, m);
-
-            libc::memcpy(
-                measurement_data as _,
-                slice.as_ptr() as _,
-                size_of::<Measurement>(),
-            );
-
-            0
-        }
-        Err(e) => {
-            set_fw_err(fw_err, e);
-
-            -1
-        }
-    }
-}
-
-/// A C FFI interface to the SEV_LAUNCH_SECRET ioctl.
-///
-/// # Safety
-///
-/// The caller of this function is responsible for ensuring that the pointer arguments are
-/// valid.
-#[cfg(all(feature = "sev", target_os = "linux"))]
-#[no_mangle]
-pub unsafe extern "C" fn sev_inject_launch_secret(
-    vm_fd: c_int,
-    header_bytes: *const c_uchar,
-    ct_bytes: *const c_uchar,
-    ct_size: u32,
-    paddr: *const c_void,
-    fw_err: *mut c_int,
-) -> c_int {
-    let mut map = MEASURED_MAP.lock().unwrap();
-    let launcher = match map.get_mut(&vm_fd) {
-        Some(l) => l,
-        None => return -1,
-    };
-
-    let header = header_bytes as *const Header;
-    let ciphertext = {
-        let bytes: &[u8] = unsafe { from_raw_parts(ct_bytes, ct_size as usize) };
-
-        bytes.to_owned().to_vec()
-    };
-
-    let secret = Secret {
-        header: unsafe { *header },
-        ciphertext,
-    };
-
-    match launcher.inject(&secret, paddr as usize) {
-        Ok(()) => 0,
-        Err(e) => {
-            set_fw_err(fw_err, e);
-            -1
-        }
-    }
-}
-
-/// A C FFI interface to the SEV_LAUNCH_FINISH ioctl.
-///
-/// # Safety
-///
-/// The caller of this function is responsible for ensuring that the mnonce is 16 bytes in
-/// size.
-///
-/// The caller of this function is responsible for ensuring that the pointer arguments are
-/// valid.
-#[cfg(all(feature = "sev", target_os = "linux"))]
-#[no_mangle]
-pub unsafe extern "C" fn sev_launch_finish(vm_fd: c_int, fw_err: *mut c_int) -> c_int {
-    let mut map = MEASURED_MAP.lock().unwrap();
-    let launcher = match map.remove(&vm_fd) {
-        Some(l) => l,
-        None => return -1,
-    };
-
-    match launcher.finish_attestable() {
-        Ok(l) => {
-            let mut map = FINISHED_MAP.lock().unwrap();
-            map.insert(vm_fd, l);
-
-            0
-        }
-        Err(e) => {
-            set_fw_err(fw_err, e);
-            -1
-        }
-    }
-}
-
-/// A C FFI interface to the SEV_ATTESTATION_REPORT ioctl.
-///
-/// # Safety
-///
-/// The caller of this function is responsible for ensuring that the pointer arguments are
-/// valid.
-#[cfg(all(feature = "sev", target_os = "linux"))]
-#[allow(unused_assignments)]
-#[no_mangle]
-pub unsafe extern "C" fn sev_attestation_report(
-    vm_fd: c_int,
-    mnonce: *const c_uchar,
-    mnonce_len: u32,
-    mut bytes: *mut c_uchar,
-    len: *mut c_uint,
-    fw_err: *mut c_int,
-) -> c_int {
-    let mut map = FINISHED_MAP.lock().unwrap();
-    let launcher = match map.get_mut(&vm_fd) {
-        Some(l) => l,
-        None => return -1,
-    };
-
-    if mnonce_len != 16 {
-        return -1;
-    }
-
-    let m: &[u8] = from_raw_parts(mnonce, 16);
-
-    let mut mnonce_cpy = [0u8; 16];
-    mnonce_cpy.copy_from_slice(m);
-
-    match launcher.report(mnonce_cpy) {
-        Ok(r) => {
-            *len = r.len() as _;
-            bytes = libc::malloc(r.len()) as *mut c_uchar;
-
-            libc::memcpy(bytes as _, r.as_ptr() as _, r.len());
-
-            0
-        }
-        Err(e) => {
-            set_fw_err(fw_err, e);
-            -1
-        }
-    };
-
-    -1
 }

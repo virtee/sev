@@ -43,6 +43,7 @@ fn map_fw_err(raw_error: RawFwError) -> UserApiError {
 
 /// A handle to the SEV-SNP guest device.
 #[cfg(target_os = "linux")]
+#[derive(Debug)]
 pub struct Firmware(File);
 
 #[cfg(target_os = "linux")]
@@ -83,15 +84,15 @@ impl Firmware {
     /// // Set the VMPL level (OPTIONAL).
     /// let vmpl = 1;
     ///
-    /// // Request the attestation report with our unique_data.
-    /// let attestation_report: AttestationReport = fw.get_report(Some(msg_ver), Some(unique_data), Some(vmpl)).unwrap();
+    /// // Request the raw attestation report with our unique_data.
+    /// let report_bytes: Vec<u8> = fw.get_report(Some(msg_ver), Some(unique_data), Some(vmpl)).unwrap();
     /// ```
     pub fn get_report(
         &mut self,
         message_version: Option<u32>,
         data: Option<[u8; 64]>,
         vmpl: Option<u32>,
-    ) -> Result<AttestationReport, UserApiError> {
+    ) -> Result<Vec<u8>, UserApiError> {
         let mut input = ReportReq::new(data, vmpl)?;
         let mut response = ReportRsp::default();
 
@@ -107,7 +108,7 @@ impl Firmware {
             Err(FirmwareError::from(response.status))?
         }
 
-        Ok(response.report)
+        Ok(response.report.to_vec())
     }
 
     /// Request an extended attestation report from the AMD Secure Processor.
@@ -119,7 +120,7 @@ impl Firmware {
         message_version: Option<u32>,
         data: Option<[u8; 64]>,
         vmpl: Option<u32>,
-    ) -> Result<(AttestationReport, Option<Vec<CertTableEntry>>), UserApiError> {
+    ) -> Result<(Vec<u8>, Option<Vec<CertTableEntry>>), UserApiError> {
         let report_request = ReportReq::new(data, vmpl)?;
 
         let mut report_response = ReportRsp::default();
@@ -180,7 +181,7 @@ impl Firmware {
         }
 
         if ext_report_request.certs_len == 0 {
-            return Ok((report_response.report, None));
+            return Ok((report_response.report.to_vec(), None));
         }
 
         let mut certificates: Vec<CertTableEntry>;
@@ -194,7 +195,7 @@ impl Firmware {
         }
 
         // Return both the Attestation Report, as well as the Cert Table.
-        Ok((report_response.report, Some(certificates)))
+        Ok((report_response.report.to_vec(), Some(certificates)))
     }
 
     /// Fetches a derived key from the AMD Secure Processor. The `message_version` will default to `1` if `None` is specified.
@@ -232,5 +233,28 @@ impl Firmware {
         }
 
         Ok(ffi_derived_key_response.key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_firmware_error_mapping() {
+        let raw_error = RawFwError(1); // Lower byte error
+        let error = map_fw_err(raw_error);
+        assert!(matches!(error, UserApiError::FirmwareError(_)));
+
+        let raw_error = RawFwError(0x100000000u64); // Upper byte error
+        let error = map_fw_err(raw_error);
+        assert!(matches!(error, UserApiError::VmmError(_)));
+
+        let raw_error = RawFwError(0x0u64); // lower byte error
+        let error = map_fw_err(raw_error);
+        assert!(matches!(
+            error,
+            UserApiError::FirmwareError(FirmwareError::UnknownSevError(0))
+        ));
     }
 }

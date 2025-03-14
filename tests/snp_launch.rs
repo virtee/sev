@@ -1,35 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#[cfg(all(feature = "snp", target_os = "linux"))]
+#![cfg(all(feature = "snp", target_os = "linux"))]
+
+use kvm_bindings::{kvm_create_guest_memfd, kvm_userspace_memory_region2, KVM_MEM_GUEST_MEMFD};
+use kvm_ioctls::{Kvm, VcpuExit};
+use sev::firmware::{guest::GuestPolicy, host::Firmware};
+use sev::launch::snp::*;
+use std::os::fd::RawFd;
 use std::slice::from_raw_parts_mut;
 
-#[cfg(all(feature = "snp", target_os = "linux"))]
-use std::os::fd::RawFd;
-
-#[cfg(all(feature = "snp", target_os = "linux"))]
-use sev::firmware::{guest::GuestPolicy, host::Firmware};
-
-#[cfg(all(feature = "snp", target_os = "linux"))]
-use sev::launch::snp::*;
-
-#[cfg(all(feature = "snp", target_os = "linux"))]
-use kvm_bindings::{kvm_create_guest_memfd, kvm_userspace_memory_region2, KVM_MEM_GUEST_MEMFD};
-
-#[cfg(all(feature = "snp", target_os = "linux"))]
-use kvm_ioctls::{Kvm, VcpuExit};
-
-// one page of `hlt`
-#[cfg(all(feature = "snp", target_os = "linux"))]
+// one page of `hlt
 const CODE: &[u8; 4096] = &[
     0xf4; 4096 // hlt
 ];
 
 const KVM_X86_SNP_VM: u64 = 4;
 
-#[cfg(all(feature = "snp", target_os = "linux"))]
-#[cfg_attr(not(has_sev), ignore)]
+#[cfg_attr(not(host), ignore)]
 #[test]
-fn snp() {
+fn snp_launch_test() {
     let kvm_fd = Kvm::new().unwrap();
 
     // Create VM-fd with SEV-SNP type
@@ -82,7 +71,7 @@ fn snp() {
     let launcher = Launcher::new(vm_fd, sev).unwrap();
 
     let mut policy = GuestPolicy(0);
-    policy.set_smt_allowed(1);
+    policy.set_smt_allowed(true);
     let start = Start::new(policy, [0; 16]);
 
     let mut launcher = launcher.start(start).unwrap();

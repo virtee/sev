@@ -36,5 +36,3 @@ pub mod idblock;
 
 #[cfg(all(feature = "snp", feature = "openssl"))]
 pub mod idblock_types;
-
-pub mod large_array;

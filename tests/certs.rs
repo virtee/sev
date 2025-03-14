@@ -24,11 +24,21 @@ mod sev {
 
 #[cfg(all(feature = "snp", any(feature = "openssl", feature = "crypto_nossl")))]
 mod snp {
+
     use sev::certs::snp::{builtin::milan, ca, Certificate, Chain, Verifiable};
 
     const TEST_MILAN_VCEK_DER: &[u8] = include_bytes!("certs_data/vcek_milan.der");
 
+    #[cfg(feature = "openssl")]
+    const TEST_TURIN_VCEK_DER: &[u8] = include_bytes!("certs_data/vcek_turin.der");
+
     const TEST_MILAN_ATTESTATION_REPORT: &[u8] = include_bytes!("certs_data/report_milan.hex");
+
+    #[cfg(feature = "openssl")]
+    const TEST_MILAN_CA: &[u8] = include_bytes!("certs_data/cert_chain_milan");
+
+    #[cfg(feature = "openssl")]
+    const TEST_TURIN_CA: &[u8] = include_bytes!("certs_data/cert_chain_turin");
 
     #[test]
     fn milan_chain() {
@@ -76,8 +86,7 @@ mod snp {
         let chain = Chain { ca, vek: vcek };
 
         let report_bytes = hex::decode(TEST_MILAN_ATTESTATION_REPORT).unwrap();
-        let report: AttestationReport =
-            unsafe { std::ptr::read(report_bytes.as_ptr() as *const _) };
+        let report: AttestationReport = AttestationReport::from_bytes(&report_bytes).unwrap();
 
         assert_eq!((&chain, &report).verify().ok(), Some(()));
     }
@@ -95,10 +104,39 @@ mod snp {
         let chain = Chain { ca, vek: vcek };
 
         let mut report_bytes = hex::decode(TEST_MILAN_ATTESTATION_REPORT).unwrap();
-        report_bytes[0] ^= 0x80;
-        let report: AttestationReport =
-            unsafe { std::ptr::read(report_bytes.as_ptr() as *const _) };
+        report_bytes[21] ^= 0x80;
+        let report = AttestationReport::from_bytes(&report_bytes).unwrap();
 
         assert_eq!((&chain, &report).verify().ok(), None);
+    }
+
+    #[cfg(feature = "openssl")]
+    #[test]
+    fn milan_ca_stack() {
+        let vcek = Certificate::from_der(TEST_MILAN_VCEK_DER).unwrap();
+
+        let ca = ca::Chain::from_pem_bytes(TEST_MILAN_CA).unwrap();
+
+        let chain = Chain {
+            ca,
+            vek: vcek.clone(),
+        };
+
+        assert_eq!(chain.verify().ok(), Some(&vcek));
+    }
+
+    #[cfg(feature = "openssl")]
+    #[test]
+    fn turin_ca_stack() {
+        let vcek = Certificate::from_der(TEST_TURIN_VCEK_DER).unwrap();
+
+        let ca = ca::Chain::from_pem_bytes(TEST_TURIN_CA).unwrap();
+
+        let chain = Chain {
+            ca,
+            vek: vcek.clone(),
+        };
+
+        assert_eq!(chain.verify().ok(), Some(&vcek));
     }
 }

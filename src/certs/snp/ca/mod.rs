@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Operations for a Certificate Authority (CA) chain.
+
 #[cfg(feature = "openssl")]
 use openssl::x509::X509;
 
@@ -116,6 +117,18 @@ impl Chain {
         Ok(Self {
             ark: Certificate::from_der(ark)?,
             ask: Certificate::from_der(ask)?,
+        })
+    }
+
+    #[cfg(feature = "openssl")]
+    /// Deserialize the certificates from a PEM stack to a CA chain.
+    pub fn from_pem_bytes(stack: &[u8]) -> Result<Self> {
+        let certificates = X509::stack_from_pem(stack)?;
+        let ark_cert = &certificates[1];
+        let ask_cert = &certificates[0];
+        Ok(Self {
+            ark: ark_cert.into(),
+            ask: ask_cert.into(),
         })
     }
 }

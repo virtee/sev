@@ -9,3 +9,4 @@ pub mod genoa;
 pub mod milan;
 pub mod naples;
 pub mod rome;
+pub mod turin;

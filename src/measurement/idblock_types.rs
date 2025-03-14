@@ -15,9 +15,8 @@ use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 
 use crate::{
-    error::IdBlockError,
-    firmware::guest::GuestPolicy,
-    measurement::{large_array::LargeArray, snp::SnpLaunchDigest},
+    error::IdBlockError, firmware::guest::GuestPolicy, measurement::snp::SnpLaunchDigest,
+    util::array::Array,
 };
 
 pub(crate) const DEFAULT_ID_VERSION: u32 = 1;
@@ -69,9 +68,9 @@ pub type ImageId = FamilyId;
 #[repr(C)]
 #[derive(Default, Serialize, Deserialize, Clone, Copy)]
 pub struct SevEcdsaSig {
-    r: LargeArray<u8, ECDSA_POINT_SIZE_BYTES>,
-    s: LargeArray<u8, ECDSA_POINT_SIZE_BYTES>,
-    reserved: LargeArray<u8, ECDSA_SIG_RESERVED>,
+    r: Array<u8, ECDSA_POINT_SIZE_BYTES>,
+    s: Array<u8, ECDSA_POINT_SIZE_BYTES>,
+    reserved: Array<u8, ECDSA_SIG_RESERVED>,
 }
 
 // Derive SEV ECDSA signature from a private EC KEY
@@ -132,11 +131,11 @@ impl TryFrom<(EcKey<Private>, &[u8])> for SevEcdsaSig {
 #[derive(Default, Serialize, Deserialize, Clone, Copy)]
 pub struct SevEcdsaKeyData {
     /// QX component of the ECDSA public key
-    pub qx: LargeArray<u8, ECDSA_POINT_SIZE_BYTES>,
+    pub qx: Array<u8, ECDSA_POINT_SIZE_BYTES>,
     /// QY component of the ECDSA public key
-    pub qy: LargeArray<u8, ECDSA_POINT_SIZE_BYTES>,
+    pub qy: Array<u8, ECDSA_POINT_SIZE_BYTES>,
     /// Reserved
-    reserved: LargeArray<u8, ECDSA_PUBKEY_RESERVED>,
+    reserved: Array<u8, ECDSA_PUBKEY_RESERVED>,
 }
 
 /// SEV ECDSA public key. Need it in this format to calculate the AUTH-ID.
@@ -268,19 +267,19 @@ pub struct IdAuth {
     /// The algorithm of the Author Key. Defaults to P-384
     pub author_key_algo: u32,
     /// Reserved
-    reserved1: LargeArray<u8, ID_AUTH_RESERVED1_BYTES>,
+    reserved1: Array<u8, ID_AUTH_RESERVED1_BYTES>,
     /// The signature of all bytes of the ID block
     pub id_block_sig: SevEcdsaSig,
     /// The public component of the ID key
     pub id_pubkey: SevEcdsaPubKey,
     /// Reserved
-    reserved2: LargeArray<u8, ID_AUTH_RESERVED2_BYTES>,
+    reserved2: Array<u8, ID_AUTH_RESERVED2_BYTES>,
     /// The signature of the ID_KEY
     pub id_key_sig: SevEcdsaSig,
     /// The public component of the Author key
     pub author_pub_key: SevEcdsaPubKey,
     /// Reserved
-    reserved3: LargeArray<u8, ID_AUTH_RESERVED3_BYTES>,
+    reserved3: Array<u8, ID_AUTH_RESERVED3_BYTES>,
 }
 
 impl IdAuth {
@@ -295,12 +294,12 @@ impl IdAuth {
     ) -> Self {
         let id_algo = match id_key_algo {
             Some(algo) => algo,
-            None => DEFAULT_KEY_ALGO,
+            _ => DEFAULT_KEY_ALGO,
         };
 
         let key_algo = match author_key_algo {
             Some(algo) => algo,
-            None => DEFAULT_KEY_ALGO,
+            _ => DEFAULT_KEY_ALGO,
         };
 
         Self {

@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Operations to build and interact with an SEV-ES VMSA
-use crate::{
-    error::MeasurementError,
-    measurement::{large_array::LargeArray, vcpu_types::CpuType},
-};
+use crate::{error::MeasurementError, measurement::vcpu_types::CpuType, util::array::Array};
 use bitfield::bitfield;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, fmt, str::FromStr};
@@ -128,9 +125,7 @@ bitfield! {
     /// | 8 | VmplSSS |
     /// | 9 | SecureTSC |
     /// | 10 | VmgexitParameter |
-    /// | 11 | Reserved, SBZ |
     /// | 12 | IbsVirtualization |
-    /// | 13 | Reserved, SBZ |
     /// | 14 | VmsaRegProt |
     /// | 15 | SmtProtection |
     /// | 63:16 | Reserved, SBZ |
@@ -139,39 +134,33 @@ bitfield! {
     pub struct GuestFeatures(u64);
     impl Debug;
     /// SNPActive
-    pub snp_active, _: 0, 0;
+    pub snp_active, _: 0;
     /// vTom
-    pub v_tom, _: 1, 1;
+    pub v_tom, _: 1;
     /// ReflectVC
-    pub reflect_vc, _: 2, 2;
+    pub reflect_vc, _: 2;
     /// RestrictedInjection
-    pub restricted_injection, _: 3,3;
+    pub restricted_injection, _: 3;
     /// AlternateInjection
-    pub alternate_injection, _: 4,4;
+    pub alternate_injection, _: 4;
     /// DebugSwap
-    pub debug_swap, _: 5,5;
+    pub debug_swap, _: 5;
     /// PreventHostIbs
-    pub prevent_host_ibs, _: 6,6;
+    pub prevent_host_ibs, _: 6;
     /// BTBIsolation
-    pub btb_isolation, _: 7,7;
+    pub btb_isolation, _: 7;
     /// VmplSSS
-    pub vmpl_sss, _: 8,8;
+    pub vmpl_sss, _: 8;
     /// SecureTSC
-    pub secure_tsc, _: 9,9;
+    pub secure_tsc, _: 9;
     /// VmgExitParameter
-    pub vmg_exit_parameter, _: 10,10;
-    /// Reserved, SBZ
-    reserved_1, _: 11,11;
+    pub vmg_exit_parameter, _: 10;
     /// IbsVirtualization
-    pub ibs_virtualization, _: 12,12;
-    /// Reserved, SBZ
-    reserved_2, _: 13,13;
+    pub ibs_virtualization, _: 12;
     /// VmsaRegProt
-    pub vmsa_reg_prot, _: 14,14;
+    pub vmsa_reg_prot, _: 14;
     ///SmtProtection
-    pub smt_protection, _: 15,15;
-    /// Reserved, SBZ
-    reserved_3, sbz: 16, 63;
+    pub smt_protection, _: 15;
 }
 
 impl Default for GuestFeatures {
@@ -207,7 +196,7 @@ struct SevEsSaveArea {
     cpl: u8,
     reserved_0xcc: [u8; 4],
     efer: u64,
-    reserved_0xd8: LargeArray<u8, 104>,
+    reserved_0xd8: Array<u8, 104>,
     xss: u64,
     cr4: u64,
     cr3: u64,
@@ -246,7 +235,7 @@ struct SevEsSaveArea {
     br_to: u64,
     last_excp_from: u64,
     last_excp_to: u64,
-    reserved_0x298: LargeArray<u8, 80>,
+    reserved_0x298: Array<u8, 80>,
     pkru: u32,
     tsc_aux: u32,
     reserved_0x2f0: [u8; 24],
@@ -290,10 +279,10 @@ struct SevEsSaveArea {
     x87_ds: u16,
     x87_cs: u16,
     x87_rip: u64,
-    fpreg_x87: LargeArray<u8, 80>,
-    fpreg_xmm: LargeArray<u8, 256>,
-    fpreg_ymm: LargeArray<u8, 256>,
-    manual_padding: LargeArray<u8, 2448>,
+    fpreg_x87: Array<u8, 80>,
+    fpreg_xmm: Array<u8, 256>,
+    fpreg_ymm: Array<u8, 256>,
+    manual_padding: Array<u8, 2448>,
 }
 
 const BSP_EIP: u64 = 0xffff_fff0;
@@ -373,7 +362,7 @@ impl VMSA {
                             area.rsp = 0x8ff0;
                         }
                     }
-                    None => {
+                    _ => {
                         area.rsi = 0x7000;
                         area.rbp = 0x8ff0;
                         area.rsp = 0x8ff0;
@@ -417,7 +406,7 @@ impl VMSA {
         let ap_save_area_bytes: Option<Vec<u8>> =
             match self.ap_save_area.map(|v| bincode::serialize(&v)) {
                 Some(value) => Some(value.map_err(|e| MeasurementError::BincodeError(*e))?),
-                None => None,
+                _ => None,
             };
 
         let mut pages = Vec::new();
