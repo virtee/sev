@@ -197,8 +197,8 @@ impl ReportVariant {
             0 | 1 => return Err(std::io::ErrorKind::Unsupported.into()),
             2 => Self::V2,
             _ => {
-                let family: u8 = bytes[388];
-                if family >= 0xB0 {
+                let family: u8 = bytes[392];
+                if family >= 0x1A {
                     Self::V3Turin
                 } else {
                     Self::V3PreTurin
