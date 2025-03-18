@@ -1485,7 +1485,7 @@ dependencies = [
 
 [[package]]
 name = "sev"
-version = "5.0.0"
+version = "6.0.0"
 dependencies = [
  "base64 0.22.1",
  "bincode",
