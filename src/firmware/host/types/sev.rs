@@ -16,11 +16,11 @@ use crate::certs::sev::{
 };
 
 #[cfg(feature = "openssl")]
-use openssl::{ec::EcKey, ecdsa::EcdsaSig, pkey::Public};
+use openssl::{ec::EcKey, ecdsa::EcdsaSig, pkey::Public, sha::Sha256};
 
 use crate::util::{TypeLoad, TypeSave};
 
-use crate::certs::sev::sev::EcdsaSignature;
+use crate::util::array::Array;
 use serde::{Deserialize, Serialize};
 
 use std::{
@@ -119,7 +119,7 @@ pub struct LegacyAttestationReport {
     /// 128-bit Nonce from the Command Buffer.
     pub mnonce: [u8; MNONCE_SIZE], // 0x00
     /// SHA-256 digest of launched guest.
-    pub launch_digest: [u8; POLICY_SIZE], // 0x10
+    pub launch_digest: [u8; DIGEST_SIZE], // 0x10
     /// Policy guest was launched with.
     pub policy: u32, // 0x30
     /// Key usage of SIG1 signing key.
@@ -129,7 +129,7 @@ pub struct LegacyAttestationReport {
     /// Reserved
     _reserved_0: u32, // 0x3C
     /// Signature of the report.
-    pub signature: EcdsaSignature,
+    pub signature: Array<u8, 144>, // 0x40 - 0xCF
 }
 
 impl LegacyAttestationReport {
@@ -153,8 +153,17 @@ impl Verifiable for (&Certificate, &LegacyAttestationReport) {
 
         let sig: EcdsaSig = (&self.1.signature).try_into()?;
 
-        sig.verify(&self.1.measurable_bytes(), pub_key)?;
+        let mut hasher = Sha256::new();
+        hasher.update(&self.1.measurable_bytes());
+        let base_digest = hasher.finish();
 
-        Ok(())
+        let signed = sig.verify(&base_digest, pub_key)?;
+        match signed {
+            true => Ok(()),
+            false => Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "PEK does not sign the attestation report",
+            )),
+        }
     }
 }
