@@ -75,6 +75,19 @@ impl TryFrom<&[u8]> for Signature {
 }
 
 #[cfg(feature = "openssl")]
+impl TryFrom<&Array<u8, 144>> for ecdsa::EcdsaSig {
+    type Error = Error;
+
+    #[inline]
+    fn try_from(value: &Array<u8, 144>) -> Result<Self> {
+        let arr: &[u8] = value.as_ref();
+        let r = bn::BigNum::from_le(&arr[..SIG_PIECE_SIZE])?;
+        let s = bn::BigNum::from_le(&arr[SIG_PIECE_SIZE..])?;
+        Ok(ecdsa::EcdsaSig::from_private_components(r, s)?)
+    }
+}
+
+#[cfg(feature = "openssl")]
 impl TryFrom<&Signature> for ecdsa::EcdsaSig {
     type Error = Error;
 
