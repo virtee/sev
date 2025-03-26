@@ -56,7 +56,7 @@ codicon = "3.0"
 dirs = "5.0"
 serde-big-array = "0.5.1"
 static_assertions = "^1.1.0"
-bitfield = "^0.15"
+bitfield = "^0.19"
 uuid = { version = "^1.11", features = ["serde"] }
 bincode = "^1.3"
 hex = "0.4.3"
