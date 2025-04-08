@@ -220,7 +220,7 @@ impl<'a> Update<'a> {
 }
 
 bitflags! {
-    #[derive(Default, Deserialize, Serialize)]
+    #[derive(Default, Copy, Clone, Debug, PartialEq, Eq)]
     /// VMPL permission masks.
     pub struct VmplPerms: u8 {
         /// Page is readable by the VMPL.
@@ -234,6 +234,25 @@ bitflags! {
 
         /// Page is executable by the VMPL in CPL2, CPL1, and CPL0.
         const EXECUTE_SUPERVISOR = 1 << 3;
+    }
+}
+
+impl Serialize for VmplPerms {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_u8(self.bits())
+    }
+}
+
+impl<'de> Deserialize<'de> for VmplPerms {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let bits = u8::deserialize(deserializer)?;
+        Ok(VmplPerms::from_bits_truncate(bits))
     }
 }
 

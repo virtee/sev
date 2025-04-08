@@ -249,7 +249,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Finished, U, V> {
 
 bitflags! {
     /// Configurable SEV Policy options.
-    #[derive(Default, Deserialize, Serialize)]
+    #[derive(Copy, Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
     pub struct PolicyFlags: u16 {
         /// When set, debugging the guest is forbidden.
         const NO_DEBUG        = 0b00000001u16.to_le();
@@ -270,6 +270,45 @@ bitflags! {
         /// When set, the guest may not be transmitted to another
         /// platform that is not SEV-capable.
         const SEV             = 0b00100000u16.to_le();
+    }
+}
+
+impl Serialize for PolicyFlags {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut flags = 0u16;
+        if self.contains(PolicyFlags::NO_DEBUG) {
+            flags |= PolicyFlags::NO_DEBUG.bits();
+        }
+        if self.contains(PolicyFlags::NO_KEY_SHARING) {
+            flags |= PolicyFlags::NO_KEY_SHARING.bits();
+        }
+        if self.contains(PolicyFlags::ENCRYPTED_STATE) {
+            flags |= PolicyFlags::ENCRYPTED_STATE.bits();
+        }
+        if self.contains(PolicyFlags::NO_SEND) {
+            flags |= PolicyFlags::NO_SEND.bits();
+        }
+        if self.contains(PolicyFlags::DOMAIN) {
+            flags |= PolicyFlags::DOMAIN.bits();
+        }
+        if self.contains(PolicyFlags::SEV) {
+            flags |= PolicyFlags::SEV.bits();
+        }
+        serializer.serialize_u16(flags)
+    }
+}
+
+impl<'de> Deserialize<'de> for PolicyFlags {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let flags = u16::deserialize(deserializer)?;
+        let flags = PolicyFlags::from_bits_truncate(flags);
+        Ok(flags)
     }
 }
 
@@ -356,11 +395,35 @@ impl codicon::Encoder<()> for Start {
 
 bitflags! {
     /// Additional descriptions of the secret header packet.
-    #[derive(Default, Deserialize, Serialize)]
+    #[derive(Default, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
     pub struct HeaderFlags: u32 {
         /// If set, the contents of the packet are compressed and
         /// the AMD SP must decompress them.
         const COMPRESSED = 0b00000001u32.to_le();
+    }
+}
+
+impl Serialize for HeaderFlags {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut flags = 0u32;
+        if self.contains(HeaderFlags::COMPRESSED) {
+            flags |= HeaderFlags::COMPRESSED.bits();
+        }
+        serializer.serialize_u32(flags)
+    }
+}
+
+impl<'de> Deserialize<'de> for HeaderFlags {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let flags = u32::deserialize(deserializer)?;
+        let flags = HeaderFlags::from_bits_truncate(flags);
+        Ok(flags)
     }
 }
 
