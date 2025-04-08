@@ -45,7 +45,7 @@ impl std::fmt::Debug for Signature {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "Signature {{ r: {:?}, s: {:?} }}",
+            "Signature {{ r:{:?}, s:{:?} }}",
             self.r.iter(),
             self.s.iter()
         )
@@ -88,8 +88,8 @@ impl std::fmt::Display for Signature {
         write!(
             f,
             r#"Signature:
-  R: {}
-  S: {}"#,
+  R:{}
+  S:{}"#,
             self.r, self.s
         )
     }
@@ -209,8 +209,8 @@ mod tests {
     fn test_signature_debug() {
         let sig: Signature = Default::default();
         let debug_str: String = format!("{:?}", sig);
-        assert!(debug_str.starts_with("Signature { r: "));
-        assert!(debug_str.contains(", s: "));
+        assert!(debug_str.starts_with("Signature { r:"));
+        assert!(debug_str.contains(", s:"));
     }
 
     #[test]
