@@ -2,23 +2,22 @@
 use super::byte_parser::ByteParser;
 use std::io::Read;
 
-pub trait ReadExt {
-    fn parse_bytes<T, const SKIP: usize>(&mut self) -> Result<T, std::io::Error>
-    where
-        T: ByteParser<Bytes: AsMut<[u8]>>;
-}
-
-impl<R> ReadExt for R
-where
-    R: Read,
-{
-    #[inline(always)]
-    fn parse_bytes<T, const SKIP: usize>(&mut self) -> Result<T, std::io::Error>
+pub trait ReadExt: Read {
+    fn parse_bytes<T>(&mut self) -> Result<T, std::io::Error>
     where
         T: ByteParser<Bytes: AsMut<[u8]>>,
     {
+        let mut bytes = T::default().to_bytes();
+        self.read_exact(bytes.as_mut())?;
+        Ok(T::from_bytes(bytes))
+    }
+
+    fn skip_bytes<const SKIP: usize>(mut self) -> Result<Self, std::io::Error>
+    where
+        Self: Sized,
+    {
         if SKIP != 0 {
-            let mut skipped_bytes = [0; SKIP];
+            let mut skipped_bytes = [0u8; SKIP];
             self.read_exact(&mut skipped_bytes)?;
 
             if skipped_bytes != [0; SKIP] {
@@ -28,12 +27,11 @@ where
                 ));
             }
         }
-
-        let mut bytes = T::default().to_bytes();
-        self.read_exact(bytes.as_mut())?;
-        Ok(T::from_bytes(bytes))
+        Ok(self)
     }
 }
+
+impl<R> ReadExt for R where R: Read {}
 
 #[cfg(test)]
 mod read_ext_tests {
@@ -41,6 +39,7 @@ mod read_ext_tests {
     use std::io::{self, Read};
 
     // Mock Reader implementation
+    #[derive(Debug)]
     struct MockReader {
         data: Vec<u8>,
         position: usize,
@@ -70,7 +69,7 @@ mod read_ext_tests {
     fn test_no_skip_valid_data() {
         let data = vec![0x12, 0x34, 0x56, 0x78];
         let mut reader = MockReader::new(data);
-        let result: Result<u32, _> = reader.parse_bytes::<u32, 0>();
+        let result: Result<u32, _> = reader.parse_bytes();
         assert_eq!(result.unwrap(), 0x78563412);
     }
 
@@ -78,8 +77,8 @@ mod read_ext_tests {
     #[test]
     fn test_skip_valid_data() {
         let data = vec![0, 0, 0, 0, 0x12, 0x34, 0x56, 0x78];
-        let mut reader = MockReader::new(data);
-        let result: Result<u32, _> = reader.parse_bytes::<u32, 4>();
+        let reader = MockReader::new(data);
+        let result: Result<u32, _> = reader.skip_bytes::<4>().unwrap().parse_bytes();
         assert_eq!(result.unwrap(), 0x78563412);
     }
 
@@ -87,8 +86,8 @@ mod read_ext_tests {
     #[test]
     fn test_skip_invalid_data() {
         let data = vec![0, 0, 1, 0, 0x12, 0x34, 0x56, 0x78];
-        let mut reader = MockReader::new(data);
-        let result: Result<u32, _> = reader.parse_bytes::<u32, 4>();
+        let reader = MockReader::new(data);
+        let result = reader.skip_bytes::<4>();
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidData);
     }
@@ -98,7 +97,7 @@ mod read_ext_tests {
     fn test_read_fails() {
         let data = vec![0x12, 0x34];
         let mut reader = MockReader::new(data);
-        let result: Result<u32, _> = reader.parse_bytes::<u32, 0>();
+        let result: Result<u32, _> = reader.parse_bytes();
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().kind(), io::ErrorKind::UnexpectedEof);
     }
@@ -108,7 +107,7 @@ mod read_ext_tests {
     fn test_zero_length_read() {
         let data: Vec<u8> = vec![];
         let mut reader = MockReader::new(data);
-        let result: Result<[u8; 0], _> = reader.parse_bytes::<[u8; 0], 0>();
+        let result: Result<[u8; 0], _> = reader.parse_bytes();
         assert!(result.is_ok());
     }
 
@@ -117,7 +116,7 @@ mod read_ext_tests {
     fn test_empty_reader() {
         let data: Vec<u8> = vec![];
         let mut reader = MockReader::new(data);
-        let result: Result<u32, _> = reader.parse_bytes::<u32, 0>();
+        let result: Result<u32, _> = reader.parse_bytes();
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().kind(), io::ErrorKind::UnexpectedEof);
     }
