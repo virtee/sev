@@ -317,139 +317,131 @@ impl AttestationReport {
                 // of SPN fields for hash-stick algorithm).
                 if Self::chip_id_is_turin_like(&stepper[0x1A0..0x1E0])? {
                     AttestationReport {
-                        version: stepper.parse_bytes::<_, 0>()?,
-                        guest_svn: stepper.parse_bytes::<_, 0>()?,
-                        policy: stepper.parse_bytes::<_, 0>()?,
-                        family_id: stepper.parse_bytes::<_, 0>()?,
-                        image_id: stepper.parse_bytes::<_, 0>()?,
-                        vmpl: stepper.parse_bytes::<_, 0>()?,
-                        sig_algo: stepper.parse_bytes::<_, 0>()?,
-                        current_tcb: TcbVersion::from_turin_bytes(
-                            &stepper.parse_bytes::<[u8; 8], 0>()?,
-                        ),
-                        plat_info: stepper.parse_bytes::<_, 0>()?,
-                        key_info: stepper.parse_bytes::<_, 0>()?,
-                        report_data: stepper.parse_bytes::<_, 4>()?,
-                        measurement: stepper.parse_bytes::<_, 0>()?,
-                        host_data: stepper.parse_bytes::<_, 0>()?,
-                        id_key_digest: stepper.parse_bytes::<_, 0>()?,
-                        author_key_digest: stepper.parse_bytes::<_, 0>()?,
-                        report_id: stepper.parse_bytes::<_, 0>()?,
-                        report_id_ma: stepper.parse_bytes::<_, 0>()?,
-                        reported_tcb: TcbVersion::from_turin_bytes(
-                            &stepper.parse_bytes::<[u8; 8], 0>()?,
-                        ),
+                        version: stepper.parse_bytes()?,
+                        guest_svn: stepper.parse_bytes()?,
+                        policy: stepper.parse_bytes()?,
+                        family_id: stepper.parse_bytes()?,
+                        image_id: stepper.parse_bytes()?,
+                        vmpl: stepper.parse_bytes()?,
+                        sig_algo: stepper.parse_bytes()?,
+                        current_tcb: TcbVersion::from_turin_bytes(&stepper.parse_bytes()?),
+                        plat_info: stepper.parse_bytes()?,
+                        key_info: stepper.parse_bytes()?,
+                        report_data: stepper.skip_bytes::<4>()?.parse_bytes()?,
+                        measurement: stepper.parse_bytes()?,
+                        host_data: stepper.parse_bytes()?,
+                        id_key_digest: stepper.parse_bytes()?,
+                        author_key_digest: stepper.parse_bytes()?,
+                        report_id: stepper.parse_bytes()?,
+                        report_id_ma: stepper.parse_bytes()?,
+                        reported_tcb: TcbVersion::from_turin_bytes(&stepper.parse_bytes()?),
                         cpuid_fam_id: None,
                         cpuid_mod_id: None,
                         cpuid_step: None,
-                        chip_id: stepper.parse_bytes::<_, 24>()?,
-                        committed_tcb: TcbVersion::from_turin_bytes(
-                            &stepper.parse_bytes::<[u8; 8], 0>()?,
-                        ),
-                        current: stepper.parse_bytes::<_, 0>()?,
-                        committed: stepper.parse_bytes::<_, 1>()?,
+                        chip_id: stepper.skip_bytes::<24>()?.parse_bytes()?,
+                        committed_tcb: TcbVersion::from_turin_bytes(&stepper.parse_bytes()?),
+                        current: stepper.parse_bytes()?,
+                        committed: stepper.skip_bytes::<1>()?.parse_bytes()?,
                         launch_tcb: TcbVersion::from_turin_bytes(
-                            &stepper.parse_bytes::<[u8; 8], 1>()?,
+                            &stepper.skip_bytes::<1>()?.parse_bytes()?,
                         ),
-                        signature: stepper.parse_bytes::<_, 168>()?,
+                        signature: stepper.skip_bytes::<168>()?.parse_bytes()?,
                     }
                 } else {
                     AttestationReport {
-                        version: stepper.parse_bytes::<_, 0>()?,
-                        guest_svn: stepper.parse_bytes::<_, 0>()?,
-                        policy: stepper.parse_bytes::<_, 0>()?,
-                        family_id: stepper.parse_bytes::<_, 0>()?,
-                        image_id: stepper.parse_bytes::<_, 0>()?,
-                        vmpl: stepper.parse_bytes::<_, 0>()?,
-                        sig_algo: stepper.parse_bytes::<_, 0>()?,
-                        current_tcb: TcbVersion::from_legacy_bytes(
-                            &stepper.parse_bytes::<[u8; 8], 0>()?,
-                        ),
-                        plat_info: stepper.parse_bytes::<_, 0>()?,
-                        key_info: stepper.parse_bytes::<_, 0>()?,
-                        report_data: stepper.parse_bytes::<_, 4>()?,
-                        measurement: stepper.parse_bytes::<_, 0>()?,
-                        host_data: stepper.parse_bytes::<_, 0>()?,
-                        id_key_digest: stepper.parse_bytes::<_, 0>()?,
-                        author_key_digest: stepper.parse_bytes::<_, 0>()?,
-                        report_id: stepper.parse_bytes::<_, 0>()?,
-                        report_id_ma: stepper.parse_bytes::<_, 0>()?,
-                        reported_tcb: TcbVersion::from_legacy_bytes(
-                            &stepper.parse_bytes::<[u8; 8], 0>()?,
-                        ),
+                        version: stepper.parse_bytes()?,
+                        guest_svn: stepper.parse_bytes()?,
+                        policy: stepper.parse_bytes()?,
+                        family_id: stepper.parse_bytes()?,
+                        image_id: stepper.parse_bytes()?,
+                        vmpl: stepper.parse_bytes()?,
+                        sig_algo: stepper.parse_bytes()?,
+                        current_tcb: TcbVersion::from_legacy_bytes(&stepper.parse_bytes()?),
+                        plat_info: stepper.parse_bytes()?,
+                        key_info: stepper.parse_bytes()?,
+                        report_data: stepper.skip_bytes::<4>()?.parse_bytes()?,
+                        measurement: stepper.parse_bytes()?,
+                        host_data: stepper.parse_bytes()?,
+                        id_key_digest: stepper.parse_bytes()?,
+                        author_key_digest: stepper.parse_bytes()?,
+                        report_id: stepper.parse_bytes()?,
+                        report_id_ma: stepper.parse_bytes()?,
+                        reported_tcb: TcbVersion::from_legacy_bytes(&stepper.parse_bytes()?),
                         cpuid_fam_id: None,
                         cpuid_mod_id: None,
                         cpuid_step: None,
-                        chip_id: stepper.parse_bytes::<_, 24>()?,
-                        committed_tcb: TcbVersion::from_legacy_bytes(
-                            &stepper.parse_bytes::<[u8; 8], 0>()?,
-                        ),
-                        current: stepper.parse_bytes::<_, 0>()?,
-                        committed: stepper.parse_bytes::<_, 1>()?,
+                        chip_id: stepper.skip_bytes::<24>()?.parse_bytes()?,
+                        committed_tcb: TcbVersion::from_legacy_bytes(&stepper.parse_bytes()?),
+                        current: stepper.parse_bytes()?,
+                        committed: stepper.skip_bytes::<1>()?.parse_bytes()?,
                         launch_tcb: TcbVersion::from_legacy_bytes(
-                            &stepper.parse_bytes::<[u8; 8], 1>()?,
+                            &stepper.skip_bytes::<1>()?.parse_bytes()?,
                         ),
-                        signature: stepper.parse_bytes::<_, 168>()?,
+                        signature: stepper.skip_bytes::<168>()?.parse_bytes()?,
                     }
                 }
             }
             ReportVariant::V3PreTurin => AttestationReport {
-                version: stepper.parse_bytes::<_, 0>()?,
-                guest_svn: stepper.parse_bytes::<_, 0>()?,
-                policy: stepper.parse_bytes::<_, 0>()?,
-                family_id: stepper.parse_bytes::<_, 0>()?,
-                image_id: stepper.parse_bytes::<_, 0>()?,
-                vmpl: stepper.parse_bytes::<_, 0>()?,
-                sig_algo: stepper.parse_bytes::<_, 0>()?,
-                current_tcb: TcbVersion::from_legacy_bytes(&stepper.parse_bytes::<[u8; 8], 0>()?),
-                plat_info: stepper.parse_bytes::<_, 0>()?,
-                key_info: stepper.parse_bytes::<_, 0>()?,
-                report_data: stepper.parse_bytes::<_, 4>()?,
-                measurement: stepper.parse_bytes::<_, 0>()?,
-                host_data: stepper.parse_bytes::<_, 0>()?,
-                id_key_digest: stepper.parse_bytes::<_, 0>()?,
-                author_key_digest: stepper.parse_bytes::<_, 0>()?,
-                report_id: stepper.parse_bytes::<_, 0>()?,
-                report_id_ma: stepper.parse_bytes::<_, 0>()?,
-                reported_tcb: TcbVersion::from_legacy_bytes(&stepper.parse_bytes::<[u8; 8], 0>()?),
-                cpuid_fam_id: Some(stepper.parse_bytes::<_, 0>()?),
-                cpuid_mod_id: Some(stepper.parse_bytes::<_, 0>()?),
-                cpuid_step: Some(stepper.parse_bytes::<_, 0>()?),
-                chip_id: stepper.parse_bytes::<_, 21>()?,
-                committed_tcb: TcbVersion::from_legacy_bytes(&stepper.parse_bytes::<[u8; 8], 0>()?),
-                current: stepper.parse_bytes::<_, 0>()?,
-                committed: stepper.parse_bytes::<_, 1>()?,
-                launch_tcb: TcbVersion::from_legacy_bytes(&stepper.parse_bytes::<[u8; 8], 1>()?),
-                signature: stepper.parse_bytes::<_, 168>()?,
+                version: stepper.parse_bytes()?,
+                guest_svn: stepper.parse_bytes()?,
+                policy: stepper.parse_bytes()?,
+                family_id: stepper.parse_bytes()?,
+                image_id: stepper.parse_bytes()?,
+                vmpl: stepper.parse_bytes()?,
+                sig_algo: stepper.parse_bytes()?,
+                current_tcb: TcbVersion::from_legacy_bytes(&stepper.parse_bytes()?),
+                plat_info: stepper.parse_bytes()?,
+                key_info: stepper.parse_bytes()?,
+                report_data: stepper.skip_bytes::<4>()?.parse_bytes()?,
+                measurement: stepper.parse_bytes()?,
+                host_data: stepper.parse_bytes()?,
+                id_key_digest: stepper.parse_bytes()?,
+                author_key_digest: stepper.parse_bytes()?,
+                report_id: stepper.parse_bytes()?,
+                report_id_ma: stepper.parse_bytes()?,
+                reported_tcb: TcbVersion::from_legacy_bytes(&stepper.parse_bytes()?),
+                cpuid_fam_id: Some(stepper.parse_bytes()?),
+                cpuid_mod_id: Some(stepper.parse_bytes()?),
+                cpuid_step: Some(stepper.parse_bytes()?),
+                chip_id: stepper.skip_bytes::<21>()?.parse_bytes()?,
+                committed_tcb: TcbVersion::from_legacy_bytes(&stepper.parse_bytes()?),
+                current: stepper.parse_bytes()?,
+                committed: stepper.skip_bytes::<1>()?.parse_bytes()?,
+                launch_tcb: TcbVersion::from_legacy_bytes(
+                    &stepper.skip_bytes::<1>()?.parse_bytes()?,
+                ),
+                signature: stepper.skip_bytes::<168>()?.parse_bytes()?,
             },
             ReportVariant::V3Turin => AttestationReport {
-                version: stepper.parse_bytes::<_, 0>()?,
-                guest_svn: stepper.parse_bytes::<_, 0>()?,
-                policy: stepper.parse_bytes::<_, 0>()?,
-                family_id: stepper.parse_bytes::<_, 0>()?,
-                image_id: stepper.parse_bytes::<_, 0>()?,
-                vmpl: stepper.parse_bytes::<_, 0>()?,
-                sig_algo: stepper.parse_bytes::<_, 0>()?,
-                current_tcb: TcbVersion::from_turin_bytes(&stepper.parse_bytes::<[u8; 8], 0>()?),
-                plat_info: stepper.parse_bytes::<_, 0>()?,
-                key_info: stepper.parse_bytes::<_, 0>()?,
-                report_data: stepper.parse_bytes::<_, 4>()?,
-                measurement: stepper.parse_bytes::<_, 0>()?,
-                host_data: stepper.parse_bytes::<_, 0>()?,
-                id_key_digest: stepper.parse_bytes::<_, 0>()?,
-                author_key_digest: stepper.parse_bytes::<_, 0>()?,
-                report_id: stepper.parse_bytes::<_, 0>()?,
-                report_id_ma: stepper.parse_bytes::<_, 0>()?,
-                reported_tcb: TcbVersion::from_turin_bytes(&stepper.parse_bytes::<[u8; 8], 0>()?),
-                cpuid_fam_id: Some(stepper.parse_bytes::<_, 0>()?),
-                cpuid_mod_id: Some(stepper.parse_bytes::<_, 0>()?),
-                cpuid_step: Some(stepper.parse_bytes::<_, 0>()?),
-                chip_id: stepper.parse_bytes::<_, 21>()?,
-                committed_tcb: TcbVersion::from_turin_bytes(&stepper.parse_bytes::<[u8; 8], 0>()?),
-                current: stepper.parse_bytes::<_, 0>()?,
-                committed: stepper.parse_bytes::<_, 1>()?,
-                launch_tcb: TcbVersion::from_turin_bytes(&stepper.parse_bytes::<[u8; 8], 1>()?),
-                signature: stepper.parse_bytes::<_, 168>()?,
+                version: stepper.parse_bytes()?,
+                guest_svn: stepper.parse_bytes()?,
+                policy: stepper.parse_bytes()?,
+                family_id: stepper.parse_bytes()?,
+                image_id: stepper.parse_bytes()?,
+                vmpl: stepper.parse_bytes()?,
+                sig_algo: stepper.parse_bytes()?,
+                current_tcb: TcbVersion::from_turin_bytes(&stepper.parse_bytes()?),
+                plat_info: stepper.parse_bytes()?,
+                key_info: stepper.parse_bytes()?,
+                report_data: stepper.skip_bytes::<4>()?.parse_bytes()?,
+                measurement: stepper.parse_bytes()?,
+                host_data: stepper.parse_bytes()?,
+                id_key_digest: stepper.parse_bytes()?,
+                author_key_digest: stepper.parse_bytes()?,
+                report_id: stepper.parse_bytes()?,
+                report_id_ma: stepper.parse_bytes()?,
+                reported_tcb: TcbVersion::from_turin_bytes(&stepper.parse_bytes()?),
+                cpuid_fam_id: Some(stepper.parse_bytes()?),
+                cpuid_mod_id: Some(stepper.parse_bytes()?),
+                cpuid_step: Some(stepper.parse_bytes()?),
+                chip_id: stepper.skip_bytes::<21>()?.parse_bytes()?,
+                committed_tcb: TcbVersion::from_turin_bytes(&stepper.parse_bytes()?),
+                current: stepper.parse_bytes()?,
+                committed: stepper.skip_bytes::<1>()?.parse_bytes()?,
+                launch_tcb: TcbVersion::from_turin_bytes(
+                    &stepper.skip_bytes::<1>()?.parse_bytes()?,
+                ),
+                signature: stepper.skip_bytes::<168>()?.parse_bytes()?,
             },
         })
     }
@@ -466,41 +458,41 @@ impl AttestationReport {
         };
 
         // Write version (common to all variants)
-        handle.write_bytes::<_, 0>(self.version)?;
-        handle.write_bytes::<_, 0>(self.guest_svn)?;
-        handle.write_bytes::<_, 0>(self.policy)?;
-        handle.write_bytes::<_, 0>(self.family_id)?;
-        handle.write_bytes::<_, 0>(self.image_id)?;
-        handle.write_bytes::<_, 0>(self.vmpl)?;
-        handle.write_bytes::<_, 0>(self.sig_algo)?;
+        handle.write_bytes(self.version)?;
+        handle.write_bytes(self.guest_svn)?;
+        handle.write_bytes(self.policy)?;
+        handle.write_bytes(self.family_id)?;
+        handle.write_bytes(self.image_id)?;
+        handle.write_bytes(self.vmpl)?;
+        handle.write_bytes(self.sig_algo)?;
 
         // Write TCB based on variant
         match variant {
             ReportVariant::V3Turin => {
-                handle.write_bytes::<_, 0>(self.current_tcb.to_turin_bytes())?;
+                handle.write_bytes(self.current_tcb.to_turin_bytes())?;
             }
             _ => {
-                handle.write_bytes::<_, 0>(self.current_tcb.to_legacy_bytes())?;
+                handle.write_bytes(self.current_tcb.to_legacy_bytes())?;
             }
         }
 
-        handle.write_bytes::<_, 0>(self.plat_info)?;
-        handle.write_bytes::<_, 0>(self.key_info)?;
-        handle.write_bytes::<_, 4>(self.report_data)?;
-        handle.write_bytes::<_, 0>(self.measurement)?;
-        handle.write_bytes::<_, 0>(self.host_data)?;
-        handle.write_bytes::<_, 0>(self.id_key_digest)?;
-        handle.write_bytes::<_, 0>(self.author_key_digest)?;
-        handle.write_bytes::<_, 0>(self.report_id)?;
-        handle.write_bytes::<_, 0>(self.report_id_ma)?;
+        handle.write_bytes(self.plat_info)?;
+        handle.write_bytes(self.key_info)?;
+        handle.skip_bytes::<4>()?.write_bytes(self.report_data)?;
+        handle.write_bytes(self.measurement)?;
+        handle.write_bytes(self.host_data)?;
+        handle.write_bytes(self.id_key_digest)?;
+        handle.write_bytes(self.author_key_digest)?;
+        handle.write_bytes(self.report_id)?;
+        handle.write_bytes(self.report_id_ma)?;
 
         // Write reported TCB based on variant
         match variant {
             ReportVariant::V3Turin => {
-                handle.write_bytes::<_, 0>(self.reported_tcb.to_turin_bytes())?;
+                handle.write_bytes(self.reported_tcb.to_turin_bytes())?;
             }
             _ => {
-                handle.write_bytes::<_, 0>(self.reported_tcb.to_legacy_bytes())?;
+                handle.write_bytes(self.reported_tcb.to_legacy_bytes())?;
             }
         }
 
@@ -511,47 +503,51 @@ impl AttestationReport {
             }
             _ => {
                 // Write CPUID fields for V3 and V4
-                handle.write_bytes::<_, 0>(self.cpuid_fam_id.unwrap_or(0))?;
-                handle.write_bytes::<_, 0>(self.cpuid_mod_id.unwrap_or(0))?;
-                handle.write_bytes::<_, 0>(self.cpuid_step.unwrap_or(0))?;
+                handle.write_bytes(self.cpuid_fam_id.unwrap_or(0))?;
+                handle.write_bytes(self.cpuid_mod_id.unwrap_or(0))?;
+                handle.write_bytes(self.cpuid_step.unwrap_or(0))?;
             }
         }
 
         // Write chip_id with appropriate padding
         match variant {
             ReportVariant::V2 => {
-                handle.write_bytes::<_, 24>(self.chip_id)?;
+                handle.skip_bytes::<24>()?.write_bytes(self.chip_id)?;
             }
             _ => {
-                handle.write_bytes::<_, 21>(self.chip_id)?;
+                handle.skip_bytes::<21>()?.write_bytes(self.chip_id)?;
             }
         }
 
         // Write committed TCB based on variant
         match variant {
             ReportVariant::V3Turin => {
-                handle.write_bytes::<_, 0>(self.committed_tcb.to_turin_bytes())?;
+                handle.write_bytes(self.committed_tcb.to_turin_bytes())?;
             }
             _ => {
-                handle.write_bytes::<_, 0>(self.committed_tcb.to_legacy_bytes())?;
+                handle.write_bytes(self.committed_tcb.to_legacy_bytes())?;
             }
         }
 
-        handle.write_bytes::<_, 0>(self.current)?;
-        handle.write_bytes::<_, 1>(self.committed)?;
+        handle.write_bytes(self.current)?;
+        handle.skip_bytes::<1>()?.write_bytes(self.committed)?;
 
         // Write launch TCB based on variant
         match variant {
             ReportVariant::V3Turin => {
-                handle.write_bytes::<_, 1>(self.launch_tcb.to_turin_bytes())?;
+                handle
+                    .skip_bytes::<1>()?
+                    .write_bytes(self.launch_tcb.to_turin_bytes())?;
             }
             _ => {
-                handle.write_bytes::<_, 1>(self.launch_tcb.to_legacy_bytes())?;
+                handle
+                    .skip_bytes::<1>()?
+                    .write_bytes(self.launch_tcb.to_legacy_bytes())?;
             }
         }
 
         // Write signature (common to all variants)
-        handle.write_bytes::<_, 168>(self.signature)?;
+        handle.skip_bytes::<168>()?.write_bytes(self.signature)?;
 
         Ok(())
     }

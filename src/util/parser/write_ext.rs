@@ -2,28 +2,23 @@
 use super::byte_parser::ByteParser;
 use std::io::Write;
 
-pub trait WriteExt {
-    fn write_bytes<T: ByteParser, const SKIP: usize>(
-        &mut self,
-        value: T,
-    ) -> Result<(), std::io::Error>;
-}
-impl<W> WriteExt for W
-where
-    W: Write,
-{
-    #[inline(always)]
-    fn write_bytes<T: ByteParser, const SKIP: usize>(
-        &mut self,
-        value: T,
-    ) -> Result<(), std::io::Error> {
+pub trait WriteExt: Write {
+    fn write_bytes<T: ByteParser>(&mut self, value: T) -> Result<(), std::io::Error> {
+        self.write_all(value.to_bytes().as_ref())
+    }
+
+    fn skip_bytes<const SKIP: usize>(&mut self) -> Result<&mut Self, std::io::Error>
+    where
+        Self: Sized,
+    {
         if SKIP != 0 {
             self.write_all(&[0; SKIP])?;
         }
-
-        self.write_all(value.to_bytes().as_ref())
+        Ok(self)
     }
 }
+
+impl<W> WriteExt for W where W: Write {}
 
 #[cfg(test)]
 mod write_ext_tests {
@@ -50,7 +45,7 @@ mod write_ext_tests {
     fn test_write_bytes_no_skip() -> Result<(), std::io::Error> {
         let mut writer = MockWriter::default();
         let value: u32 = 0x12345678;
-        writer.write_bytes::<_, 0>(value)?;
+        writer.write_bytes(value)?;
 
         assert_eq!(writer.written, [0x78, 0x56, 0x34, 0x12]);
         Ok(())
@@ -60,7 +55,7 @@ mod write_ext_tests {
     fn test_write_bytes_with_skip() -> Result<(), std::io::Error> {
         let mut writer = MockWriter::default();
         let value: u16 = 0xABCD;
-        writer.write_bytes::<_, 2>(value)?;
+        writer.skip_bytes::<2>()?.write_bytes(value)?;
 
         assert_eq!(writer.written, [0, 0, 0xCD, 0xAB]);
         Ok(())
