@@ -452,7 +452,7 @@ bitfield! {
     #[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
     pub struct MaskId(u32);
     impl Debug;
-    /// Indicates that the CHIP_ID field in the attestation report will alwaysbe zero.
+    /// Indicates that the CHIP_ID field in the attestation report will always be zero.
     pub mask_chip_id, _: 0;
     /// Indicates that the VCEK is not used in attestation and guest key derivation.
     pub mask_chip_key, _: 1;
