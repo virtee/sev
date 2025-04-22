@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use std::ops::{Deref, DerefMut};
+
 #[cfg(target_os = "linux")]
 use crate::error::CertError;
 
@@ -311,6 +313,40 @@ impl<'a> std::convert::From<&WrappedVlekHashstick<'a>> for SnpVlekLoad {
             _reserved: Default::default(),
             vlek_wrapped_address: value as *const WrappedVlekHashstick as u64,
         }
+    }
+}
+
+#[cfg(feature = "snp")]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+#[repr(C, packed)]
+/// Kernel-friendly Snp Platform Status
+pub struct SnpPlatformStatus {
+    pub buffer: [u8; 32],
+}
+
+impl Deref for SnpPlatformStatus {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.buffer
+    }
+}
+
+impl DerefMut for SnpPlatformStatus {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.buffer
+    }
+}
+
+impl AsRef<[u8]> for SnpPlatformStatus {
+    fn as_ref(&self) -> &[u8] {
+        &self.buffer
+    }
+}
+
+impl AsMut<[u8]> for SnpPlatformStatus {
+    fn as_mut(&mut self) -> &mut [u8] {
+        &mut self.buffer
     }
 }
 

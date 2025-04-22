@@ -198,6 +198,82 @@ pub enum Generation {
     Turin,
 }
 
+#[cfg(feature = "snp")]
+impl TryFrom<&[u8]> for Generation {
+    type Error = std::io::Error;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        if bytes.len() != 4 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "invalid length of bytes representing cpuid",
+            ));
+        }
+
+        let base_model = (bytes[0] & 0xF0) >> 4;
+        let base_family = bytes[1] & 0x0F;
+
+        let ext_model = bytes[2] & 0x0F;
+
+        let ext_family = {
+            let low = (bytes[2] & 0xF0) >> 4;
+            let high = (bytes[3] & 0x0F) << 4;
+
+            low | high
+        };
+
+        let family = base_family + ext_family;
+        let model = (ext_model << 4) | base_model;
+
+        Self::identify_cpu(family, model)
+    }
+}
+
+/// Type alias for the CPU family
+#[cfg(feature = "snp")]
+pub type CpuFamily = u8;
+
+/// Type alias for the CPU model
+#[cfg(feature = "snp")]
+pub type CpuModel = u8;
+
+#[cfg(feature = "snp")]
+impl TryFrom<(CpuFamily, CpuModel)> for Generation {
+    type Error = std::io::Error;
+
+    fn try_from(val: (CpuFamily, CpuModel)) -> Result<Self, Self::Error> {
+        Self::identify_cpu(val.0, val.1)
+    }
+}
+
+#[cfg(feature = "snp")]
+impl Generation {
+    /// Identify the SEV generation based on the CPU family and model.
+    pub fn identify_cpu(family: u8, model: u8) -> Result<Self, std::io::Error> {
+        match family {
+            0x19 => match model {
+                0x0..=0xF => Ok(Self::Milan),
+                0x10..=0x1F | 0xA0..=0xAF => Ok(Self::Genoa),
+                _ => Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "processor is not of know SEV-SNP model.",
+                )),
+            },
+            0x1A => match model {
+                0x0..=0x11 => Ok(Self::Turin),
+                _ => Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "processor is not of know SEV-SNP model.",
+                )),
+            },
+            _ => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "processor is not of know SEV-SNP generation.",
+            )),
+        }
+    }
+}
+
 #[cfg(all(feature = "sev", feature = "openssl"))]
 impl From<Generation> for CertSevCaChain {
     fn from(generation: Generation) -> CertSevCaChain {

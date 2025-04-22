@@ -9,9 +9,6 @@ use crate::impl_const_id;
 
 use crate::error::FirmwareError;
 
-#[cfg(feature = "snp")]
-use crate::firmware::host::SnpPlatformStatus;
-
 use std::marker::PhantomData;
 
 use iocuddle::*;

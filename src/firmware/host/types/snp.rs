@@ -7,7 +7,10 @@ pub(crate) use crate::firmware::linux::host as FFI;
 
 #[cfg(target_os = "linux")]
 use crate::error::CertError;
-use crate::util::parser::ByteParser;
+use crate::{
+    util::parser::{ByteParser, ReadExt},
+    Generation,
+};
 
 use std::{
     convert::{TryFrom, TryInto},
@@ -219,9 +222,9 @@ pub struct TcbStatus {
 }
 
 bitfield! {
-    #[derive(Default)]
     /// Various platform initialization configuration data. Byte 0x3 in SEV-SNP's
     /// STRUCT_PLATFORM_STATUS.
+    #[derive(PartialEq, Eq, PartialOrd, Ord)]
     pub struct PlatformInit(u8);
     impl Debug;
 
@@ -245,10 +248,32 @@ impl BitOrAssign for PlatformInit {
     }
 }
 
+impl ByteParser for PlatformInit {
+    type Bytes = [u8; 1];
+
+    fn from_bytes(bytes: Self::Bytes) -> Self {
+        Self(u8::from_le_bytes(bytes))
+    }
+
+    fn to_bytes(&self) -> Self::Bytes {
+        self.0.to_le_bytes()
+    }
+
+    fn default() -> Self {
+        Self(Default::default())
+    }
+}
+
+impl Default for PlatformInit {
+    fn default() -> Self {
+        Self(ByteParser::default())
+    }
+}
+
 /// Query the SEV-SNP platform status.
 ///
 /// (Chapter 8.3; Table 38)
-#[derive(Default, Debug)]
+#[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(C)]
 pub struct SnpPlatformStatus {
     /// The firmware API version (major.minor)
@@ -263,8 +288,8 @@ pub struct SnpPlatformStatus {
     /// The platform build ID.
     pub build_id: u32,
 
-    /// MaskChipId
-    pub mask_chip_id: u32,
+    /// PlatforPolicy of the machine
+    pub platform_policy: PlatformPolicy,
 
     /// The number of valid guests maintained by the SEV-SNP firmware.
     pub guest_count: u32,
@@ -274,6 +299,41 @@ pub struct SnpPlatformStatus {
 
     /// Reported TCB version.
     pub reported_tcb_version: TcbVersion,
+}
+#[cfg(feature = "snp")]
+impl TryFrom<(Generation, &[u8])> for SnpPlatformStatus {
+    type Error = std::io::Error;
+
+    fn try_from(mut value: (Generation, &[u8])) -> Result<Self, Self::Error> {
+        //Cast FFI type to rust friendly type
+        let stepper: &mut &[u8] = &mut value.1;
+        let major: u8 = stepper.parse_bytes()?;
+        let minor: u8 = stepper.parse_bytes()?;
+
+        // Find generation from CPUID
+        Ok(match value.0 {
+            Generation::Turin => Self {
+                version: (major, minor),
+                state: stepper.parse_bytes()?,
+                is_rmp_init: stepper.parse_bytes()?,
+                build_id: stepper.parse_bytes()?,
+                platform_policy: stepper.parse_bytes()?,
+                guest_count: stepper.parse_bytes()?,
+                platform_tcb_version: TcbVersion::from_turin_bytes(&stepper.parse_bytes()?),
+                reported_tcb_version: TcbVersion::from_turin_bytes(&stepper.parse_bytes()?),
+            },
+            _ => Self {
+                version: (major, minor),
+                state: stepper.parse_bytes()?,
+                is_rmp_init: stepper.parse_bytes()?,
+                build_id: stepper.parse_bytes()?,
+                platform_policy: stepper.parse_bytes()?,
+                guest_count: stepper.parse_bytes()?,
+                platform_tcb_version: TcbVersion::from_legacy_bytes(&stepper.parse_bytes()?),
+                reported_tcb_version: TcbVersion::from_legacy_bytes(&stepper.parse_bytes()?),
+            },
+        })
+    }
 }
 
 /// Sets the system wide configuration values for SNP.
@@ -495,8 +555,89 @@ impl Display for MaskId {
     }
 }
 
+bitfield! {
+    /// Policy settings that appear in SNP PLATFORM STATUS
+    ///
+    /// | Bit(s) | Name | Description |
+    /// |--------|------|-------------|
+    /// |0|MASK_CHIP_ID|Set to the value of MaskChipID.|
+    /// |1|MASK_CHIP_KEY|Set to the value of MaskChipKey.|
+    /// |2|VLEK_EN|Indicates whether a VLEK hashtick is loaded|
+    /// |3|FEATURE_INFO|Indicates that the SNP_FEATURE_INFO command is available.|
+    /// |4|RAPL_DIS|Indicates that the RAPL is disabled.|
+    /// |5|CIPHERTEXT_HIDING_DRAM_CAP|Indicates platform capable of ciphertext hiding for the DRAM.|
+    /// |6|CIPHERTEXT_HIDING_DRAM_EN|Indicates ciphertext hiding is enabled for the DRAM.|
+    /// |31:7|-|Reserved.|
+    #[repr(C)]
+    #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    pub struct PlatformPolicy(u32);
+    impl Debug;
+    /// Indicates that the CHIP_ID field in the attestation report will alwaysbe zero.
+    pub mask_chip_id, _: 0;
+    /// Indicates that the VCEK is not used in attestation and guest key derivation.
+    pub mask_chip_key, _: 1;
+    /// Indicates whether a VLEK hashtick is loaded
+    pub vlek_en, _: 2;
+    /// Indicates that the SNP_FEATURE_INFO command is available.
+    pub feature_info, _: 3;
+    /// Indicates that the RAPL is disabled.
+    pub rapl_dis, _: 4;
+    /// Indicates platform capable of ciphertext hiding for the DRAM.
+    pub ciphertext_hiding_dram_cap, _: 5;
+    /// Indicates ciphertext hiding is enabled for the DRAM.
+    pub ciphertext_hiding_dram_en, _: 6;
+}
+
+impl Default for PlatformPolicy {
+    fn default() -> Self {
+        Self(ByteParser::default())
+    }
+}
+
+impl ByteParser for PlatformPolicy {
+    type Bytes = [u8; 4];
+
+    fn from_bytes(bytes: Self::Bytes) -> Self {
+        Self(u32::from_le_bytes(bytes))
+    }
+
+    fn to_bytes(&self) -> Self::Bytes {
+        self.0.to_le_bytes()
+    }
+
+    fn default() -> Self {
+        Self(0)
+    }
+}
+
+impl Display for PlatformPolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            r#"
+    MaskID ({}):
+    Mask Chip ID Enabled: {}
+    Mask Chip Key Enabled: {}
+    Vlek Enabled: {}
+    Feature Info Enabled {}
+    RAPL Disabled: {}
+    Ciphertext Capable: {}
+    Ciphertext enabled: {}"#,
+            self.0,
+            self.mask_chip_id(),
+            self.mask_chip_key(),
+            self.vlek_en(),
+            self.feature_info(),
+            self.rapl_dis(),
+            self.ciphertext_hiding_dram_cap(),
+            self.ciphertext_hiding_dram_en(),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
+
     use super::*;
     use uuid::Uuid;
 
@@ -882,7 +1023,7 @@ mod tests {
         let status = SnpPlatformStatus {
             guest_count: u32::MAX,
             build_id: u32::MAX,
-            mask_chip_id: u32::MAX,
+            platform_policy: PlatformPolicy(u32::MAX),
             ..Default::default()
         };
 
@@ -912,14 +1053,20 @@ mod tests {
         let status: SnpPlatformStatus = SnpPlatformStatus {
             version: (1, 2),
             build_id: 0xDEADBEEF,
-            mask_chip_id: 0x1,
+            platform_policy: PlatformPolicy(0x7f),
             state: 0xFF,
             ..Default::default()
         };
         assert_eq!(status.version.0, 1);
         assert_eq!(status.version.1, 2);
         assert_eq!(status.build_id, 0xDEADBEEF);
-        assert_eq!(status.mask_chip_id, 0x1);
+        assert!(status.platform_policy.mask_chip_id());
+        assert!(status.platform_policy.mask_chip_key());
+        assert!(status.platform_policy.vlek_en());
+        assert!(status.platform_policy.feature_info());
+        assert!(status.platform_policy.rapl_dis());
+        assert!(status.platform_policy.ciphertext_hiding_dram_cap());
+        assert!(status.platform_policy.ciphertext_hiding_dram_en());
         assert_eq!(status.state, 0xFF);
     }
 
@@ -1272,8 +1419,8 @@ mod tests {
 
     #[test]
     fn test_platform_init_bitor_assign() {
-        let mut init1 = PlatformInit::default();
-        let init2 = PlatformInit::default();
+        let mut init1: PlatformInit = Default::default();
+        let init2: PlatformInit = Default::default();
         init1 |= init2;
         assert_eq!(init1.0, 0);
 
@@ -1311,5 +1458,75 @@ mod tests {
     fn test_mask_id_default() {
         let mask_id: MaskId = Default::default();
         assert_eq!(mask_id.0, 0);
+    }
+
+    #[test]
+    fn test_snp_platform_status_non_turin() {
+        let expected: SnpPlatformStatus = SnpPlatformStatus {
+            version: (1, 1),
+            state: 1,
+            is_rmp_init: PlatformInit(1),
+            build_id: 1,
+            platform_policy: PlatformPolicy(1),
+            guest_count: 0,
+            platform_tcb_version: TcbVersion {
+                fmc: None,
+                bootloader: 1,
+                tee: 1,
+                snp: 1,
+                microcode: 1,
+            },
+            reported_tcb_version: TcbVersion {
+                fmc: None,
+                bootloader: 1,
+                tee: 1,
+                snp: 1,
+                microcode: 1,
+            },
+        };
+        let raw_actual: FFI::types::SnpPlatformStatus = FFI::types::SnpPlatformStatus {
+            buffer: [
+                1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, // Other stuff
+                1, 1, 0, 0, 0, 0, 1, 1, //Platform TCB
+                1, 1, 0, 0, 0, 0, 1, 1, //Reported TCB
+            ],
+        };
+        let actual: SnpPlatformStatus = (Generation::Milan, &*raw_actual).try_into().unwrap();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_snp_platform_status_turin() {
+        let expected: SnpPlatformStatus = SnpPlatformStatus {
+            version: (1, 1),
+            state: 1,
+            is_rmp_init: PlatformInit(1),
+            build_id: 1,
+            platform_policy: PlatformPolicy(1),
+            guest_count: 0,
+            platform_tcb_version: TcbVersion {
+                fmc: Some(1),
+                bootloader: 1,
+                tee: 1,
+                snp: 1,
+                microcode: 1,
+            },
+            reported_tcb_version: TcbVersion {
+                fmc: Some(1),
+                bootloader: 1,
+                tee: 1,
+                snp: 1,
+                microcode: 1,
+            },
+        };
+        let raw_actual: FFI::types::SnpPlatformStatus = FFI::types::SnpPlatformStatus {
+            buffer: [
+                1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, // Other stuff
+                1, 1, 1, 1, 0, 0, 0, 1, //Platform TCB
+                1, 1, 1, 1, 0, 0, 0, 1, //Reported TCB
+            ],
+        };
+        let actual: SnpPlatformStatus = (Generation::Turin, &*raw_actual).try_into().unwrap();
+        assert_eq!(actual, expected);
     }
 }

@@ -4,6 +4,9 @@
 mod types;
 pub use types::*;
 
+#[cfg(feature = "snp")]
+use crate::Generation;
+
 #[cfg(target_os = "linux")]
 use super::linux::host::{ioctl::*, types::GetId};
 
@@ -37,6 +40,9 @@ use std::convert::TryInto;
 #[cfg(feature = "snp")]
 #[cfg(target_os = "linux")]
 use super::linux::host::types::SnpCommit;
+
+#[cfg(all(target_os = "linux", feature = "snp"))]
+use super::linux::host::types::SnpPlatformStatus as FFISnpPlatformStatus;
 
 /// The CPU-unique identifier for the platform.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -209,14 +215,23 @@ impl Firmware {
     /// ```
     #[cfg(feature = "snp")]
     pub fn snp_platform_status(&mut self) -> Result<SnpPlatformStatus, UserApiError> {
-        let mut platform_status: SnpPlatformStatus = SnpPlatformStatus::default();
+        // Create an empty buffer for the SNP Platform Status to be written to by the Kernel.
+        let mut platform_status: FFISnpPlatformStatus = FFISnpPlatformStatus::default();
+
         let mut cmd_buf = Command::from_mut(&mut platform_status);
 
         SNP_PLATFORM_STATUS
             .ioctl(&mut self.0, &mut cmd_buf)
             .map_err(|_| cmd_buf.encapsulate())?;
 
-        Ok(platform_status)
+        // Determine SEV-SNP CPU generation in order to parse platform status accordingly.
+        let raw_cpuid = unsafe { std::arch::x86_64::__cpuid(0x8000_0001) }
+            .eax
+            .to_le_bytes();
+
+        let generation: Generation = raw_cpuid.as_slice().try_into()?;
+
+        Ok((generation, &*platform_status).try_into()?)
     }
 
     /// The firmware will perform the following actions:  
