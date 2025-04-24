@@ -723,15 +723,25 @@ pub enum AttestationReportError {
 
     /// Field is not supported in the current version of the Attestation Report
     UnsupportedField(String),
+
+    /// MASK_CHIP_ID enabled
+    MaskedChipId,
 }
 
 impl std::fmt::Display for AttestationReportError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             AttestationReportError::BincodeError(e) => write!(f, "Bincode error encountered: {e}"),
+            AttestationReportError::MaskedChipId => write!(f, "MASK_CHIP_ID is enabled, preventing the identification of the CPU generation."),
             AttestationReportError::UnsupportedReportVersion(version) => write!(f, "The encountered Attestation Report version {version} is not supported by the library yet."),
             AttestationReportError::UnsupportedField(field) => write!(f,"The field {field} is not supported in the provided Attestation Report version"),
         }
+    }
+}
+
+impl From<AttestationReportError> for std::io::Error {
+    fn from(value: AttestationReportError) -> Self {
+        std::io::Error::new(std::io::ErrorKind::Other, value)
     }
 }
 

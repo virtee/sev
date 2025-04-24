@@ -5,6 +5,7 @@ use crate::certs::snp::{Certificate, Chain, Verifiable};
 
 use crate::{
     certs::snp::ecdsa::Signature,
+    error::AttestationReportError,
     firmware::host::TcbVersion,
     util::{
         array::Array,
@@ -283,20 +284,16 @@ pub struct AttestationReport {
 
 impl AttestationReport {
     #[inline(always)]
-    /// This will never panic because we are enforcing the length of
-    /// the slice before checking.
-    fn chip_id_is_turin_like(bytes: &[u8]) -> bool {
+    /// Checkes if the MaskChipId is set to 1. If not, then it will check if
+    /// the CHIP_ID is Turin-like.
+    fn chip_id_is_turin_like(bytes: &[u8]) -> Result<bool, AttestationReportError> {
         // Chip ID -> 0x1A0-0x1E0
-        // Last 8 bytes of CHIP_ID are zero, then it is Turin Like.
-        bytes == [0; 56]
-    }
+        if bytes == [0; 64] {
+            return Err(AttestationReportError::MaskedChipId);
+        }
 
-    #[inline(always)]
-    /// Check if MASK_CHIP_ID is set before checking chip_id_is_turin_like
-    fn mask_chip_id_en(bytes: &[u8]) -> bool {
-        let mut byte_array: [u8; 4] = [0; 4];
-        byte_array.copy_from_slice(bytes);
-        u32::from_bytes(byte_array) & 0b10 != 0
+        // Last 8 bytes of CHIP_ID are zero, then it is Turin Like.
+        Ok(bytes[8..] == [0; 56])
     }
 
     /// Attempts to parse an AttestationReport structure from raw bytes.
@@ -318,9 +315,7 @@ impl AttestationReport {
                 // Skip the first 8 bytes of the `CHIP_ID` field and see if
                 // the remaining bytes are all zero (how Turin+ behaves because
                 // of SPN fields for hash-stick algorithm).
-                if !Self::mask_chip_id_en(&stepper[0x48..0x4C])
-                    && Self::chip_id_is_turin_like(&stepper[0x1A8..0x1E0])
-                {
+                if Self::chip_id_is_turin_like(&stepper[0x1A0..0x1E0])? {
                     AttestationReport {
                         version: stepper.parse_bytes::<_, 0>()?,
                         guest_svn: stepper.parse_bytes::<_, 0>()?,
@@ -1897,7 +1892,7 @@ Signature:
             0x2E, 0x2F, 0x87, 0xA4, 0x4D, 0x54, 0x1E, 0xB6,
         ];
 
-        assert!(!AttestationReport::chip_id_is_turin_like(&vcek_bytes[8..]));
+        assert!(!AttestationReport::chip_id_is_turin_like(&vcek_bytes).unwrap());
     }
 
     #[test]
@@ -1911,20 +1906,6 @@ Signature:
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
 
-        assert!(AttestationReport::chip_id_is_turin_like(&vcek_bytes[8..]));
-    }
-
-    #[test]
-    fn test_attestation_report_mask_chip_key_en() {
-        let mask_chip_on: [u8; 4] = 0b10u32.to_le_bytes();
-
-        assert!(AttestationReport::mask_chip_id_en(mask_chip_on.as_slice()));
-    }
-
-    #[test]
-    fn test_attestation_report_mask_chip_key_disabled() {
-        let mask_chip_on: [u8; 4] = 0x00u32.to_le_bytes();
-
-        assert!(!AttestationReport::mask_chip_id_en(mask_chip_on.as_slice()));
+        assert!(AttestationReport::chip_id_is_turin_like(&vcek_bytes).unwrap());
     }
 }
