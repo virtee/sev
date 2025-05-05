@@ -62,13 +62,19 @@ enum KeyFormat {
     Der,
 }
 
-/// Identifies the format of a key based upon the first twenty-seven
-/// bytes of a byte stream. A non-PEM format assumes DER format.
+const PEM_PREFIXES: &[&[u8]] = &[
+    b"-----BEGIN PRIVATE KEY-----",           // PKCS8
+    b"-----BEGIN EC PRIVATE KEY-----",        // legacy EC
+    b"-----BEGIN ENCRYPTED PRIVATE KEY-----", // encrypted PKCS8
+];
+
+/// Identifies the format of a key based on the first line specified
+/// for the PEM. A non-PEM format assumes a DER format.
 fn identify_priv_key_format(bytes: &[u8]) -> KeyFormat {
-    const PEM_START: &[u8] = b"-----BEGIN PRIVATE KEY-----";
-    match &bytes[0..27] {
-        PEM_START => KeyFormat::Pem,
-        _ => KeyFormat::Der,
+    if PEM_PREFIXES.iter().any(|prefix| bytes.starts_with(prefix)) {
+        KeyFormat::Pem
+    } else {
+        KeyFormat::Der
     }
 }
 ///Read a key file and return a private EcKey.
