@@ -451,7 +451,7 @@ impl AttestationReport {
         // Determine the variant based on version and CPUID step
         let variant = if self.version == 2 {
             ReportVariant::V2
-        } else if self.version == 3 && (self.cpuid_fam_id.unwrap_or(0) < 0x1A) {
+        } else if self.version >= 3 && (self.cpuid_fam_id.unwrap_or(0) < 0x1A) {
             ReportVariant::V3PreTurin
         } else {
             ReportVariant::V3Turin
