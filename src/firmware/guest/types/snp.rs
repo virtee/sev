@@ -458,7 +458,6 @@ impl AttestationReport {
             ReportVariant::V2 => {
                 // V2 doesn't have CPUID fields
                 handle.skip_bytes::<24>()?.write_bytes(self.chip_id)?;
-                handle.write_bytes(self.committed_tcb.to_legacy_bytes())?;
             }
             _ => {
                 // Write CPUID fields for V3 and V4
@@ -466,10 +465,11 @@ impl AttestationReport {
                 handle.write_bytes(self.cpuid_mod_id.unwrap_or(0))?;
                 handle.write_bytes(self.cpuid_step.unwrap_or(0))?;
                 handle.skip_bytes::<21>()?.write_bytes(self.chip_id)?;
-                handle.write_bytes(self.committed_tcb.to_turin_bytes())?;
             }
         }
 
+        // Write committed TCB based on variant
+        write_tcb(&mut handle, &variant, &self.committed_tcb, turin_like)?;
         handle.write_bytes(self.current)?;
         handle.skip_bytes::<1>()?.write_bytes(self.committed)?;
 
