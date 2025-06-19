@@ -198,20 +198,42 @@ impl Firmware {
         Ok((report_response.report.to_vec(), Some(certificates)))
     }
 
-    /// Fetches a derived key from the AMD Secure Processor. The `message_version` will default to `1` if `None` is specified.
+    /// Fetches a derived key from the AMD Secure Processor. The `message_version` will default to `2` if `None` is specified.
     ///
     /// # Example:
     /// ```ignore
-    /// let request: DerivedKey = DerivedKey::new(false, GuestFieldSelect(1), 0, 0, 0);
+    /// let request: DerivedKey = DerivedKey::new(false, GuestFieldSelect(1), 0, 0, 0, None);
     ///
     /// let mut fw: Firmware = Firmware::open().unwrap();
-    /// let derived_key: DerivedKeyRsp = fw.get_derived_key(None, request).unwrap();
+    /// let derived_key: DerivedKeyRsp = fw.get_derived_key(1, request).unwrap();
     /// ```
     pub fn get_derived_key(
         &mut self,
         message_version: Option<u32>,
-        derived_key_request: DerivedKey,
+        mut derived_key_request: DerivedKey,
     ) -> Result<[u8; 32], UserApiError> {
+        // Defaulting to 2 instead of the regular 1 introduced in FW 1.58
+        let message_version = if message_version.is_some() {
+            message_version
+        } else {
+            Some(2)
+        };
+
+        // Check if the launch mitigation vector is provided for message version >= 2
+        if let Some(version) = message_version {
+            if version >= 2 && derived_key_request.launch_mit_vector.is_none() {
+                use std::io;
+
+                return Err(UserApiError::IOError(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Launch Mitigation Vector must be provided for message version >= 2",
+                )));
+            } else {
+                // Set launch_vector to None for message requests version 1.
+                derived_key_request.launch_mit_vector = None;
+            }
+        }
+
         let mut ffi_derived_key_request: DerivedKeyReq = derived_key_request.into();
         let mut ffi_derived_key_response: DerivedKeyRsp = Default::default();
 

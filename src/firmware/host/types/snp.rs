@@ -586,6 +586,8 @@ bitfield! {
     pub ciphertext_hiding_dram_cap, _: 5;
     /// Indicates ciphertext hiding is enabled for the DRAM.
     pub ciphertext_hiding_dram_en, _: 6;
+    /// Indicates TIO is enbaled. Present if SEV-TIO feature bit is set.
+    pub is_tio_en, _: 7;
 }
 
 impl Default for PlatformPolicy {
@@ -622,7 +624,8 @@ impl Display for PlatformPolicy {
     Feature Info Enabled {}
     RAPL Disabled: {}
     Ciphertext Capable: {}
-    Ciphertext enabled: {}"#,
+    Ciphertext enabled: {}
+    SEV-TIO enabled: {}"#,
             self.0,
             self.mask_chip_id(),
             self.mask_chip_key(),
@@ -631,6 +634,7 @@ impl Display for PlatformPolicy {
             self.rapl_dis(),
             self.ciphertext_hiding_dram_cap(),
             self.ciphertext_hiding_dram_en(),
+            self.is_tio_en()
         )
     }
 }
