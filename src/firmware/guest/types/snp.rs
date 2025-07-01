@@ -186,6 +186,8 @@ pub enum ReportVariant {
     /// Version 3 of the Attestation Report for PreTurin CPUs.
     V3,
 
+    /// Version 5 of the Attestation Report
+    V5,
 }
 
 impl ReportVariant {
@@ -198,7 +200,9 @@ impl ReportVariant {
         Ok(match version {
             0 | 1 => return Err(std::io::ErrorKind::Unsupported.into()),
             2 => Self::V2,
-            _  => Self::V3,
+            3 | 4 => Self::V3,
+            5 => Self::V5,
+            _ => Self::V5,
         })
     }
 }
@@ -209,6 +213,9 @@ impl ReportVariant {
 /// Added in version 3:
 /// The CPUID Family, Model and Stepping fields
 /// The Alias_Check_Complete field in the PlatformInfo field
+/// Added in version 5:
+/// The launch_mit_vector and current_mit_vector fields
+/// The SEV-TIO field in the PlatformInfo field
 #[repr(C)]
 #[derive(Default, Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AttestationReport {
@@ -272,6 +279,10 @@ pub struct AttestationReport {
     pub committed: Version,
     /// The CurrentTcb at the time the guest was launched or imported.
     pub launch_tcb: TcbVersion,
+    /// The verified mitigation vecor value at the time the guest was launched (LaunchMitVector).
+    pub launch_mit_vector: Option<u64>,
+    /// Value is set to the current verified mitigation vectore value (CurrentMitVector).
+    pub current_mit_vector: Option<u64>,
     /// Signature of bytes 0 to 0x29F inclusive of this report.
     /// The format of the signature is found within Signature.
     pub signature: Signature,
@@ -383,7 +394,18 @@ impl AttestationReport {
         let current = stepper.parse_bytes()?;
         let committed = stepper.skip_bytes::<1>()?.parse_bytes()?;
         let launch_tcb = parse_tcb(stepper.skip_bytes::<1>()?, &generation)?;
-        let signature = stepper.skip_bytes::<168>()?.parse_bytes()?;
+
+        // mit vecor fields were added in V5 and later.
+        let (launch_mit_vector, current_mit_vector, signature) = match variant {
+            ReportVariant::V2 | ReportVariant::V3 => {
+                (None, None, stepper.skip_bytes::<168>()?.parse_bytes()?)
+            }
+            _ => (
+                Some(stepper.parse_bytes()?),
+                Some(stepper.parse_bytes()?),
+                stepper.skip_bytes::<152>()?.parse_bytes()?,
+            ),
+        };
 
         Ok(Self {
             version,
@@ -412,6 +434,8 @@ impl AttestationReport {
             current,
             committed,
             launch_tcb,
+            launch_mit_vector,
+            current_mit_vector,
             signature,
         })
     }
@@ -421,7 +445,8 @@ impl AttestationReport {
         // Determine the variant based on version and CPUID step
         let variant = match self.version {
             2 => ReportVariant::V2,
-            _ => ReportVariant::V3,
+            3 | 4 => ReportVariant::V3,
+            _ => ReportVariant::V5,
         };
 
         let generation = match variant {
@@ -480,7 +505,17 @@ impl AttestationReport {
         handle.skip_bytes::<1>()?.write_bytes(self.committed)?;
         write_tcb(handle.skip_bytes::<1>()?, &self.launch_tcb, &generation)?;
 
-        handle.skip_bytes::<168>()?.write_bytes(self.signature)?;
+        // Write launch and current mitigation vectors based on variant
+        match variant {
+            ReportVariant::V2 | ReportVariant::V3 => {
+                handle.skip_bytes::<168>()?.write_bytes(self.signature)?;
+            }
+            _ => {
+                handle.write_bytes(self.launch_mit_vector.unwrap_or(0))?;
+                handle.write_bytes(self.current_mit_vector.unwrap_or(0))?;
+                handle.skip_bytes::<152>()?.write_bytes(self.signature)?;
+            }
+        }
 
         Ok(())
     }
@@ -552,6 +587,10 @@ Launch TCB:
 
 {}
 
+Launch Mitigation Vector:     {}
+
+Current Mitigation Vector:    {}
+
 {}"#,
             self.version,
             self.guest_svn,
@@ -582,6 +621,10 @@ Launch TCB:
             self.current,
             self.committed,
             self.launch_tcb,
+            self.launch_mit_vector
+                .map_or("None".to_string(), |lmv| lmv.to_string()),
+            self.current_mit_vector
+                .map_or("None".to_string(), |cmv| cmv.to_string()),
             self.signature
         )
     }
@@ -729,6 +772,7 @@ bitfield! {
     /// | 22     | MEM_AES_256_XTS   | 0: Allow either AES 128 XEX or AES 256 XTS for memory encryption.<br>1: Require AES 256 XTS for memory encryption. >
     /// | 23     | RAPL_DIS          | 0: Allow Running Average Power Limit (RAPL).<br>1: RAPL must be disabled.                                          >
     /// | 24     | CIPHERTEXT_HIDING | 0: Ciphertext hiding may be enabled or disabled.<br>1: Ciphertext hiding must be enabled.                          >
+    /// | 25     | PAGE_SWAP_DISABLE | 0: Disable Guest access to SNP_PAGE_MOVE, SNP_SWAP_OUT and SNP_SWAP_IN commands.                                   >
     /// | 63:25  | -                 | Reserved. MBZ.                                                                                                     >
     ///
     #[repr(C)]
@@ -756,6 +800,11 @@ bitfield! {
     pub rapl_dis, set_rapl_dis: 23;
     /// CIPHERTEXT_HIDING field: (1) ciphertext hiding must be enabled, (0) ciphertext hiding may be enabled/disabled
     pub ciphertext_hiding, set_ciphertext_hiding: 24;
+    /// Guest policy to disable Guest access to SNP_PAGE_MOVE, SNP_SWAP_OUT, and SNP_SWAP_IN commands. If this policy
+    /// option is selected to disable these Page Move commands, then these commands will return POLICY_FAILURE.
+    /// 0: Do not disable Guest support for the commands.
+    /// 1: Disable Guest support for the commands.
+    pub page_swap_disabled, set_page_swap_disabled: 25;
 }
 
 impl Default for GuestPolicy {
@@ -790,14 +839,24 @@ impl Display for GuestPolicy {
   SMT Allowed:   {}
   Migrate MA:    {}
   Debug Allowed: {}
-  Single Socket: {}"#,
+  Single Socket: {}
+  CXL Allowed:   {}
+  AEX 256 XTS:   {}
+  RAPL Allowed:  {}
+  Ciphertext hiding: {}
+  Page Swap Disable: {}"#,
             self.0,
             self.abi_major(),
             self.abi_minor(),
             self.smt_allowed(),
             self.migrate_ma_allowed(),
             self.debug_allowed(),
-            self.single_socket_required()
+            self.single_socket_required(),
+            self.cxl_allowed(),
+            self.mem_aes_256_xts(),
+            self.rapl_dis(),
+            self.ciphertext_hiding(),
+            self.page_swap_disabled()
         )
     }
 }
@@ -829,7 +888,9 @@ bitfield! {
     /// Bit 3 indicates if RAPL is disabled.
     /// Bit 4 indicates if ciphertext hiding is enabled
     /// Bit 5 indicates that alias detection has completed since the last system reset and there are no aliasing addresses. Resets to 0.
-    /// Bits 5-63 are reserved.
+    /// Bit 6 reserved
+    /// Bit 7 indicates that SEV-TIO is enabled.
+    /// Bits 8-63 are reserved.
     #[repr(C)]
     #[derive(Deserialize, Clone, Copy, Serialize, PartialEq, Eq, PartialOrd, Ord)]
     pub struct PlatformInfo(u64);
@@ -846,6 +907,8 @@ bitfield! {
     pub ciphertext_hiding_enabled, _: 4;
     /// Indicates that alias detection has completed since the last system reset and there are no aliasing addresses. Resets to 0.
     pub alias_check_complete, _: 5;
+    /// Indicates that SEV-TIO is enabled.
+    pub tio_enabled, _ : 7
 
 }
 
@@ -859,14 +922,16 @@ impl Display for PlatformInfo {
   ECC Enabled:               {}
   RAPL Disabled:             {}
   Ciphertext Hiding Enabled: {}
-  Alias Check Complete:      {}"#,
+  Alias Check Complete:      {}
+  SEV-TIO Enabled:           {}"#,
             self.0,
             self.smt_enabled(),
             self.tsme_enabled(),
             self.ecc_enabled(),
             self.rapl_disabled(),
             self.ciphertext_hiding_enabled(),
-            self.alias_check_complete()
+            self.alias_check_complete(),
+            self.tio_enabled()
         )
     }
 }
@@ -1070,6 +1135,11 @@ Guest Policy (0x0):
   Migrate MA:    false
   Debug Allowed: false
   Single Socket: false
+  CXL Allowed:   false
+  AEX 256 XTS:   false
+  RAPL Allowed:  false
+  Ciphertext hiding: false
+  Page Swap Disable: false
 
 Family ID:
 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
@@ -1097,6 +1167,7 @@ Platform Info (0):
   RAPL Disabled:             false
   Ciphertext Hiding Enabled: false
   Alias Check Complete:      false
+  SEV-TIO Enabled:           false
 
 Key Information:
     author key enabled: false
@@ -1178,6 +1249,10 @@ TCB Version:
   TEE:         0
   Boot Loader: 0
   FMC:         None
+
+Launch Mitigation Vector:     None
+
+Current Mitigation Vector:    None
 
 Signature:
   R:
@@ -1323,7 +1398,8 @@ Signature:
   ECC Enabled:               false
   RAPL Disabled:             false
   Ciphertext Hiding Enabled: false
-  Alias Check Complete:      false"#;
+  Alias Check Complete:      false
+  SEV-TIO Enabled:           false"#;
         let actual: PlatformInfo = PlatformInfo(0);
 
         assert_eq!(expected, actual.to_string());
