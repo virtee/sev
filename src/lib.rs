@@ -272,6 +272,17 @@ impl Generation {
             )),
         }
     }
+
+    /// Identify the EPYC processor generation based on the CPUID instruction.
+    #[cfg(feature = "snp")]
+    pub fn identify_host_generation() -> Result<Self, std::io::Error> {
+        use std::convert::TryInto;
+
+        let raw_cpuid = unsafe { std::arch::x86_64::__cpuid(0x8000_0001) }
+            .eax
+            .to_le_bytes();
+        raw_cpuid.as_slice().try_into()
+    }
 }
 
 #[cfg(all(feature = "sev", feature = "openssl"))]
