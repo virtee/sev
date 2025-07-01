@@ -642,6 +642,9 @@ pub enum HashstickError {
     /// No hashstick was provided
     EmptyHashstickBuffer,
 
+    /// Invalid reserved field in the hashstick.
+    InvalidReservedField,
+
     /// Unknown Error.
     UnknownError,
 }
@@ -658,6 +661,9 @@ impl std::fmt::Display for HashstickError {
                 )
             }
             HashstickError::EmptyHashstickBuffer => write!(f, "Hashstick buffer is empty."),
+            HashstickError::InvalidReservedField => {
+                write!(f, "Reserved field in the VLEK Hashstick is invalid.")
+            }
             HashstickError::UnknownError => {
                 write!(
                     f,
