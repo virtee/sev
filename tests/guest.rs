@@ -27,7 +27,7 @@ fn get_ext_report() {
 #[cfg_attr(not(guest), ignore)]
 #[test]
 fn get_derived_key() {
-    let derived_key = DerivedKey::new(false, GuestFieldSelect(1), 0, 0, 0);
+    let derived_key = DerivedKey::new(false, GuestFieldSelect(1), 0, 0, 0, None);
 
     let mut fw = Firmware::open().unwrap();
 
@@ -43,6 +43,7 @@ fn guest_fw_error() {
         0xFFFFFFFF,
         0xFFFFFFFF,
         0xFFFFFFFFFFFFFFFF,
+        Some(0xFFFFFFFFFFFFFFFF),
     );
 
     let mut fw = Firmware::open().unwrap();
