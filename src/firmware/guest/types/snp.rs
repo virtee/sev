@@ -11,6 +11,7 @@ use crate::{
         array::Array,
         parser::{ByteParser, ReadExt, WriteExt},
     },
+    Generation,
 };
 
 use serde::{Deserialize, Serialize};
@@ -18,10 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::{fmt::Display, io::Write, ops::Range};
 
 #[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
-use std::{
-    convert::TryFrom,
-    io::{self, ErrorKind},
-};
+use std::{convert::TryFrom, io};
 
 #[cfg(feature = "openssl")]
 use std::io::Error;
@@ -33,6 +31,8 @@ use openssl::{ecdsa::EcdsaSig, sha::Sha384};
 
 const ATT_REP_FW_LEN: usize = 1184;
 const CHIP_ID_RANGE: Range<usize> = 0x1A0..0x1E0;
+const CPUID_FAMILY_ID_BYTES: usize = 0x188;
+const CPUID_MODEL_ID_BYTES: usize = 0x189;
 
 /// Structure of required data for fetching the derived key.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -59,6 +59,10 @@ pub struct DerivedKey {
     /// The TCB version to mix into the derived key. Must not
     /// exceed CommittedTcb.
     pub tcb_version: u64,
+
+    /// The mitigation vector value to mix into the derived key.
+    /// Specific bit settings corresponding to mitigations required for Guest operation.
+    pub launch_mit_vector: Option<u64>,
 }
 
 impl DerivedKey {
@@ -69,6 +73,7 @@ impl DerivedKey {
         vmpl: u32,
         guest_svn: u32,
         tcb_version: u64,
+        launch_mit_vector: Option<u64>,
     ) -> Self {
         Self {
             root_key_select: u32::from(root_key_select),
@@ -77,6 +82,7 @@ impl DerivedKey {
             vmpl,
             guest_svn,
             tcb_version,
+            launch_mit_vector,
         }
     }
 
@@ -97,7 +103,8 @@ bitfield! {
     /// |3|MEASUREMENT|Indicates the measurement of the guest during launch will be mixed into the key.|
     /// |4|GUEST_SVN|Indicates that the guest-provided SVN will be mixed into the key.|
     /// |5|TCB_VERSION|Indicates that the guest-provided TCB_VERSION will be mixed into the key.|
-    /// |63:6|\-|Reserved. Must be zero.|
+    /// |6|LAUNCH_MIT_VECTOR|Indicates that the guest-provided LAUNCH_MIT_VECTOR will be mixed into the key.|
+    /// |63:7|\-|Reserved. Must be zero.|
     #[repr(C)]
     #[derive(Default, Copy, Clone,PartialEq, Eq, PartialOrd, Ord)]
     pub struct GuestFieldSelect(u64);
@@ -114,6 +121,8 @@ bitfield! {
     pub get_svn, set_svn: 4;
     /// Check/Set tcb version inclusion in derived key.
     pub get_tcb_version, set_tcb_version: 5;
+     /// Indicates that the guest-provied LAUNCH_MIT_VECTOR will be mixed into the key.
+    pub get_launch_mit_vector, set_launch_mit_vector: 6;
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -184,10 +193,10 @@ pub enum ReportVariant {
     V2,
 
     /// Version 3 of the Attestation Report for PreTurin CPUs.
-    V3PreTurin,
+    V3,
 
-    /// Version 3 of the Attestation Report for Turin+ CPUs.
-    V3Turin,
+    /// Version 5 of the Attestation Report
+    V5,
 }
 
 impl ReportVariant {
@@ -200,23 +209,22 @@ impl ReportVariant {
         Ok(match version {
             0 | 1 => return Err(std::io::ErrorKind::Unsupported.into()),
             2 => Self::V2,
-            _ => {
-                let family: u8 = bytes[392];
-                if family >= 0x1A {
-                    Self::V3Turin
-                } else {
-                    Self::V3PreTurin
-                }
-            }
+            3 | 4 => Self::V3,
+            5 => Self::V5,
+            _ => Self::V5,
         })
     }
 }
 
-/// Version 3 of the attestation report
-/// Systems that contain firmware starting from the spec release 1.56 will use this attestation report.
-/// This version adds:
+/// Attestation Report for SEV-SNP guests.
+/// These are all the possible fields in the attestation report.
+/// Optional fields are set to none or a value depending on the version the system has.
+/// Added in version 3:
 /// The CPUID Family, Model and Stepping fields
 /// The Alias_Check_Complete field in the PlatformInfo field
+/// Added in version 5:
+/// The launch_mit_vector and current_mit_vector fields
+/// The SEV-TIO field in the PlatformInfo field
 #[repr(C)]
 #[derive(Default, Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AttestationReport {
@@ -280,6 +288,10 @@ pub struct AttestationReport {
     pub committed: Version,
     /// The CurrentTcb at the time the guest was launched or imported.
     pub launch_tcb: TcbVersion,
+    /// The verified mitigation vecor value at the time the guest was launched (LaunchMitVector).
+    pub launch_mit_vector: Option<u64>,
+    /// Value is set to the current verified mitigation vectore value (CurrentMitVector).
+    pub current_mit_vector: Option<u64>,
     /// Signature of bytes 0 to 0x29F inclusive of this report.
     /// The format of the signature is found within Signature.
     pub signature: Signature,
@@ -288,36 +300,33 @@ pub struct AttestationReport {
 #[inline]
 fn write_tcb(
     h: &mut impl Write,
-    variant: &ReportVariant,
     tcb: &TcbVersion,
-    turin_like: bool,
+    generation: &Generation,
 ) -> Result<(), std::io::Error> {
-    h.write_bytes(
-        if matches!(variant, ReportVariant::V3PreTurin)
-            || (matches!(variant, ReportVariant::V2) && !turin_like)
-        {
-            tcb.to_legacy_bytes()
-        } else {
-            tcb.to_turin_bytes()
-        },
-    )
+    h.write_bytes(match generation {
+        Generation::Milan | Generation::Genoa => tcb.to_legacy_bytes(),
+        Generation::Turin => tcb.to_turin_bytes(),
+        _ => {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "Unsupported Processor Generation for TCB writing",
+            ))
+        }
+    })
 }
 
 #[inline]
-fn parse_tcb(
-    stepper: &mut &[u8],
-    variant: &ReportVariant,
-    turin_like: bool,
-) -> Result<TcbVersion, std::io::Error> {
-    Ok(
-        if matches!(variant, ReportVariant::V3PreTurin)
-            || (matches!(variant, ReportVariant::V2) && !turin_like)
-        {
-            TcbVersion::from_legacy_bytes(&stepper.parse_bytes()?)
-        } else {
-            TcbVersion::from_turin_bytes(&stepper.parse_bytes()?)
-        },
-    )
+fn parse_tcb(stepper: &mut &[u8], generation: &Generation) -> Result<TcbVersion, std::io::Error> {
+    match generation {
+        Generation::Milan | Generation::Genoa => {
+            Ok(TcbVersion::from_legacy_bytes(&stepper.parse_bytes()?))
+        }
+        Generation::Turin => Ok(TcbVersion::from_turin_bytes(&stepper.parse_bytes()?)),
+        _ => Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "Unsupported Processor Generation for TCB parsing",
+        )),
+    }
 }
 
 impl AttestationReport {
@@ -344,10 +353,19 @@ impl AttestationReport {
 
         let stepper = &mut bytes;
 
-        let turin_like = match variant {
-            ReportVariant::V2 => Self::chip_id_is_turin_like(&stepper[CHIP_ID_RANGE])?,
-            ReportVariant::V3PreTurin => false,
-            _ => true,
+        let generation = match variant {
+            ReportVariant::V2 => {
+                if Self::chip_id_is_turin_like(&stepper[CHIP_ID_RANGE])? {
+                    Generation::Turin
+                } else {
+                    Generation::Genoa
+                }
+            }
+            _ => {
+                let family = &stepper[CPUID_FAMILY_ID_BYTES];
+                let model = &stepper[CPUID_MODEL_ID_BYTES];
+                Generation::identify_cpu(*family, *model)?
+            }
         };
 
         let version = stepper.parse_bytes()?;
@@ -358,7 +376,7 @@ impl AttestationReport {
         let vmpl = stepper.parse_bytes()?;
         let sig_algo = stepper.parse_bytes()?;
 
-        let current_tcb = parse_tcb(stepper, &variant, turin_like)?;
+        let current_tcb = parse_tcb(stepper, &generation)?;
         let plat_info = stepper.parse_bytes()?;
         let key_info = stepper.parse_bytes()?;
         let report_data = stepper.skip_bytes::<4>()?.parse_bytes()?;
@@ -368,8 +386,9 @@ impl AttestationReport {
         let author_key_digest = stepper.parse_bytes()?;
         let report_id = stepper.parse_bytes()?;
         let report_id_ma = stepper.parse_bytes()?;
-        let reported_tcb = parse_tcb(stepper, &variant, turin_like)?;
+        let reported_tcb = parse_tcb(stepper, &generation)?;
 
+        // CPUID fields were added in V3 and later.
         let (cpuid_fam_id, cpuid_mod_id, cpuid_step, chip_id) = match variant {
             ReportVariant::V2 => (None, None, None, stepper.skip_bytes::<24>()?.parse_bytes()?),
             _ => (
@@ -380,11 +399,22 @@ impl AttestationReport {
             ),
         };
 
-        let committed_tcb = parse_tcb(stepper, &variant, turin_like)?;
+        let committed_tcb = parse_tcb(stepper, &generation)?;
         let current = stepper.parse_bytes()?;
         let committed = stepper.skip_bytes::<1>()?.parse_bytes()?;
-        let launch_tcb = parse_tcb(stepper.skip_bytes::<1>()?, &variant, turin_like)?;
-        let signature = stepper.skip_bytes::<168>()?.parse_bytes()?;
+        let launch_tcb = parse_tcb(stepper.skip_bytes::<1>()?, &generation)?;
+
+        // mit vecor fields were added in V5 and later.
+        let (launch_mit_vector, current_mit_vector, signature) = match variant {
+            ReportVariant::V2 | ReportVariant::V3 => {
+                (None, None, stepper.skip_bytes::<168>()?.parse_bytes()?)
+            }
+            _ => (
+                Some(stepper.parse_bytes()?),
+                Some(stepper.parse_bytes()?),
+                stepper.skip_bytes::<152>()?.parse_bytes()?,
+            ),
+        };
 
         Ok(Self {
             version,
@@ -413,6 +443,8 @@ impl AttestationReport {
             current,
             committed,
             launch_tcb,
+            launch_mit_vector,
+            current_mit_vector,
             signature,
         })
     }
@@ -420,18 +452,25 @@ impl AttestationReport {
     /// Writes the Attestation Report back into the ASP binary format.
     pub fn write_bytes(self, mut handle: impl Write) -> Result<(), std::io::Error> {
         // Determine the variant based on version and CPUID step
-        let variant = if self.version == 2 {
-            ReportVariant::V2
-        } else if self.version >= 3 && (self.cpuid_fam_id.unwrap_or(0) < 0x1A) {
-            ReportVariant::V3PreTurin
-        } else {
-            ReportVariant::V3Turin
+        let variant = match self.version {
+            2 => ReportVariant::V2,
+            3 | 4 => ReportVariant::V3,
+            _ => ReportVariant::V5,
         };
 
-        let turin_like = match variant {
-            ReportVariant::V2 => Self::chip_id_is_turin_like(&*self.chip_id)?,
-            ReportVariant::V3PreTurin => false,
-            _ => true,
+        let generation = match variant {
+            ReportVariant::V2 => {
+                if Self::chip_id_is_turin_like(&*self.chip_id)? {
+                    Generation::Turin
+                } else {
+                    Generation::Genoa
+                }
+            }
+            _ => {
+                let family = self.cpuid_fam_id.unwrap_or(0);
+                let model = self.cpuid_mod_id.unwrap_or(0);
+                Generation::identify_cpu(family, model)?
+            }
         };
 
         // Write version (common to all variants)
@@ -442,7 +481,7 @@ impl AttestationReport {
         handle.write_bytes(self.image_id)?;
         handle.write_bytes(self.vmpl)?;
         handle.write_bytes(self.sig_algo)?;
-        write_tcb(&mut handle, &variant, &self.current_tcb, turin_like)?;
+        write_tcb(&mut handle, &self.current_tcb, &generation)?;
         handle.write_bytes(self.plat_info)?;
         handle.write_bytes(self.key_info)?;
         handle.skip_bytes::<4>()?.write_bytes(self.report_data)?;
@@ -452,7 +491,8 @@ impl AttestationReport {
         handle.write_bytes(self.author_key_digest)?;
         handle.write_bytes(self.report_id)?;
         handle.write_bytes(self.report_id_ma)?;
-        write_tcb(&mut handle, &variant, &self.reported_tcb, turin_like)?;
+        write_tcb(&mut handle, &self.reported_tcb, &generation)?;
+
         // Write CPUID fields based on variant
         match variant {
             ReportVariant::V2 => {
@@ -469,18 +509,22 @@ impl AttestationReport {
         }
 
         // Write committed TCB based on variant
-        write_tcb(&mut handle, &variant, &self.committed_tcb, turin_like)?;
+        write_tcb(&mut handle, &self.committed_tcb, &generation)?;
         handle.write_bytes(self.current)?;
         handle.skip_bytes::<1>()?.write_bytes(self.committed)?;
+        write_tcb(handle.skip_bytes::<1>()?, &self.launch_tcb, &generation)?;
 
-        write_tcb(
-            handle.skip_bytes::<1>()?,
-            &variant,
-            &self.launch_tcb,
-            turin_like,
-        )?;
-        // Write signature (common to all variants)
-        handle.skip_bytes::<168>()?.write_bytes(self.signature)?;
+        // Write launch and current mitigation vectors based on variant
+        match variant {
+            ReportVariant::V2 | ReportVariant::V3 => {
+                handle.skip_bytes::<168>()?.write_bytes(self.signature)?;
+            }
+            _ => {
+                handle.write_bytes(self.launch_mit_vector.unwrap_or(0))?;
+                handle.write_bytes(self.current_mit_vector.unwrap_or(0))?;
+                handle.skip_bytes::<152>()?.write_bytes(self.signature)?;
+            }
+        }
 
         Ok(())
     }
@@ -552,6 +596,10 @@ Launch TCB:
 
 {}
 
+Launch Mitigation Vector:     {}
+
+Current Mitigation Vector:    {}
+
 {}"#,
             self.version,
             self.guest_svn,
@@ -582,6 +630,10 @@ Launch TCB:
             self.current,
             self.committed,
             self.launch_tcb,
+            self.launch_mit_vector
+                .map_or("None".to_string(), |lmv| lmv.to_string()),
+            self.current_mit_vector
+                .map_or("None".to_string(), |cmv| cmv.to_string()),
             self.signature
         )
     }
@@ -609,10 +661,7 @@ impl Verifiable for (&Chain, &AttestationReport) {
         let signed = sig.verify(&base_digest, &ec)?;
         match signed {
             true => Ok(()),
-            false => Err(Error::new(
-                ErrorKind::Other,
-                "VEK does not sign the attestation report",
-            )),
+            false => Err(Error::other("VEK does not sign the attestation report")),
         }
     }
 }
@@ -638,10 +687,7 @@ impl Verifiable for (&Certificate, &AttestationReport) {
         let signed = sig.verify(&base_digest, &ec)?;
         match signed {
             true => Ok(()),
-            false => Err(Error::new(
-                ErrorKind::Other,
-                "VEK does not sign the attestation report",
-            )),
+            false => Err(Error::other("VEK does not sign the attestation report")),
         }
     }
 }
@@ -668,17 +714,13 @@ impl Verifiable for (&Chain, &AttestationReport) {
         let base_digest = sha2::Sha384::new_with_prefix(measurable_bytes);
         let verifying_key = p384::ecdsa::VerifyingKey::from_sec1_bytes(vek.public_key_sec1())
             .map_err(|e| {
-                io::Error::new(
-                    ErrorKind::Other,
-                    format!("failed to deserialize public key from sec1 bytes: {e:?}"),
-                )
+                io::Error::other(format!(
+                    "failed to deserialize public key from sec1 bytes: {e:?}"
+                ))
             })?;
         use p384::ecdsa::signature::DigestVerifier;
         verifying_key.verify_digest(base_digest, &sig).map_err(|e| {
-            io::Error::new(
-                ErrorKind::Other,
-                format!("VEK does not sign the attestation report: {e:?}"),
-            )
+            io::Error::other(format!("VEK does not sign the attestation report: {e:?}"))
         })
     }
 }
@@ -706,17 +748,13 @@ impl Verifiable for (&Certificate, &AttestationReport) {
         let base_digest = sha2::Sha384::new_with_prefix(measurable_bytes);
         let verifying_key = p384::ecdsa::VerifyingKey::from_sec1_bytes(vek.public_key_sec1())
             .map_err(|e| {
-                io::Error::new(
-                    ErrorKind::Other,
-                    format!("failed to deserialize public key from sec1 bytes: {e:?}"),
-                )
+                io::Error::other(format!(
+                    "failed to deserialize public key from sec1 bytes: {e:?}"
+                ))
             })?;
         use p384::ecdsa::signature::DigestVerifier;
         verifying_key.verify_digest(base_digest, &sig).map_err(|e| {
-            io::Error::new(
-                ErrorKind::Other,
-                format!("VEK does not sign the attestation report: {e:?}"),
-            )
+            io::Error::other(format!("VEK does not sign the attestation report: {e:?}"))
         })
     }
 }
@@ -743,6 +781,7 @@ bitfield! {
     /// | 22     | MEM_AES_256_XTS   | 0: Allow either AES 128 XEX or AES 256 XTS for memory encryption.<br>1: Require AES 256 XTS for memory encryption. >
     /// | 23     | RAPL_DIS          | 0: Allow Running Average Power Limit (RAPL).<br>1: RAPL must be disabled.                                          >
     /// | 24     | CIPHERTEXT_HIDING | 0: Ciphertext hiding may be enabled or disabled.<br>1: Ciphertext hiding must be enabled.                          >
+    /// | 25     | PAGE_SWAP_DISABLE | 0: Disable Guest access to SNP_PAGE_MOVE, SNP_SWAP_OUT and SNP_SWAP_IN commands.                                   >
     /// | 63:25  | -                 | Reserved. MBZ.                                                                                                     >
     ///
     #[repr(C)]
@@ -770,6 +809,11 @@ bitfield! {
     pub rapl_dis, set_rapl_dis: 23;
     /// CIPHERTEXT_HIDING field: (1) ciphertext hiding must be enabled, (0) ciphertext hiding may be enabled/disabled
     pub ciphertext_hiding, set_ciphertext_hiding: 24;
+    /// Guest policy to disable Guest access to SNP_PAGE_MOVE, SNP_SWAP_OUT, and SNP_SWAP_IN commands. If this policy
+    /// option is selected to disable these Page Move commands, then these commands will return POLICY_FAILURE.
+    /// 0: Do not disable Guest support for the commands.
+    /// 1: Disable Guest support for the commands.
+    pub page_swap_disabled, set_page_swap_disabled: 25;
 }
 
 impl Default for GuestPolicy {
@@ -804,14 +848,24 @@ impl Display for GuestPolicy {
   SMT Allowed:   {}
   Migrate MA:    {}
   Debug Allowed: {}
-  Single Socket: {}"#,
+  Single Socket: {}
+  CXL Allowed:   {}
+  AEX 256 XTS:   {}
+  RAPL Allowed:  {}
+  Ciphertext hiding: {}
+  Page Swap Disable: {}"#,
             self.0,
             self.abi_major(),
             self.abi_minor(),
             self.smt_allowed(),
             self.migrate_ma_allowed(),
             self.debug_allowed(),
-            self.single_socket_required()
+            self.single_socket_required(),
+            self.cxl_allowed(),
+            self.mem_aes_256_xts(),
+            self.rapl_dis(),
+            self.ciphertext_hiding(),
+            self.page_swap_disabled()
         )
     }
 }
@@ -843,7 +897,9 @@ bitfield! {
     /// Bit 3 indicates if RAPL is disabled.
     /// Bit 4 indicates if ciphertext hiding is enabled
     /// Bit 5 indicates that alias detection has completed since the last system reset and there are no aliasing addresses. Resets to 0.
-    /// Bits 5-63 are reserved.
+    /// Bit 6 reserved
+    /// Bit 7 indicates that SEV-TIO is enabled.
+    /// Bits 8-63 are reserved.
     #[repr(C)]
     #[derive(Deserialize, Clone, Copy, Serialize, PartialEq, Eq, PartialOrd, Ord)]
     pub struct PlatformInfo(u64);
@@ -860,6 +916,8 @@ bitfield! {
     pub ciphertext_hiding_enabled, _: 4;
     /// Indicates that alias detection has completed since the last system reset and there are no aliasing addresses. Resets to 0.
     pub alias_check_complete, _: 5;
+    /// Indicates that SEV-TIO is enabled.
+    pub tio_enabled, _ : 7
 
 }
 
@@ -873,14 +931,16 @@ impl Display for PlatformInfo {
   ECC Enabled:               {}
   RAPL Disabled:             {}
   Ciphertext Hiding Enabled: {}
-  Alias Check Complete:      {}"#,
+  Alias Check Complete:      {}
+  SEV-TIO Enabled:           {}"#,
             self.0,
             self.smt_enabled(),
             self.tsme_enabled(),
             self.ecc_enabled(),
             self.rapl_disabled(),
             self.ciphertext_hiding_enabled(),
-            self.alias_check_complete()
+            self.alias_check_complete(),
+            self.tio_enabled()
         )
     }
 }
@@ -1008,10 +1068,7 @@ impl Display for KeyInfo {
 mod tests {
 
     use super::*;
-    use std::{
-        convert::TryInto,
-        io::{ErrorKind, Write},
-    };
+    use std::{convert::TryInto, io::Write};
 
     #[test]
     fn test_derive_key_new() {
@@ -1022,11 +1079,12 @@ mod tests {
             vmpl: 0,
             guest_svn: 0,
             tcb_version: 0,
+            launch_mit_vector: None,
         };
 
         let guest_field: GuestFieldSelect = GuestFieldSelect(0);
 
-        let actual: DerivedKey = DerivedKey::new(false, guest_field, 0, 0, 0);
+        let actual: DerivedKey = DerivedKey::new(false, guest_field, 0, 0, 0, None);
 
         assert_eq!(actual, expected);
     }
@@ -1040,6 +1098,7 @@ mod tests {
             vmpl: 0,
             guest_svn: 0,
             tcb_version: 0,
+            launch_mit_vector: None,
         };
 
         let expected: u32 = 0;
@@ -1087,6 +1146,11 @@ Guest Policy (0x0):
   Migrate MA:    false
   Debug Allowed: false
   Single Socket: false
+  CXL Allowed:   false
+  AEX 256 XTS:   false
+  RAPL Allowed:  false
+  Ciphertext hiding: false
+  Page Swap Disable: false
 
 Family ID:
 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
@@ -1114,6 +1178,7 @@ Platform Info (0):
   RAPL Disabled:             false
   Ciphertext Hiding Enabled: false
   Alias Check Complete:      false
+  SEV-TIO Enabled:           false
 
 Key Information:
     author key enabled: false
@@ -1195,6 +1260,10 @@ TCB Version:
   TEE:         0
   Boot Loader: 0
   FMC:         None
+
+Launch Mitigation Vector:     None
+
+Current Mitigation Vector:    None
 
 Signature:
   R:
@@ -1340,7 +1409,8 @@ Signature:
   ECC Enabled:               false
   RAPL Disabled:             false
   Ciphertext Hiding Enabled: false
-  Alias Check Complete:      false"#;
+  Alias Check Complete:      false
+  SEV-TIO Enabled:           false"#;
         let actual: PlatformInfo = PlatformInfo(0);
 
         assert_eq!(expected, actual.to_string());
@@ -1498,7 +1568,7 @@ Signature:
 
     #[test]
     fn test_derived_key_fields() {
-        let key = DerivedKey::new(true, GuestFieldSelect(0xFF), 2, 3, 0x1234);
+        let key = DerivedKey::new(true, GuestFieldSelect(0xFF), 2, 3, 0x1234, None);
         assert_eq!(key.get_root_key_select(), 1);
         assert_eq!(key.vmpl, 2);
         assert_eq!(key.guest_svn, 3);
@@ -1627,7 +1697,7 @@ Signature:
     #[test]
     fn test_attestation_report_write_bytes() {
         let report = AttestationReport {
-            version: Default::default(),
+            version: 2,
             guest_svn: Default::default(),
             policy: Default::default(),
             family_id: Default::default(),
@@ -1653,7 +1723,7 @@ Signature:
         struct FailingWriter;
         impl Write for FailingWriter {
             fn write(&mut self, _buf: &[u8]) -> std::io::Result<usize> {
-                Err(std::io::Error::new(ErrorKind::Other, "test error"))
+                Err(std::io::Error::other("test error"))
             }
             fn flush(&mut self) -> std::io::Result<()> {
                 Ok(())
@@ -1738,7 +1808,7 @@ Signature:
     #[test]
     fn test_write_with_limited_writer() {
         let report = AttestationReport {
-            version: Default::default(),
+            version: 2,
             guest_svn: Default::default(),
             policy: Default::default(),
             family_id: Default::default(),

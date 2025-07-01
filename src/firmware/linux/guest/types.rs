@@ -33,6 +33,11 @@ pub struct DerivedKeyReq {
     /// The TCB version to mix into the derived key. Must not
     /// exceed CommittedTcb.
     pub tcb_version: u64,
+
+    /// The mitigation vector value to mix into the derived key.
+    /// Specific bit settings corresponding to mitigations required for Guest operation.
+    /// Introduced in FW 1.58, so if unset, it will default to 0.
+    pub launch_mit_vector: u64,
 }
 
 impl From<DerivedKey> for DerivedKeyReq {
@@ -44,6 +49,7 @@ impl From<DerivedKey> for DerivedKeyReq {
             vmpl: value.vmpl,
             guest_svn: value.guest_svn,
             tcb_version: value.tcb_version,
+            launch_mit_vector: value.launch_mit_vector.unwrap_or(0),
         }
     }
 }
@@ -57,6 +63,7 @@ impl From<&mut DerivedKey> for DerivedKeyReq {
             vmpl: value.vmpl,
             guest_svn: value.guest_svn,
             tcb_version: value.tcb_version,
+            launch_mit_vector: value.launch_mit_vector.unwrap_or(0),
         }
     }
 }
@@ -263,7 +270,7 @@ mod test {
     #[test]
     fn test_derived_key_req_conversion() {
         // Create a mock DerivedKey
-        let derived_key = DerivedKey::new(false, GuestFieldSelect(0x1234), 2, 1, 100);
+        let derived_key = DerivedKey::new(false, GuestFieldSelect(0x1234), 2, 1, 100, Some(123));
 
         // Test From<DerivedKey>
         let req: DerivedKeyReq = derived_key.into();
@@ -273,6 +280,7 @@ mod test {
         assert_eq!(req.vmpl, 2);
         assert_eq!(req.guest_svn, 1);
         assert_eq!(req.tcb_version, 100);
+        assert_eq!(req.launch_mit_vector, 123);
 
         // Test From<&mut DerivedKey>
         let mut derived_key = derived_key;
@@ -283,6 +291,7 @@ mod test {
         assert_eq!(req.vmpl, 2);
         assert_eq!(req.guest_svn, 1);
         assert_eq!(req.tcb_version, 100);
+        assert_eq!(req.launch_mit_vector, 123);
     }
 
     #[test]
