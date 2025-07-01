@@ -225,11 +225,7 @@ impl Firmware {
             .map_err(|_| cmd_buf.encapsulate())?;
 
         // Determine SEV-SNP CPU generation in order to parse platform status accordingly.
-        let raw_cpuid = unsafe { std::arch::x86_64::__cpuid(0x8000_0001) }
-            .eax
-            .to_le_bytes();
-
-        let generation: Generation = raw_cpuid.as_slice().try_into()?;
+        let generation = Generation::identify_host_generation()?;
 
         Ok((generation, &*platform_status).try_into()?)
     }
