@@ -59,6 +59,10 @@ pub struct DerivedKey {
     /// The TCB version to mix into the derived key. Must not
     /// exceed CommittedTcb.
     pub tcb_version: u64,
+
+    /// The mitigation vector value to mix into the derived key.
+    /// Specific bit settings corresponding to mitigations required for Guest operation.
+    pub launch_mit_vector: Option<u64>,
 }
 
 impl DerivedKey {
@@ -69,6 +73,7 @@ impl DerivedKey {
         vmpl: u32,
         guest_svn: u32,
         tcb_version: u64,
+        launch_mit_vector: Option<u64>,
     ) -> Self {
         Self {
             root_key_select: u32::from(root_key_select),
@@ -77,6 +82,7 @@ impl DerivedKey {
             vmpl,
             guest_svn,
             tcb_version,
+            launch_mit_vector,
         }
     }
 
@@ -97,7 +103,8 @@ bitfield! {
     /// |3|MEASUREMENT|Indicates the measurement of the guest during launch will be mixed into the key.|
     /// |4|GUEST_SVN|Indicates that the guest-provided SVN will be mixed into the key.|
     /// |5|TCB_VERSION|Indicates that the guest-provided TCB_VERSION will be mixed into the key.|
-    /// |63:6|\-|Reserved. Must be zero.|
+    /// |6|LAUNCH_MIT_VECTOR|Indicates that the guest-provided LAUNCH_MIT_VECTOR will be mixed into the key.|
+    /// |63:7|\-|Reserved. Must be zero.|
     #[repr(C)]
     #[derive(Default, Copy, Clone,PartialEq, Eq, PartialOrd, Ord)]
     pub struct GuestFieldSelect(u64);
@@ -114,6 +121,8 @@ bitfield! {
     pub get_svn, set_svn: 4;
     /// Check/Set tcb version inclusion in derived key.
     pub get_tcb_version, set_tcb_version: 5;
+     /// Indicates that the guest-provied LAUNCH_MIT_VECTOR will be mixed into the key.
+    pub get_launch_mit_vector, set_launch_mit_vector: 6;
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -1070,11 +1079,12 @@ mod tests {
             vmpl: 0,
             guest_svn: 0,
             tcb_version: 0,
+            launch_mit_vector: None,
         };
 
         let guest_field: GuestFieldSelect = GuestFieldSelect(0);
 
-        let actual: DerivedKey = DerivedKey::new(false, guest_field, 0, 0, 0);
+        let actual: DerivedKey = DerivedKey::new(false, guest_field, 0, 0, 0, None);
 
         assert_eq!(actual, expected);
     }
@@ -1088,6 +1098,7 @@ mod tests {
             vmpl: 0,
             guest_svn: 0,
             tcb_version: 0,
+            launch_mit_vector: None,
         };
 
         let expected: u32 = 0;
@@ -1557,7 +1568,7 @@ Signature:
 
     #[test]
     fn test_derived_key_fields() {
-        let key = DerivedKey::new(true, GuestFieldSelect(0xFF), 2, 3, 0x1234);
+        let key = DerivedKey::new(true, GuestFieldSelect(0xFF), 2, 3, 0x1234, None);
         assert_eq!(key.get_root_key_select(), 1);
         assert_eq!(key.vmpl, 2);
         assert_eq!(key.guest_svn, 3);
