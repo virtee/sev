@@ -286,7 +286,7 @@ pub struct AttestationReport {
 }
 
 #[inline]
-fn write_tcb(
+pub(crate) fn write_tcb(
     h: &mut impl Write,
     variant: &ReportVariant,
     tcb: &TcbVersion,
@@ -304,7 +304,7 @@ fn write_tcb(
 }
 
 #[inline]
-fn parse_tcb(
+pub(crate) fn parse_tcb(
     stepper: &mut &[u8],
     variant: &ReportVariant,
     turin_like: bool,
