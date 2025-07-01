@@ -288,12 +288,27 @@ impl Firmware {
     ///
     /// let mut firmware: Firmware = Firmware::open().unwrap();
     ///
-    /// firmware.snp_vlek_load(hashstick_bytes.as_slice()).unwrap();
+    /// let generation = Generation::identify_host_generation().unwrap();
+    ///
+    /// // Create a WrappedVlekHashstick from the bytes.
+    /// let hashstick: WrappedVlekHashstick = WrappedVlekHashstick::from_bytes(hashstick_bytes, generation).unwrap();
+    ///
+    /// // Load the VLEK Hashstick into the AMD Secure Processor.
+    /// firmware.snp_vlek_load(hashstick)).unwrap();
     /// ```
-    pub fn snp_vlek_load(&mut self, hashstick_bytes: &[u8]) -> Result<(), UserApiError> {
-        use types::FFI::types::{SnpVlekLoad, WrappedVlekHashstick};
+    pub fn snp_vlek_load(&mut self, hashstick: WrappedVlekHashstick) -> Result<(), UserApiError> {
+        use std::convert::TryFrom;
 
-        let parsed_bytes: WrappedVlekHashstick = hashstick_bytes.try_into()?;
+        use types::FFI::types::{SnpVlekLoad, WrappedVlekHashstick as FFIWrappedVlekHashstick};
+
+        let generation = Generation::identify_host_generation()?;
+
+        let mut byte_buf = Vec::new();
+
+        hashstick.write_bytes(&mut byte_buf, generation)?;
+
+        let parsed_bytes: FFIWrappedVlekHashstick =
+            FFIWrappedVlekHashstick::try_from(byte_buf.as_slice())?;
 
         let mut vlek_load: SnpVlekLoad = SnpVlekLoad::new(&parsed_bytes);
         let mut cmd_buf = Command::from_mut(&mut vlek_load);

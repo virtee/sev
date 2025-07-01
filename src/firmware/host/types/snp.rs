@@ -1,20 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::firmware::guest::{parse_tcb, write_tcb};
+pub(crate) use crate::firmware::linux::host as FFI;
 /// A representation of the type of data provided to [parse_table](crate::firmware::host::parse_table)
 pub use crate::firmware::linux::host::types::RawData;
-
-pub(crate) use crate::firmware::linux::host as FFI;
 
 #[cfg(target_os = "linux")]
 use crate::error::CertError;
 use crate::{
-    util::parser::{ByteParser, ReadExt},
+    util::{
+        array::Array,
+        parser::{ByteParser, ReadExt, WriteExt},
+    },
     Generation,
 };
 
 use std::{
     convert::{TryFrom, TryInto},
     fmt::{self, Display, Formatter},
+    io::Write,
     ops::BitOrAssign,
 };
 
@@ -635,6 +639,79 @@ impl Display for PlatformPolicy {
             self.ciphertext_hiding_dram_cap(),
             self.ciphertext_hiding_dram_en(),
             self.is_tio_en()
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+/// Wrapped VLEK Hashstick strucutre.
+/// As defined in AMD's SEV-SNP specification chapter 8.30
+/// An address to a buffer containing this structure is passed to the snp_vlek_load command.
+pub struct WrappedVlekHashstick {
+    /// IV used to wrap chip-unique key
+    pub iv: [u8; 12], // 96 bits = 12 bytes
+
+    /// VLEK hashstick wrapped with a chip-unique key using AES-256-GCM
+    pub vlek_wrapped: Array<u8, 384>,
+
+    /// The TCB version associated with this VLEK hashstick
+    pub tcb_version: TcbVersion,
+
+    /// AES-256-GCM authentication tag of the wrapped VLEK hashstick and TCB_VERSION
+    pub vlek_auth_tag: [u8; 16],
+}
+
+impl WrappedVlekHashstick {
+    /// Parses raw bytes into the WrappedVlekHashstick structure.
+    pub fn from_bytes(mut bytes: &[u8], generation: Generation) -> Result<Self, std::io::Error> {
+        if bytes.len() != 432usize {
+            return Err(std::io::ErrorKind::InvalidData)?;
+        }
+
+        let stepper = &mut bytes;
+
+        let iv: [u8; 12] = stepper.parse_bytes()?;
+        let vlek_wrapped: Array<u8, 384> = stepper.skip_bytes::<4>()?.parse_bytes()?;
+        let tcb_version = parse_tcb(stepper, &generation)?;
+        let vlek_auth_tag: [u8; 16] = stepper.skip_bytes::<8>()?.parse_bytes()?;
+
+        Ok(Self {
+            iv,
+            vlek_wrapped,
+            tcb_version,
+            vlek_auth_tag,
+        })
+    }
+
+    /// Writes the WrappedVlekHashstick structure to bytes.
+    pub fn write_bytes(
+        self,
+        mut handle: impl Write,
+        generation: Generation,
+    ) -> Result<(), std::io::Error> {
+        handle.write_bytes(self.iv)?;
+        handle.skip_bytes::<4>()?.write_bytes(self.vlek_wrapped)?;
+
+        write_tcb(&mut handle, &self.tcb_version, &generation)?;
+
+        handle.skip_bytes::<8>()?.write_bytes(self.vlek_auth_tag)?;
+
+        Ok(())
+    }
+}
+
+impl Display for WrappedVlekHashstick {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            r#"
+    Wrapped VLEK Hashstick:
+    IV:                      {:?}
+    VLEK hashstic Wrapped:   {}
+    TCB: 
+    {}
+    VLEK authentication tag: {:?}"#,
+            self.iv, self.vlek_wrapped, self.tcb_version, self.vlek_auth_tag
         )
     }
 }
@@ -1532,5 +1609,117 @@ mod tests {
         };
         let actual: SnpPlatformStatus = (Generation::Turin, &*raw_actual).try_into().unwrap();
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_wrapped_vlek_hashstick_from_bytes() {
+        // Create a test buffer with the correct layout
+        let mut test_buffer = Vec::with_capacity(432);
+
+        // IV (12 bytes)
+        test_buffer.extend_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+
+        // Reserved field 1 (4 bytes of zeros)
+        test_buffer.extend_from_slice(&[0, 0, 0, 0]);
+
+        // VLEK_WRAPPED (384 bytes)
+        test_buffer.extend_from_slice(&[42; 384]);
+
+        // TCB_VERSION (8 bytes)
+        test_buffer.extend_from_slice(&[1, 2, 0, 0, 0, 0, 3, 4]); // bootloader=1, tee=2, snp=3, microcode=4
+
+        // Reserved field 2 (8 bytes of zeros)
+        test_buffer.extend_from_slice(&[0, 0, 0, 0, 0, 0, 0, 0]);
+
+        // VLEK_AUTH_TAG (16 bytes)
+        test_buffer.extend_from_slice(&[9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0]);
+
+        // Parse the buffer
+        let hashstick = WrappedVlekHashstick::from_bytes(&test_buffer, Generation::Milan).unwrap();
+
+        // Verify the fields
+        assert_eq!(hashstick.iv, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+        assert_eq!(hashstick.vlek_wrapped.as_ref(), &[42; 384]);
+        assert_eq!(hashstick.tcb_version.bootloader, 1);
+        assert_eq!(hashstick.tcb_version.tee, 2);
+        assert_eq!(hashstick.tcb_version.snp, 3);
+        assert_eq!(hashstick.tcb_version.microcode, 4);
+        assert_eq!(
+            hashstick.vlek_auth_tag,
+            [9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0]
+        );
+    }
+
+    #[test]
+    fn test_wrapped_vlek_hashstick_invalid_length() {
+        // Test with a buffer that's too short
+        let test_buffer = [0u8; 431]; // One byte too short
+        let result = WrappedVlekHashstick::from_bytes(&test_buffer, Generation::Milan);
+        assert!(result.is_err());
+
+        // Test with a buffer that's too long
+        let test_buffer = [0u8; 433]; // One byte too long
+        let result = WrappedVlekHashstick::from_bytes(&test_buffer, Generation::Milan);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_wrapped_vlek_hashstick_write_bytes() {
+        // Create a test hashstick
+        let hashstick = WrappedVlekHashstick {
+            iv: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+            vlek_wrapped: Array([42; 384]),
+            tcb_version: TcbVersion::new(None, 1, 2, 3, 4),
+            vlek_auth_tag: [9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0],
+        };
+
+        // Write it to a buffer
+        let mut buffer = Vec::with_capacity(432);
+
+        hashstick
+            .write_bytes(&mut buffer, Generation::Milan)
+            .unwrap();
+
+        // Verify the buffer is the correct length
+        assert_eq!(buffer.len(), 432);
+
+        // Verify the fields were written correctly
+        assert_eq!(&buffer[0..12], &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]); // IV
+        assert_eq!(&buffer[0x0C..0x10], &[0, 0, 0, 0]); // Reserved field 1
+        assert_eq!(&buffer[0x10..0x190], &[42; 384]); // VLEK_WRAPPED
+
+        // TCB_VERSION format depends on the CPU generation, so we'll read it back
+        let tcb_bytes = &buffer[0x190..0x198];
+
+        let tcb = TcbVersion::from_legacy_bytes(&tcb_bytes.try_into().unwrap());
+        assert_eq!(tcb.bootloader, 1);
+        assert_eq!(tcb.tee, 2);
+        assert_eq!(tcb.snp, 3);
+        assert_eq!(tcb.microcode, 4);
+
+        assert_eq!(&buffer[0x198..0x1A0], &[0, 0, 0, 0, 0, 0, 0, 0]); // Reserved field 2
+        assert_eq!(
+            &buffer[0x1A0..0x1B0],
+            &[9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0]
+        ); // VLEK_AUTH_TAG
+    }
+
+    #[test]
+    fn test_wrapped_vlek_hashstick_display() {
+        // Create a test hashstick
+        let hashstick = WrappedVlekHashstick {
+            iv: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+            vlek_wrapped: Array([42; 384]),
+            tcb_version: TcbVersion::new(None, 1, 2, 3, 4),
+            vlek_auth_tag: [9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0],
+        };
+
+        // Convert to string and check contents
+        let display_string = format!("{}", hashstick);
+        assert!(display_string.contains("Wrapped VLEK Hashstick:"));
+        assert!(display_string.contains("IV:"));
+        assert!(display_string.contains("VLEK hashstic Wrapped:"));
+        assert!(display_string.contains("TCB:"));
+        assert!(display_string.contains("VLEK authentication tag:"));
     }
 }

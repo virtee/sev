@@ -298,7 +298,7 @@ pub struct AttestationReport {
 }
 
 #[inline]
-fn write_tcb(
+pub(crate) fn write_tcb(
     h: &mut impl Write,
     tcb: &TcbVersion,
     generation: &Generation,
@@ -316,7 +316,10 @@ fn write_tcb(
 }
 
 #[inline]
-fn parse_tcb(stepper: &mut &[u8], generation: &Generation) -> Result<TcbVersion, std::io::Error> {
+pub(crate) fn parse_tcb(
+    stepper: &mut &[u8],
+    generation: &Generation,
+) -> Result<TcbVersion, std::io::Error> {
     match generation {
         Generation::Milan | Generation::Genoa => {
             Ok(TcbVersion::from_legacy_bytes(&stepper.parse_bytes()?))
