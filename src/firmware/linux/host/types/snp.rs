@@ -259,8 +259,8 @@ const HASHSTICK_BUFFER_LEN: usize = 432;
 #[repr(C, packed)]
 /// Wrapped VLEK data.
 pub struct WrappedVlekHashstick<'a> {
-    /// Opaque data provided by AMD Key Distribution Server
-    /// (as described in SEV-SNP Firmware ABI 1.54, SNP_VLEK_LOAD)
+    /// Wrapped VLEK data provided by AMD Key Distribution Server as bytes.
+    /// Address to this data is passed to the AMD Secure Processor.
     pub data: &'a [u8], // 432 bytes of data
 }
 
@@ -274,6 +274,17 @@ impl<'a, 'b: 'a> std::convert::TryFrom<&'b [u8]> for WrappedVlekHashstick<'a> {
 
         if value == [0u8; HASHSTICK_BUFFER_LEN] {
             return Err(HashstickError::EmptyHashstickBuffer);
+        }
+
+        // Validate reserved fields are zero as required by spec
+        // Check first reserved field (0x0C-0x0F)
+        if value[0x0C..0x10] != [0u8; 4] {
+            return Err(HashstickError::InvalidReservedField);
+        }
+
+        // Check second reserved field (0x198-0x19F)
+        if value[0x198..0x1A0] != [0u8; 8] {
+            return Err(HashstickError::InvalidReservedField);
         }
 
         Ok(Self { data: value })
@@ -429,7 +440,24 @@ mod test {
 
         use super::super::{WrappedVlekHashstick, HASHSTICK_BUFFER_LEN};
 
-        const VALID_HASHSTICK_BYTES: [u8; HASHSTICK_BUFFER_LEN] = [1u8; HASHSTICK_BUFFER_LEN];
+        const VALID_HASHSTICK_BYTES: [u8; HASHSTICK_BUFFER_LEN] = [
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        ];
+
         const INVALID_HASHSTICK_BYTES: [u8; 25] = [2u8; 25];
 
         #[test]
