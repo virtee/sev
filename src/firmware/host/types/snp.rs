@@ -377,13 +377,22 @@ impl Config {
 }
 
 #[cfg(feature = "snp")]
-impl TryFrom<Config> for FFI::types::SnpSetConfig {
-    type Error = uuid::Error;
+/// TryFrom to FFI Config when manually passing in the CPU generation
+impl TryFrom<(Config, Generation)> for FFI::types::SnpSetConfig {
+    type Error = std::io::Error;
 
-    fn try_from(value: Config) -> Result<Self, Self::Error> {
+    fn try_from(args: (Config, Generation)) -> Result<Self, Self::Error> {
         let mut snp_config: SnpSetConfig = Default::default();
+        let (value, generation) = args;
 
-        snp_config.reported_tcb = value.reported_tcb;
+        let mut buffer = Vec::new();
+        write_tcb(&mut buffer, &value.reported_tcb, &generation)?;
+        snp_config.reported_tcb = buffer.try_into().map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Failed to convert TCB into bytes",
+            )
+        })?;
         snp_config.mask_id = value.mask_id;
 
         Ok(snp_config)
@@ -391,12 +400,53 @@ impl TryFrom<Config> for FFI::types::SnpSetConfig {
 }
 
 #[cfg(feature = "snp")]
+/// TryFrom to FFI Config type when CPU Generation is unknown
+impl TryFrom<Config> for FFI::types::SnpSetConfig {
+    type Error = std::io::Error;
+
+    fn try_from(value: Config) -> Result<Self, Self::Error> {
+        let mut snp_config: SnpSetConfig = Default::default();
+        let generation = Generation::identify_host_generation()?;
+
+        let mut buffer = Vec::new();
+        write_tcb(&mut buffer, &value.reported_tcb, &generation)?;
+        snp_config.reported_tcb = buffer.try_into().map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Failed to convert TCB into bytes",
+            )
+        })?;
+        snp_config.mask_id = value.mask_id;
+
+        Ok(snp_config)
+    }
+}
+
+#[cfg(feature = "snp")]
+/// TryFrom from FFI Config type when CPU Generation is manually passed in
+impl TryFrom<(FFI::types::SnpSetConfig, Generation)> for Config {
+    type Error = std::io::Error;
+
+    fn try_from(value: (FFI::types::SnpSetConfig, Generation)) -> Result<Self, Self::Error> {
+        let reported_tcb = parse_tcb(&mut value.0.reported_tcb.as_slice(), &value.1)?;
+        Ok(Self {
+            reported_tcb,
+            mask_id: value.0.mask_id,
+            ..Default::default()
+        })
+    }
+}
+
+#[cfg(feature = "snp")]
+/// TryFrom from FFI Config type when CPU Generation is unknown
 impl TryFrom<FFI::types::SnpSetConfig> for Config {
-    type Error = uuid::Error;
+    type Error = std::io::Error;
 
     fn try_from(value: FFI::types::SnpSetConfig) -> Result<Self, Self::Error> {
+        let generation = Generation::identify_host_generation()?;
+        let reported_tcb = parse_tcb(&mut value.reported_tcb.as_slice(), &generation)?;
         Ok(Self {
-            reported_tcb: value.reported_tcb,
+            reported_tcb,
             mask_id: value.mask_id,
             ..Default::default()
         })
@@ -938,8 +988,8 @@ mod tests {
         assert_eq!(config_mask, mask);
 
         // Test conversion to FFI type
-        let snp_config: SnpSetConfig = config.try_into().unwrap();
-        assert_eq!(snp_config.reported_tcb, tcb);
+        let snp_config: SnpSetConfig = (config, Generation::Milan).try_into().unwrap();
+        assert_eq!(snp_config.reported_tcb, tcb.to_legacy_bytes());
         let snp_config_mask = snp_config.mask_id;
 
         assert_eq!(snp_config_mask, mask);
@@ -1031,12 +1081,12 @@ mod tests {
         let mask = MaskId(0x3);
         let config = Config::new(tcb, mask);
 
-        let ffi_config: SnpSetConfig = config.try_into().unwrap();
-        assert_eq!(ffi_config.reported_tcb, tcb);
+        let ffi_config: SnpSetConfig = (config, Generation::Milan).try_into().unwrap();
+        assert_eq!(ffi_config.reported_tcb, tcb.to_legacy_bytes());
         let ffi_config_mask = ffi_config.mask_id;
         assert_eq!(ffi_config_mask, mask);
 
-        let converted_config: Config = ffi_config.try_into().unwrap();
+        let converted_config: Config = (ffi_config, Generation::Milan).try_into().unwrap();
         assert_eq!(converted_config.reported_tcb, tcb);
         let converted_config_mask = converted_config.mask_id;
         assert_eq!(converted_config_mask, mask);
@@ -1077,13 +1127,93 @@ mod tests {
         let mask = MaskId(u32::MAX);
         let config = Config::new(tcb, mask);
 
-        let ffi_result: Result<SnpSetConfig, _> = config.try_into();
+        let ffi_result: Result<SnpSetConfig, _> = (config, Generation::Milan).try_into();
         assert!(ffi_result.is_ok());
 
         let default_config = Config::default();
         assert_eq!(default_config.reported_tcb, Default::default());
         let default_config_mask_id = default_config.mask_id;
         assert_eq!(default_config_mask_id, Default::default());
+    }
+
+    #[test]
+    #[cfg(feature = "snp")]
+    fn test_config_edge_cases() {
+        // Test with maximum values
+        let tcb = TcbVersion::new(Some(255), 255, 255, 255, 255);
+        let mask_id = MaskId(u32::MAX);
+        let config = Config::new(tcb, mask_id);
+
+        // Convert to SnpSetConfig
+        let result: Result<SnpSetConfig, _> = (config, Generation::Turin).try_into();
+        assert!(result.is_ok());
+        let snp_config = result.unwrap();
+
+        // Convert back to Config
+        let result: Result<Config, _> = (snp_config, Generation::Turin).try_into();
+        assert!(result.is_ok());
+        let round_trip = result.unwrap();
+
+        assert_eq!(round_trip.reported_tcb, tcb);
+        let round_trip_mask_id = round_trip.mask_id;
+        assert_eq!(round_trip_mask_id, mask_id);
+
+        // Test with minimum values
+        let tcb = TcbVersion::new(Some(0), 0, 0, 0, 0);
+        let mask_id = MaskId(0);
+        let config = Config::new(tcb, mask_id);
+
+        // Convert to SnpSetConfig
+        let result: Result<SnpSetConfig, _> = (config, Generation::Turin).try_into();
+        assert!(result.is_ok());
+        let snp_config = result.unwrap();
+
+        // Convert back to Config
+        let result: Result<Config, _> = (snp_config, Generation::Turin).try_into();
+        assert!(result.is_ok());
+        let round_trip = result.unwrap();
+
+        assert_eq!(round_trip.reported_tcb, tcb);
+        let round_trip_mask_id = round_trip.mask_id;
+        assert_eq!(round_trip_mask_id, mask_id);
+    }
+
+    #[test]
+    #[cfg(feature = "snp")]
+    fn test_different_generation_conversions() {
+        let tcb = TcbVersion::new(Some(1), 2, 3, 4, 5);
+        let mask_id = MaskId(0x3);
+        let config = Config::new(tcb, mask_id);
+
+        // Test all generations
+        let generations = [Generation::Milan, Generation::Genoa, Generation::Turin];
+
+        for generation in generations {
+            // Convert to SnpSetConfig
+            let snp_config: Result<SnpSetConfig, _> = (config, generation).try_into();
+            assert!(snp_config.is_ok());
+            let snp_config = snp_config.unwrap();
+
+            // Convert back to Config
+            let round_trip: Result<Config, _> = (snp_config, generation).try_into();
+            assert!(round_trip.is_ok());
+            let round_trip = round_trip.unwrap();
+
+            // For non-Turin generations, FMC will be lost in the conversion
+            match generation {
+                Generation::Turin => assert_eq!(round_trip.reported_tcb, tcb),
+                _ => {
+                    // FMC field is not preserved for legacy generations
+                    assert_eq!(round_trip.reported_tcb.bootloader, tcb.bootloader);
+                    assert_eq!(round_trip.reported_tcb.tee, tcb.tee);
+                    assert_eq!(round_trip.reported_tcb.snp, tcb.snp);
+                    assert_eq!(round_trip.reported_tcb.microcode, tcb.microcode);
+                    assert_eq!(round_trip.reported_tcb.fmc, None); // FMC lost in legacy format
+                }
+            }
+            let round_trip_mask_id = round_trip.mask_id;
+            assert_eq!(round_trip_mask_id, mask_id);
+        }
     }
 
     #[test]
