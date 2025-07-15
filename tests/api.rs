@@ -176,8 +176,9 @@ mod snp {
     #[cfg_attr(not(all(host, feature = "dangerous_hw_tests")), ignore)]
     #[test]
     #[serial]
-    fn set_config() {
+    fn set_config_generation() {
         let mut fw: Firmware = Firmware::open().unwrap();
+
         fw.snp_set_config(Config::default()).unwrap();
     }
 

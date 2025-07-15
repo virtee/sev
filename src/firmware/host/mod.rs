@@ -42,7 +42,7 @@ use std::convert::TryInto;
 use super::linux::host::types::SnpCommit;
 
 #[cfg(all(target_os = "linux", feature = "snp"))]
-use super::linux::host::types::SnpPlatformStatus as FFISnpPlatformStatus;
+use super::linux::host::types::{SnpPlatformStatus as FFISnpPlatformStatus, SnpSetConfig};
 
 /// The CPU-unique identifier for the platform.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -268,7 +268,8 @@ impl Firmware {
     /// ```
     #[cfg(feature = "snp")]
     pub fn snp_set_config(&mut self, new_config: Config) -> Result<(), UserApiError> {
-        let mut binding = new_config.try_into()?;
+        let mut binding: SnpSetConfig = new_config.try_into()?;
+
         let mut cmd_buf = Command::from_mut(&mut binding);
 
         SNP_SET_CONFIG
