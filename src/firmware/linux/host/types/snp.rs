@@ -229,8 +229,8 @@ pub struct SnpCommit {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(C, packed)]
 pub struct SnpSetConfig {
-    /// The TCB_VERSION to report in guest attestation reports.
-    pub reported_tcb: UAPI::TcbVersion,
+    /// The bytes corresponding to the TCB_VERSION to report in guest attestation reports.
+    pub reported_tcb: [u8; 8],
 
     /// mask_id [0] : whether chip id is present in attestation reports or not  
     /// mask_id [1]: whether attestation reports are signed or not

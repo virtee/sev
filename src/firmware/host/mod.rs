@@ -264,11 +264,17 @@ impl Firmware {
     /// );
     /// let mut firmware: Firmware = Firmware::open().unwrap();
     ///
-    /// let status: bool = firmware.snp_set_config(configuration).unwrap();
+    /// let generation = Generation::identify_host_generation().unwrap();
+    ///
+    /// let status: bool = firmware.snp_set_config(configuration, generation).unwrap();
     /// ```
     #[cfg(feature = "snp")]
-    pub fn snp_set_config(&mut self, new_config: Config) -> Result<(), UserApiError> {
-        let mut binding = new_config.try_into()?;
+    pub fn snp_set_config(
+        &mut self,
+        new_config: Config,
+        generation: Generation,
+    ) -> Result<(), UserApiError> {
+        let mut binding = (new_config, generation).try_into()?;
         let mut cmd_buf = Command::from_mut(&mut binding);
 
         SNP_SET_CONFIG

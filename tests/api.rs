@@ -119,7 +119,10 @@ mod sev {
 #[cfg(all(feature = "snp", target_os = "linux"))]
 mod snp {
     use serial_test::serial;
-    use sev::firmware::host::{Config, Firmware, MaskId, SnpPlatformStatus, TcbVersion};
+    use sev::{
+        firmware::host::{Config, Firmware, MaskId, SnpPlatformStatus, TcbVersion},
+        Generation,
+    };
 
     #[cfg_attr(not(host), ignore)]
     #[test]
@@ -178,7 +181,10 @@ mod snp {
     #[serial]
     fn set_config() {
         let mut fw: Firmware = Firmware::open().unwrap();
-        fw.snp_set_config(Config::default()).unwrap();
+
+        let generation = Generation::identify_host_generation().unwrap();
+
+        fw.snp_set_config(Config::default(), generation).unwrap();
     }
 
     #[cfg_attr(not(all(host, feature = "dangerous_hw_tests")), ignore)]
@@ -187,7 +193,11 @@ mod snp {
     fn test_host_fw_error() {
         let mut fw: Firmware = Firmware::open().unwrap();
         let invalid_config = Config::new(TcbVersion::new(None, 100, 100, 100, 100), MaskId(31));
-        let fw_error = fw.snp_set_config(invalid_config).unwrap_err().to_string();
+        let generation = Generation::identify_host_generation().unwrap();
+        let fw_error = fw
+            .snp_set_config(invalid_config, generation)
+            .unwrap_err()
+            .to_string();
         assert_eq!(fw_error, "Firmware Error Encountered: Known SEV FW Error: Status Code: 0x16: Given parameter is invalid.")
     }
 }
