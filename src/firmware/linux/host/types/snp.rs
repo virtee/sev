@@ -251,23 +251,23 @@ impl Default for SnpSetConfig {
     }
 }
 
-// Length defined in the Linux Kernel for the IOCTL.
+// Expected length for the VLEK hashstick.
 const HASHSTICK_BUFFER_LEN: usize = 432;
 
 #[cfg(feature = "snp")]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(C, packed)]
-/// Wrapped VLEK data.
-pub struct WrappedVlekHashstick<'a> {
+/// Wrapped VLEK data for FFI layer.
+pub struct WrappedVlekHashstick {
     /// Wrapped VLEK data provided by AMD Key Distribution Server as bytes.
-    /// Address to this data is passed to the AMD Secure Processor.
-    pub data: &'a [u8], // 432 bytes of data
+    /// Address to this data is passed to the kernel.
+    pub data: [u8; HASHSTICK_BUFFER_LEN],
 }
 
-impl<'a, 'b: 'a> std::convert::TryFrom<&'b [u8]> for WrappedVlekHashstick<'a> {
+impl std::convert::TryFrom<&[u8]> for WrappedVlekHashstick {
     type Error = HashstickError;
 
-    fn try_from(value: &'b [u8]) -> Result<Self, Self::Error> {
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         if value.len() != HASHSTICK_BUFFER_LEN {
             return Err(HashstickError::InvalidLength);
         }
@@ -287,7 +287,10 @@ impl<'a, 'b: 'a> std::convert::TryFrom<&'b [u8]> for WrappedVlekHashstick<'a> {
             return Err(HashstickError::InvalidReservedField);
         }
 
-        Ok(Self { data: value })
+        let mut data = [0u8; HASHSTICK_BUFFER_LEN];
+        data.copy_from_slice(value);
+
+        Ok(Self { data })
     }
 }
 
@@ -296,7 +299,7 @@ impl<'a, 'b: 'a> std::convert::TryFrom<&'b [u8]> for WrappedVlekHashstick<'a> {
 #[repr(C, packed)]
 /// Structure used to load a VLEK hashstick into the AMD Secure Processor.
 pub struct SnpVlekLoad {
-    /// Length of the command buffer read by the AMD Secure Processor.
+    /// Length of this command buffer in bytes.
     pub len: u32,
 
     /// Version of wrapped VLEK hashstick (Must be 0h).
@@ -304,7 +307,7 @@ pub struct SnpVlekLoad {
 
     _reserved: [u8; 3],
 
-    /// Address of wrapped VLEK hashstick ([WrappedVlekHashstick])
+    /// System Physical Address of wrapped VLEK hashstick ([WrappedVlekHashstick])
     pub vlek_wrapped_address: u64,
 }
 
@@ -316,10 +319,10 @@ impl SnpVlekLoad {
     }
 }
 
-impl<'a> std::convert::From<&WrappedVlekHashstick<'a>> for SnpVlekLoad {
-    fn from(value: &WrappedVlekHashstick<'a>) -> Self {
+impl From<&WrappedVlekHashstick> for SnpVlekLoad {
+    fn from(value: &WrappedVlekHashstick) -> Self {
         Self {
-            len: value.data.len() as u32,
+            len: std::mem::size_of::<SnpVlekLoad>() as u32,
             vlek_wrapped_version: 0u8,
             _reserved: Default::default(),
             vlek_wrapped_address: value as *const WrappedVlekHashstick as u64,
@@ -463,7 +466,7 @@ mod test {
         #[test]
         fn test_bytes_to_wrapped_hashstick() {
             let bytes: [u8; HASHSTICK_BUFFER_LEN] = VALID_HASHSTICK_BYTES;
-            let expected: WrappedVlekHashstick = WrappedVlekHashstick { data: &bytes };
+            let expected: WrappedVlekHashstick = WrappedVlekHashstick { data: bytes };
             let actual: WrappedVlekHashstick =
                 WrappedVlekHashstick::try_from(VALID_HASHSTICK_BYTES.as_slice()).unwrap();
 
@@ -494,7 +497,7 @@ mod test {
             let actual: SnpVlekLoad = (&test_hashstick).into();
 
             let expected: SnpVlekLoad = SnpVlekLoad {
-                len: HASHSTICK_BUFFER_LEN as u32,
+                len: std::mem::size_of::<SnpVlekLoad>() as u32,
                 vlek_wrapped_version: 0u8,
                 _reserved: Default::default(),
                 vlek_wrapped_address: &test_hashstick as *const WrappedVlekHashstick as u64,
@@ -511,7 +514,7 @@ mod test {
             let actual: SnpVlekLoad = SnpVlekLoad::new(&test_hashstick);
 
             let expected: SnpVlekLoad = SnpVlekLoad {
-                len: HASHSTICK_BUFFER_LEN as u32,
+                len: std::mem::size_of::<SnpVlekLoad>() as u32,
                 vlek_wrapped_version: 0u8,
                 _reserved: Default::default(),
                 vlek_wrapped_address: &test_hashstick as *const WrappedVlekHashstick as u64,
