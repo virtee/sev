@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use bincode;
 #[cfg(feature = "openssl")]
 use openssl::error::ErrorStack;
 use std::{
@@ -722,7 +721,7 @@ impl error::Error for CertError {}
 /// Errors which may be encountered when handling attestation reports
 pub enum AttestationReportError {
     /// Bincode Error Handling
-    BincodeError(bincode::ErrorKind),
+    BincodeError(BincodeError),
 
     /// Unsuported Attestation Report Version
     UnsupportedReportVersion(u32),
@@ -751,9 +750,9 @@ impl From<AttestationReportError> for std::io::Error {
     }
 }
 
-impl std::convert::From<bincode::ErrorKind> for AttestationReportError {
-    fn from(value: bincode::ErrorKind) -> Self {
-        Self::BincodeError(value)
+impl std::convert::From<bincode::error::DecodeError> for AttestationReportError {
+    fn from(value: bincode::error::DecodeError) -> Self {
+        Self::BincodeError(BincodeError::DecodeError(value))
     }
 }
 
@@ -926,7 +925,7 @@ pub enum IdBlockError {
     FileError(std::io::Error),
 
     /// Bincode Error Handling
-    BincodeError(bincode::ErrorKind),
+    BincodeError(BincodeError),
 
     /// TryFrom Slice Error handling
     FromSliceError(TryFromSliceError),
@@ -978,15 +977,52 @@ impl std::convert::From<std::io::Error> for IdBlockError {
     }
 }
 
-impl std::convert::From<bincode::ErrorKind> for IdBlockError {
-    fn from(value: bincode::ErrorKind) -> Self {
-        Self::BincodeError(value)
-    }
-}
-
 impl std::convert::From<TryFromSliceError> for IdBlockError {
     fn from(value: TryFromSliceError) -> Self {
         Self::FromSliceError(value)
+    }
+}
+
+/// Errors when decoding/encoding binary data
+#[derive(Debug)]
+pub enum BincodeError {
+    /// Error when decoding binary data
+    DecodeError(bincode::error::DecodeError),
+
+    /// Error when encoding binary data
+    EncodeError(bincode::error::EncodeError),
+}
+
+impl std::fmt::Display for BincodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::DecodeError(e) => write!(f, "Bincode decode error: {e}"),
+            Self::EncodeError(e) => write!(f, "Bincode encode error: {e}"),
+        }
+    }
+}
+
+impl From<bincode::error::DecodeError> for MeasurementError {
+    fn from(e: bincode::error::DecodeError) -> Self {
+        Self::BincodeError(BincodeError::DecodeError(e))
+    }
+}
+
+impl From<bincode::error::EncodeError> for MeasurementError {
+    fn from(e: bincode::error::EncodeError) -> Self {
+        Self::BincodeError(BincodeError::EncodeError(e))
+    }
+}
+
+impl From<bincode::error::DecodeError> for IdBlockError {
+    fn from(e: bincode::error::DecodeError) -> Self {
+        Self::BincodeError(BincodeError::DecodeError(e))
+    }
+}
+
+impl From<bincode::error::EncodeError> for IdBlockError {
+    fn from(e: bincode::error::EncodeError) -> Self {
+        Self::BincodeError(BincodeError::EncodeError(e))
     }
 }
 
@@ -1000,7 +1036,7 @@ pub enum MeasurementError {
     UUIDError(uuid::Error),
 
     /// Bincode Error Handling
-    BincodeError(bincode::ErrorKind),
+    BincodeError(BincodeError),
 
     /// File Error Handling
     FileError(std::io::Error),
@@ -1095,12 +1131,6 @@ impl std::convert::From<uuid::Error> for MeasurementError {
     }
 }
 
-impl std::convert::From<bincode::ErrorKind> for MeasurementError {
-    fn from(value: bincode::ErrorKind) -> Self {
-        Self::BincodeError(value)
-    }
-}
-
 impl std::convert::From<std::io::Error> for MeasurementError {
     fn from(value: std::io::Error) -> Self {
         Self::FileError(value)
@@ -1180,7 +1210,7 @@ impl From<ErrorStack> for SessionError {
 
 #[cfg(test)]
 mod tests {
-    use bincode::ErrorKind;
+    use bincode::error::DecodeError;
 
     use super::*;
     use std::{
@@ -1436,7 +1466,7 @@ mod tests {
     #[test]
     fn test_id_block_error_complete() {
         let slice_err: Result<[u8; 2], TryFromSliceError> = vec![1u8].as_slice().try_into();
-        let bincode_err: ErrorKind = bincode::ErrorKind::Custom("test".into());
+        let bincode_err: DecodeError = DecodeError::Other("test");
 
         let variants = vec![
             ArrayError::VectorError("test".into()).into(),
@@ -1463,7 +1493,7 @@ mod tests {
     #[test]
     fn test_measurement_error_complete() {
         let slice_err: Result<[u8; 2], TryFromSliceError> = vec![1u8].as_slice().try_into();
-        let bincode_err: ErrorKind = bincode::ErrorKind::Custom("test".into());
+        let bincode_err: DecodeError = DecodeError::Other("test");
 
         let uuid_err = uuid::Uuid::try_from("").unwrap_err();
 

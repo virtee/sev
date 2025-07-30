@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Operations to build and interact with an SEV-ES VMSA
-use crate::{error::MeasurementError, measurement::vcpu_types::CpuType, util::array::Array};
+use crate::{
+    error::MeasurementError, measurement::vcpu_types::CpuType, util::array::Array, BINCODE_CFG,
+};
+use bincode::{Decode, Encode};
 use bitfield::bitfield;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, fmt, str::FromStr};
@@ -81,7 +84,7 @@ impl fmt::Debug for VMMType {
 /// The layout of a VMCB struct is documented in Table B-1 of the
 /// AMD64 Architecture Programmer’s Manual, Volume 2: System Programming
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, Encode, Decode)]
 struct VmcbSeg {
     /// Segment selector: documented in Figure 4-3 of the
     /// AMD64 Architecture Programmer’s Manual, Volume 2: System Programming
@@ -174,7 +177,7 @@ impl Default for GuestFeatures {
 /// https://github.com/AMDESE/linux/blob/sev-snp-v12/arch/x86/include/asm/svm.h#L318
 /// (following the definitions in AMD APM Vol 2 Table B-4)
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, Encode, Decode)]
 struct SevEsSaveArea {
     es: VmcbSeg,
     cs: VmcbSeg,
@@ -401,13 +404,11 @@ impl VMSA {
 
     /// Return a vector containing the save area pages
     pub fn pages(&self, vcpus: usize) -> Result<Vec<Vec<u8>>, MeasurementError> {
-        let bsp_page = bincode::serialize(&self.bsp_save_area)
-            .map_err(|e| MeasurementError::BincodeError(*e))?;
-        let ap_save_area_bytes: Option<Vec<u8>> =
-            match self.ap_save_area.map(|v| bincode::serialize(&v)) {
-                Some(value) => Some(value.map_err(|e| MeasurementError::BincodeError(*e))?),
-                _ => None,
-            };
+        let bsp_page = bincode::encode_to_vec(self.bsp_save_area, BINCODE_CFG)?;
+        let ap_save_area_bytes: Option<Vec<u8>> = self
+            .ap_save_area
+            .map(|v| bincode::encode_to_vec(v, BINCODE_CFG))
+            .transpose()?;
 
         let mut pages = Vec::new();
 

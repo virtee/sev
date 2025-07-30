@@ -29,6 +29,8 @@ use bitfield::bitfield;
 #[cfg(feature = "openssl")]
 use openssl::{ecdsa::EcdsaSig, sha::Sha384};
 
+use bincode::{Decode, Encode};
+
 const ATT_REP_FW_LEN: usize = 1184;
 const CHIP_ID_RANGE: Range<usize> = 0x1A0..0x1E0;
 const CPUID_FAMILY_ID_BYTES: usize = 0x188;
@@ -788,7 +790,7 @@ bitfield! {
     /// | 63:25  | -                 | Reserved. MBZ.                                                                                                     >
     ///
     #[repr(C)]
-    #[derive(Deserialize, Clone, Copy, Eq, PartialEq, Serialize, PartialOrd, Ord)]
+    #[derive(Deserialize, Clone, Copy, Eq, PartialEq, Serialize, PartialOrd, Ord, Decode, Encode)]
     pub struct GuestPolicy(u64);
     impl Debug;
     /// ABI_MINOR field: Indicates the minor API version.
@@ -904,7 +906,7 @@ bitfield! {
     /// Bit 7 indicates that SEV-TIO is enabled.
     /// Bits 8-63 are reserved.
     #[repr(C)]
-    #[derive(Deserialize, Clone, Copy, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+    #[derive(Deserialize, Clone, Copy, Serialize, PartialEq, Eq, PartialOrd, Ord, Decode, Encode)]
     pub struct PlatformInfo(u64);
     impl Debug;
     /// Returns the bit state of SMT
@@ -993,7 +995,7 @@ bitfield! {
     /// | 4:2    | SIGNING_KEY       | Encodes the key used to sign this report.                                                                          >
     /// | 5:31   | -                 | Reserved. Must be zero.                                                                                            >
     #[repr(C)]
-    #[derive(Deserialize, Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Serialize)]
+    #[derive(Deserialize, Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Serialize, Decode, Encode)]
     pub struct KeyInfo(u32);
     impl Debug;
     /// AUTHOR_KEY_EN field: Indicates that the digest of the author key is present in AUTHOR_KEY_DIGEST
@@ -1071,6 +1073,7 @@ impl Display for KeyInfo {
 mod tests {
 
     use super::*;
+    use crate::BINCODE_CFG;
     use std::{convert::TryInto, io::Write};
 
     #[test]
@@ -1487,8 +1490,9 @@ Signature:
         let original = PlatformInfo(0b11111);
 
         // Test bincode
-        let binary = bincode::serialize(&original).unwrap();
-        let from_binary: PlatformInfo = bincode::deserialize(&binary).unwrap();
+        let binary = bincode::encode_to_vec(original, BINCODE_CFG).unwrap();
+        let (from_binary, _): (PlatformInfo, usize) =
+            bincode::decode_from_slice(&binary, BINCODE_CFG).unwrap();
         assert_eq!(original, from_binary);
     }
 
@@ -1497,8 +1501,9 @@ Signature:
         let original = KeyInfo(0b11111);
 
         // Test bincode
-        let binary = bincode::serialize(&original).unwrap();
-        let from_binary: KeyInfo = bincode::deserialize(&binary).unwrap();
+        let binary = bincode::encode_to_vec(original, BINCODE_CFG).unwrap();
+        let (from_binary, _): (KeyInfo, usize) =
+            bincode::decode_from_slice(&binary, BINCODE_CFG).unwrap();
         assert_eq!(original, from_binary);
         assert!(from_binary.author_key_en());
         assert!(from_binary.mask_chip_key());
@@ -1514,8 +1519,9 @@ Signature:
         original.set_debug_allowed(true);
 
         // Test bincode
-        let binary = bincode::serialize(&original).unwrap();
-        let from_binary: GuestPolicy = bincode::deserialize(&binary).unwrap();
+        let binary = bincode::encode_to_vec(original, BINCODE_CFG).unwrap();
+        let (from_binary, _): (GuestPolicy, usize) =
+            bincode::decode_from_slice(&binary, BINCODE_CFG).unwrap();
         assert_eq!(original, from_binary);
     }
 
@@ -1540,15 +1546,30 @@ Signature:
         // Verify serialization/deserialization preserves max values
         assert_eq!(
             platform_info,
-            bincode::deserialize(&bincode::serialize(&platform_info).unwrap()).unwrap()
+            bincode::decode_from_slice(
+                &bincode::encode_to_vec(platform_info, BINCODE_CFG).unwrap(),
+                BINCODE_CFG
+            )
+            .unwrap()
+            .0
         );
         assert_eq!(
             key_info,
-            bincode::deserialize(&bincode::serialize(&key_info).unwrap()).unwrap()
+            bincode::decode_from_slice(
+                &bincode::encode_to_vec(key_info, BINCODE_CFG).unwrap(),
+                BINCODE_CFG
+            )
+            .unwrap()
+            .0
         );
         assert_eq!(
             guest_policy,
-            bincode::deserialize(&bincode::serialize(&guest_policy).unwrap()).unwrap()
+            bincode::decode_from_slice(
+                &bincode::encode_to_vec(guest_policy, BINCODE_CFG).unwrap(),
+                BINCODE_CFG
+            )
+            .unwrap()
+            .0
         );
     }
 
