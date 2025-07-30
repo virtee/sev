@@ -4,6 +4,7 @@ use crate::firmware::guest::{parse_tcb, write_tcb};
 pub(crate) use crate::firmware::linux::host as FFI;
 /// A representation of the type of data provided to [parse_table](crate::firmware::host::parse_table)
 pub use crate::firmware::linux::host::types::RawData;
+use bincode::{Decode, Encode};
 
 #[cfg(target_os = "linux")]
 use crate::error::CertError;
@@ -47,7 +48,7 @@ impl BitOrAssign for SnpPlatformStatusFlags {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, Encode, Decode)]
 #[repr(C)]
 /// Certificates which are accepted for [CertTableEntry](self::CertTableEntry)
 pub enum CertType {
@@ -70,7 +71,7 @@ pub enum CertType {
     CRL,
 
     /// Other (Specify GUID)
-    OTHER(uuid::Uuid),
+    OTHER(#[bincode(with_serde)] uuid::Uuid),
 }
 
 impl Display for CertType {
@@ -152,7 +153,7 @@ impl PartialOrd for CertType {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, Encode, Decode)]
 #[repr(C)]
 /// An entry with information regarding a specific certificate.
 pub struct CertTableEntry {
@@ -456,7 +457,20 @@ impl TryFrom<FFI::types::SnpSetConfig> for Config {
 /// TcbVersion represents the version of the firmware.
 ///
 /// (Chapter 2.2; Table 3)
-#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Default,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+    Decode,
+    Encode,
+)]
 #[repr(C)]
 pub struct TcbVersion {
     /// Current FMC fw version
@@ -563,7 +577,7 @@ bitfield! {
     /// |0|MASK_CHIP_ID|Indicates that the CHIP_ID field in the attestation report will alwaysbe zero.|
     /// |1|MASK_CHIP_KEY|Indicates that the VCEK is not used in attestation and guest key derivation.|
     #[repr(C)]
-    #[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Decode, Encode)]
     pub struct MaskId(u32);
     impl Debug;
     /// Indicates that the CHIP_ID field in the attestation report will alwaysbe zero.
@@ -770,6 +784,7 @@ impl Display for WrappedVlekHashstick {
 mod tests {
 
     use super::*;
+    use crate::BINCODE_CFG;
     use uuid::Uuid;
 
     #[test]
@@ -1294,8 +1309,9 @@ mod tests {
         ];
 
         for cert_type in cert_types {
-            let serialized = bincode::serialize(&cert_type).unwrap();
-            let deserialized: CertType = bincode::deserialize(&serialized).unwrap();
+            let serialized = bincode::encode_to_vec(&cert_type, BINCODE_CFG).unwrap();
+            let (deserialized, _): (CertType, usize) =
+                bincode::decode_from_slice(&serialized, BINCODE_CFG).unwrap();
             assert_eq!(cert_type, deserialized);
         }
     }
@@ -1352,8 +1368,9 @@ mod tests {
     fn test_cert_table_entry_deserialization() {
         let entry = CertTableEntry::new(CertType::ARK, vec![1, 2, 3, 4]);
 
-        let serialized = bincode::serialize(&entry).unwrap();
-        let deserialized: CertTableEntry = bincode::deserialize(&serialized).unwrap();
+        let serialized = bincode::encode_to_vec(&entry, BINCODE_CFG).unwrap();
+        let (deserialized, _): (CertTableEntry, usize) =
+            bincode::decode_from_slice(&serialized, BINCODE_CFG).unwrap();
 
         assert_eq!(entry.cert_type, deserialized.cert_type);
         assert_eq!(entry.data, deserialized.data);
@@ -1381,8 +1398,9 @@ mod tests {
     fn test_tcb_version_deserialization() {
         let tcb = TcbVersion::new(None, 1, 2, 3, 4);
 
-        let serialized = bincode::serialize(&tcb).unwrap();
-        let deserialized: TcbVersion = bincode::deserialize(&serialized).unwrap();
+        let serialized = bincode::encode_to_vec(tcb, BINCODE_CFG).unwrap();
+        let (deserialized, _): (TcbVersion, usize) =
+            bincode::decode_from_slice(&serialized, BINCODE_CFG).unwrap();
 
         assert_eq!(tcb, deserialized);
     }
@@ -1398,8 +1416,9 @@ mod tests {
         ];
 
         for mask in test_cases {
-            let serialized = bincode::serialize(&mask).unwrap();
-            let deserialized: MaskId = bincode::deserialize(&serialized).unwrap();
+            let serialized = bincode::encode_to_vec(mask, BINCODE_CFG).unwrap();
+            let (deserialized, _): (MaskId, usize) =
+                bincode::decode_from_slice(&serialized, BINCODE_CFG).unwrap();
 
             assert_eq!(mask.0, deserialized.0);
             assert_eq!(mask.mask_chip_id(), deserialized.mask_chip_id());
@@ -1531,14 +1550,14 @@ mod tests {
     }
     #[test]
     fn test_cert_table_entry_deserialize() {
-        use bincode::{deserialize, serialize};
-
         // Create a test entry
         let original = CertTableEntry::new(CertType::ARK, vec![0x41, 0x42, 0x43]);
 
         // Serialize and then deserialize
-        let serialized = serialize(&original).expect("Failed to serialize");
-        let deserialized: CertTableEntry = deserialize(&serialized).expect("Failed to deserialize");
+        let serialized =
+            bincode::encode_to_vec(&original, BINCODE_CFG).expect("Failed to serialize");
+        let (deserialized, _): (CertTableEntry, usize) =
+            bincode::decode_from_slice(&serialized, BINCODE_CFG).expect("Failed to deserialize");
 
         // Verify deserialized data matches original
         assert_eq!(deserialized.cert_type, original.cert_type);
@@ -1582,15 +1601,15 @@ mod tests {
 
     #[test]
     fn test_chain_visitor_methods() {
-        use bincode::{deserialize, serialize};
         // Test sequence visiting
         let chain_data = vec![
             CertTableEntry::new(CertType::ARK, vec![1]),
             CertTableEntry::new(CertType::ASK, vec![2]),
         ];
-        let serialized = serialize(&chain_data).expect("Failed to serialize");
-        let deserialized: Vec<CertTableEntry> =
-            deserialize(&serialized).expect("Failed to deserialize");
+        let serialized =
+            bincode::encode_to_vec(&chain_data, BINCODE_CFG).expect("Failed to serialize");
+        let (deserialized, _): (Vec<CertTableEntry>, usize) =
+            bincode::decode_from_slice(&serialized, BINCODE_CFG).expect("Failed to deserialize");
 
         assert_eq!(deserialized.len(), chain_data.len());
         assert_eq!(deserialized[0].cert_type, chain_data[0].cert_type);
@@ -1598,19 +1617,19 @@ mod tests {
 
     #[test]
     fn test_field_visitor_methods() {
-        use bincode::{deserialize, serialize};
-
         // Test various field types
         let bytes = vec![1u8, 2u8, 3u8];
-        let serialized = serialize(&bytes).expect("Failed to serialize");
-        let deserialized: Vec<u8> = deserialize(&serialized).expect("Failed to deserialize");
+        let serialized = bincode::encode_to_vec(&bytes, BINCODE_CFG).expect("Failed to serialize");
+        let (deserialized, _): (Vec<u8>, usize) =
+            bincode::decode_from_slice(&serialized, BINCODE_CFG).expect("Failed to deserialize");
 
         assert_eq!(deserialized, bytes);
 
         // Test string field
         let text = "test";
-        let serialized = serialize(&text).expect("Failed to serialize");
-        let deserialized: String = deserialize(&serialized).expect("Failed to deserialize");
+        let serialized = bincode::encode_to_vec(text, BINCODE_CFG).expect("Failed to serialize");
+        let (deserialized, _): (String, usize) =
+            bincode::decode_from_slice(&serialized, BINCODE_CFG).expect("Failed to deserialize");
 
         assert_eq!(deserialized, text);
     }

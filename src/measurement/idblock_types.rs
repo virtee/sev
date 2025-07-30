@@ -18,6 +18,7 @@ use crate::{
     error::IdBlockError, firmware::guest::GuestPolicy, measurement::snp::SnpLaunchDigest,
     util::array::Array,
 };
+use bincode::{Decode, Encode};
 
 pub(crate) const DEFAULT_ID_VERSION: u32 = 1;
 pub(crate) const DEFAULT_ID_POLICY: u64 = 0x30000;
@@ -41,7 +42,7 @@ pub(crate) const ECDSA_SIG_RESERVED: usize = 0x1ff - 0x90 + 1;
 
 /// Family-Id of the guest, provided by the guest owner and uninterpreted by the firmware.
 #[repr(C)]
-#[derive(Default, Serialize, Deserialize, Clone, Copy)]
+#[derive(Default, Serialize, Deserialize, Clone, Copy, Encode, Debug)]
 pub struct FamilyId([u8; ID_BLK_ID_BYTES]);
 
 impl FamilyId {
@@ -66,7 +67,7 @@ pub type ImageId = FamilyId;
 
 /// The way the ECDSA SEV signature is strucutred. Need it in this format to calculate the AUTH-ID.
 #[repr(C)]
-#[derive(Default, Serialize, Deserialize, Clone, Copy)]
+#[derive(Default, Serialize, Deserialize, Clone, Copy, Encode, Decode)]
 pub struct SevEcdsaSig {
     r: Array<u8, ECDSA_POINT_SIZE_BYTES>,
     s: Array<u8, ECDSA_POINT_SIZE_BYTES>,
@@ -128,7 +129,7 @@ impl TryFrom<(EcKey<Private>, &[u8])> for SevEcdsaSig {
 
 /// Data inside the SEV ECDSA key
 #[repr(C)]
-#[derive(Default, Serialize, Deserialize, Clone, Copy)]
+#[derive(Default, Serialize, Deserialize, Clone, Copy, Encode, Decode)]
 pub struct SevEcdsaKeyData {
     /// QX component of the ECDSA public key
     pub qx: Array<u8, ECDSA_POINT_SIZE_BYTES>,
@@ -139,7 +140,7 @@ pub struct SevEcdsaKeyData {
 }
 
 /// SEV ECDSA public key. Need it in this format to calculate the AUTH-ID.
-#[derive(Default, Serialize, Deserialize, Clone, Copy)]
+#[derive(Default, Serialize, Deserialize, Clone, Copy, Encode, Decode)]
 pub struct SevEcdsaPubKey {
     /// curve type for the public key (defaults to P384)
     pub curve: u32,
@@ -195,7 +196,7 @@ impl TryFrom<&EcKey<Private>> for SevEcdsaPubKey {
 
 /// SEV-SNP ID-BLOCK
 #[repr(C)]
-#[derive(Serialize, Deserialize, Clone, Copy)]
+#[derive(Serialize, Deserialize, Clone, Copy, Encode, Debug)]
 pub struct IdBlock {
     /// The expected launch digest of the guest (aka measurement)
     pub launch_digest: SnpLaunchDigest,
@@ -259,7 +260,7 @@ impl IdBlock {
 }
 
 #[repr(C)]
-#[derive(Serialize, Deserialize, Clone, Copy)]
+#[derive(Serialize, Deserialize, Clone, Copy, Decode, Encode)]
 ///ID Authentication Information Structure
 pub struct IdAuth {
     /// The algorithm of the ID Key. Defaults to P-384

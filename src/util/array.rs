@@ -15,11 +15,14 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use bincode::{Decode, Encode};
+
 /// Large array structure to serialize and default arrays larger than 32 bytes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct Array<T, const N: usize>(#[serde(with = "BigArray")] pub [T; N])
-where
-    T: Serialize + for<'a> Deserialize<'a>;
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Encode, Decode,
+)]
+#[serde(bound(serialize = "T: Serialize", deserialize = "T: Deserialize<'de>"))]
+pub struct Array<T, const N: usize>(#[serde(with = "BigArray")] pub [T; N]);
 
 impl<T, const N: usize> LowerHex for Array<T, N>
 where

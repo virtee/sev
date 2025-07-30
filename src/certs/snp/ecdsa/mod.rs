@@ -16,12 +16,13 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "openssl")]
 use openssl::{bn, ecdsa};
 
+use bincode::{Decode, Encode};
+
 #[repr(C)]
-#[derive(Default, Copy, Clone, Deserialize, Serialize, PartialOrd, Ord)]
+#[derive(Default, Copy, Clone, Deserialize, Serialize, Decode, Encode, PartialOrd, Ord)]
 /// ECDSA signature.
 pub struct Signature {
     r: Array<u8, 72>,
-
     s: Array<u8, 72>,
 }
 
@@ -163,6 +164,7 @@ impl TryFrom<&Signature> for Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::BINCODE_CFG;
 
     #[test]
     fn test_signature_default() {
@@ -292,10 +294,11 @@ mod tests {
     }
 
     #[test]
-    fn test_signature_serde() {
+    fn test_signature_bincode() {
         let sig: Signature = Default::default();
-        let serialized: Vec<u8> = bincode::serialize(&sig).unwrap();
-        let deserialized: Signature = bincode::deserialize(&serialized).unwrap();
+        let serialized: Vec<u8> = bincode::encode_to_vec(sig, BINCODE_CFG).unwrap();
+        let (deserialized, _): (Signature, usize) =
+            bincode::decode_from_slice(&serialized, BINCODE_CFG).unwrap();
         assert_eq!(sig, deserialized);
     }
 

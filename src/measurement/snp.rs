@@ -13,6 +13,7 @@ use crate::{
     },
     util::array::Array,
 };
+use bincode::{Decode, Encode};
 use hex::FromHex;
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
@@ -26,7 +27,7 @@ pub(crate) const LD_BYTES: usize = LD_BITS / 8;
 
 /// The expected launch digest of the guest
 #[repr(C)]
-#[derive(Debug, Default, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, Copy, Encode, Decode)]
 pub struct SnpLaunchDigest(Array<u8, LD_BYTES>);
 
 // Try from slice
