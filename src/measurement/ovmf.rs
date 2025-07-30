@@ -2,7 +2,9 @@
 
 //! Operations to handle ovmf data
 use crate::error::*;
+use crate::BINCODE_CFG;
 use bincode;
+use bincode::Decode;
 use byteorder::{ByteOrder, LittleEndian};
 use serde::Deserialize;
 use std::{
@@ -71,13 +73,14 @@ pub trait TryFromBytes {
 
 /// OVMF SEV Metadata Section Description
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Decode)]
 pub struct OvmfSevMetadataSectionDesc {
     /// Guest Physical Adress
     pub gpa: u32,
     /// Size
     pub size: u32,
     /// Section Type
+    #[bincode(with_serde)]
     pub section_type: SectionType,
 }
 
@@ -85,13 +88,15 @@ impl TryFromBytes for OvmfSevMetadataSectionDesc {
     type Error = MeasurementError;
     fn try_from_bytes(value: &[u8], offset: usize) -> Result<Self, Self::Error> {
         let value = &value[offset..offset + std::mem::size_of::<OvmfSevMetadataSectionDesc>()];
-        bincode::deserialize(value).map_err(|e| MeasurementError::BincodeError(*e))
+        let (decoded, _) = bincode::decode_from_slice(value, BINCODE_CFG)?;
+
+        Ok(decoded)
     }
 }
 
 /// OVMF Metadata Header
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Decode)]
 struct OvmfSevMetadataHeader {
     /// Header Signature
     signature: [u8; 4],
@@ -107,7 +112,8 @@ impl TryFromBytes for OvmfSevMetadataHeader {
     type Error = MeasurementError;
     fn try_from_bytes(value: &[u8], offset: usize) -> Result<Self, Self::Error> {
         let value = &value[offset..offset + std::mem::size_of::<OvmfSevMetadataHeader>()];
-        bincode::deserialize(value).map_err(|e| MeasurementError::BincodeError(*e))
+        let (decoded, _) = bincode::decode_from_slice(value, BINCODE_CFG)?;
+        Ok(decoded)
     }
 }
 
