@@ -9,7 +9,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
-          toolchain: 1.80.0
+          toolchain: 1.85.0
       - run: cargo fmt --all -- --check
 
   clippy-openssl:
@@ -20,7 +20,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-          toolchain: 1.80.0
+          toolchain: 1.85.0
       - run: cargo clippy --features=openssl,hw_tests,dangerous_hw_tests --all-targets -- -D clippy::all -D unused_imports -D warnings -D clippy::style
 
   clippy-crypto_nossl:
@@ -31,7 +31,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-          toolchain: 1.80.0
+          toolchain: 1.85.0
       - run: cargo clippy --features=crypto_nossl,hw_tests,dangerous_hw_tests --all-targets -- -D clippy::all -D unused_imports -D warnings -D clippy::style
 
   readme:

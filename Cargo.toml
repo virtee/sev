@@ -20,7 +20,7 @@ categories = [
     "hardware-support",
 ]
 exclude = [".gitignore", ".github/*"]
-rust-version = "1.80.0"
+rust-version = "1.85.0"
 
 [badges]
 # See https://doc.rust-lang.org/cargo/reference/manifest.html#the-badges-section
