@@ -12,14 +12,16 @@ use std::{
     str::FromStr,
 };
 
+use bincode::Encode;
 use uuid::{uuid, Uuid};
 
 use crate::error::*;
+use crate::BINCODE_CFG;
 
 type Sha256Hash = [u8; 32];
 
 /// GUID stored as little endian
-#[derive(Debug, Clone, Copy, Serialize, Default)]
+#[derive(Debug, Clone, Copy, Serialize, Default, Encode)]
 struct GuidLe {
     _data: [u8; 16],
 }
@@ -51,7 +53,7 @@ impl FromStr for GuidLe {
 
 /// SEV hash table entry
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Serialize, Default)]
+#[derive(Debug, Clone, Copy, Serialize, Default, Encode)]
 struct SevHashTableEntry {
     /// GUID of the SEV hash
     guid: GuidLe,
@@ -73,7 +75,7 @@ impl SevHashTableEntry {
 
 /// Table of SEV hashes
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Serialize, Default)]
+#[derive(Debug, Clone, Copy, Serialize, Default, Encode)]
 struct SevHashTable {
     /// GUID of the SEV hash table entry
     guid: GuidLe,
@@ -106,7 +108,7 @@ impl SevHashTable {
 
 /// Padded SEV hash table
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Serialize, Default)]
+#[derive(Debug, Clone, Copy, Serialize, Default, Encode)]
 struct PaddedSevHashTable {
     ht: SevHashTable,
     padding: [u8; PaddedSevHashTable::PADDING_SIZE],
@@ -192,7 +194,9 @@ impl SevHashes {
 
         let padded_hash_table = PaddedSevHashTable::new(sev_hash_table);
 
-        bincode::serialize(&padded_hash_table).map_err(|e| MeasurementError::BincodeError(*e))
+        let bytes = bincode::encode_to_vec(padded_hash_table, BINCODE_CFG)?;
+
+        Ok(bytes)
     }
 
     /// Construct an SEV Hash page using hash table.

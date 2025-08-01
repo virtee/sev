@@ -18,6 +18,8 @@ use sev::measurement::{
     snp::SnpLaunchDigest,
 };
 
+use sev::BINCODE_CFG;
+
 // Testing that the appropriate id-block and key digests are being generated.
 #[test]
 fn test_id_block_and_key_digests() {
@@ -45,8 +47,8 @@ fn test_id_block_and_key_digests() {
     .unwrap();
 
     // Converting ID-block and key digests into BASE64
-    let id_block_string =
-        general_purpose::STANDARD.encode(bincode::serialize(&block_calculations.id_block).unwrap());
+    let id_block_string = general_purpose::STANDARD
+        .encode(bincode::encode_to_vec(block_calculations.id_block, BINCODE_CFG).unwrap());
     let id_key_digest_string = general_purpose::STANDARD
         .encode::<Vec<u8>>(block_calculations.id_key_digest.try_into().unwrap());
     let auth_key_digest_string = general_purpose::STANDARD
@@ -136,7 +138,8 @@ fn test_auth_block_generation() {
     let mut id_sig_file = fs::File::open("./tests/measurement/test_id_sig.bin").unwrap();
     let mut id_block_bytes = Vec::new();
     id_sig_file.read_to_end(&mut id_block_bytes).unwrap();
-    let id_block_sig: SevEcdsaSig = bincode::deserialize(&id_block_bytes).unwrap();
+    let (id_block_sig, _): (SevEcdsaSig, usize) =
+        bincode::decode_from_slice(&id_block_bytes, BINCODE_CFG).unwrap();
 
     // Get author private test key from pem
     let author_ec_priv_key = load_priv_key(auth_path).unwrap();
@@ -148,7 +151,8 @@ fn test_auth_block_generation() {
     let mut auth_sig_file = fs::File::open("./tests/measurement/test_auth_sig.bin").unwrap();
     let mut auth_block_bytes = Vec::new();
     auth_sig_file.read_to_end(&mut auth_block_bytes).unwrap();
-    let auth_block_sig: SevEcdsaSig = bincode::deserialize(&auth_block_bytes).unwrap();
+    let (auth_block_sig, _): (SevEcdsaSig, usize) =
+        bincode::decode_from_slice(&auth_block_bytes, BINCODE_CFG).unwrap();
 
     let auth_block = IdAuth::new(
         None,
@@ -160,7 +164,7 @@ fn test_auth_block_generation() {
     );
 
     // Generate Generate auth_block string
-    let id_auth_bytes = bincode::serialize(&auth_block).unwrap();
+    let id_auth_bytes = bincode::encode_to_vec(auth_block, BINCODE_CFG).unwrap();
     let id_auth_str = general_purpose::STANDARD.encode(id_auth_bytes);
 
     // Comparing auth_blocks
