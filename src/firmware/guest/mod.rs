@@ -76,7 +76,7 @@ impl Firmware {
     /// ];
     ///
     /// // Create a message version (OPTIONAL)
-    /// let msg_ver: u8 = 1;
+    /// let msg_ver: u32 = 1;
     ///
     /// // Open a connection to the AMD Secure Processor.
     /// let mut fw: Firmware = Firmware::open().unwrap();
