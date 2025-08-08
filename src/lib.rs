@@ -135,6 +135,14 @@ use std::io::{Read, Write};
 
 use serde::{Deserialize, Serialize};
 
+use bincode::config::{Configuration, Fixint, LittleEndian};
+
+/// Bincode configuration for serializing and deserializing using little-endian and fixed
+/// integer encoding.
+pub const BINCODE_CFG: Configuration<LittleEndian, Fixint> = bincode::config::standard()
+    .with_little_endian()
+    .with_fixed_int_encoding();
+
 /// A representation for EPYC generational product lines.
 ///
 /// Implements type conversion traits to determine which generation

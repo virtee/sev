@@ -21,6 +21,7 @@ use crate::{
         },
         snp::SnpLaunchDigest,
     },
+    BINCODE_CFG,
 };
 
 /// Generate an AUTH-BLOCK using 2 EC P-384 keys and an already calculated ID-BlOCK
@@ -33,18 +34,14 @@ pub fn gen_id_auth_block(
     let id_ec_pub_key = SevEcdsaPubKey::try_from(&id_ec_priv_key)?;
     let id_sig = SevEcdsaSig::try_from((
         id_ec_priv_key,
-        bincode::serialize(id_block)
-            .map_err(|e| IdBlockError::BincodeError(*e))?
-            .as_slice(),
+        bincode::encode_to_vec(id_block, BINCODE_CFG)?.as_slice(),
     ))?;
 
     let author_ec_priv_key = load_priv_key(author_key_file)?;
     let author_pub_key = SevEcdsaPubKey::try_from(&author_ec_priv_key)?;
     let author_sig = SevEcdsaSig::try_from((
         author_ec_priv_key,
-        bincode::serialize(&id_ec_pub_key)
-            .map_err(|e| IdBlockError::BincodeError(*e))?
-            .as_slice(),
+        bincode::encode_to_vec(id_ec_pub_key, BINCODE_CFG)?.as_slice(),
     ))?;
 
     Ok(IdAuth::new(
@@ -116,12 +113,7 @@ pub fn generate_key_digest(key_path: PathBuf) -> Result<SnpLaunchDigest, IdBlock
     let pub_key = SevEcdsaPubKey::try_from(&ec_key)?;
 
     Ok(SnpLaunchDigest::new(
-        sha384(
-            bincode::serialize(&pub_key)
-                .map_err(|e| IdBlockError::BincodeError(*e))?
-                .as_slice(),
-        )
-        .try_into()?,
+        sha384(bincode::encode_to_vec(pub_key, BINCODE_CFG)?.as_slice()).try_into()?,
     ))
 }
 
