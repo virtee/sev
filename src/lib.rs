@@ -116,7 +116,7 @@ pub use util::cached_chain;
 #[cfg(all(feature = "openssl", feature = "sev"))]
 use certs::sev::sev;
 
-#[cfg(all(feature = "sev"))]
+#[cfg(feature = "sev")]
 use certs::sev::ca::{Certificate, Chain as CertSevCaChain};
 
 #[cfg(all(
@@ -126,7 +126,7 @@ use certs::sev::ca::{Certificate, Chain as CertSevCaChain};
 ))]
 use certs::snp::ca::Chain as CertSnpCaChain;
 
-#[cfg(all(feature = "sev"))]
+#[cfg(feature = "sev")]
 use certs::sev::builtin as SevBuiltin;
 
 #[cfg(all(
@@ -293,7 +293,7 @@ impl Generation {
     }
 }
 
-#[cfg(all(feature = "sev"))]
+#[cfg(feature = "sev")]
 impl From<Generation> for CertSevCaChain {
     fn from(generation: Generation) -> CertSevCaChain {
         use codicon::Decoder;
