@@ -116,16 +116,24 @@ pub use util::cached_chain;
 #[cfg(all(feature = "openssl", feature = "sev"))]
 use certs::sev::sev;
 
-#[cfg(all(feature = "sev", feature = "openssl"))]
+#[cfg(feature = "sev")]
 use certs::sev::ca::{Certificate, Chain as CertSevCaChain};
 
-#[cfg(all(not(feature = "sev"), feature = "snp", feature = "openssl"))]
+#[cfg(all(
+    not(feature = "sev"),
+    feature = "snp",
+    any(feature = "openssl", feature = "crypto_nossl")
+))]
 use certs::snp::ca::Chain as CertSnpCaChain;
 
-#[cfg(all(feature = "sev", feature = "openssl"))]
+#[cfg(feature = "sev")]
 use certs::sev::builtin as SevBuiltin;
 
-#[cfg(all(not(feature = "sev"), feature = "snp", feature = "openssl"))]
+#[cfg(all(
+    not(feature = "sev"),
+    feature = "snp",
+    any(feature = "openssl", feature = "crypto_nossl")
+))]
 use certs::snp::builtin as SnpBuiltin;
 
 #[cfg(any(feature = "sev", feature = "snp"))]
@@ -293,7 +301,7 @@ impl Generation {
     }
 }
 
-#[cfg(all(feature = "sev", feature = "openssl"))]
+#[cfg(feature = "sev")]
 impl From<Generation> for CertSevCaChain {
     fn from(generation: Generation) -> CertSevCaChain {
         use codicon::Decoder;
@@ -318,7 +326,11 @@ impl From<Generation> for CertSevCaChain {
     }
 }
 
-#[cfg(all(not(feature = "sev"), feature = "snp", feature = "openssl"))]
+#[cfg(all(
+    not(feature = "sev"),
+    feature = "snp",
+    any(feature = "openssl", feature = "crypto_nossl")
+))]
 impl From<Generation> for CertSnpCaChain {
     fn from(gen: Generation) -> CertSnpCaChain {
         let (ark, ask) = match gen {
