@@ -2,9 +2,10 @@
 
 //! Operations for managing the SEV platform.
 
-pub use crate::firmware::linux::host::types::PlatformStatusFlags;
-
 use crate::firmware::host::State;
+pub use crate::firmware::linux::host::types::PlatformStatusFlags;
+use crate::util::{array::Array, TypeLoad, TypeSave};
+use crate::{Decoder, Encoder};
 
 #[cfg(feature = "openssl")]
 use std::convert::TryInto;
@@ -18,9 +19,6 @@ use crate::certs::sev::{
 #[cfg(feature = "openssl")]
 use openssl::{ec::EcKey, ecdsa::EcdsaSig, pkey::Public, sha::Sha256};
 
-use crate::util::{TypeLoad, TypeSave};
-
-use crate::util::array::Array;
 use serde::{Deserialize, Serialize};
 
 use std::{
@@ -77,7 +75,7 @@ impl std::fmt::Display for Build {
     }
 }
 
-impl codicon::Decoder<()> for Build {
+impl Decoder<()> for Build {
     type Error = std::io::Error;
 
     fn decode(mut reader: impl Read, _: ()) -> std::io::Result<Self> {
@@ -85,7 +83,7 @@ impl codicon::Decoder<()> for Build {
     }
 }
 
-impl codicon::Encoder<()> for Build {
+impl Encoder<()> for Build {
     type Error = std::io::Error;
 
     fn encode(&self, mut writer: impl Write, _: ()) -> std::io::Result<()> {

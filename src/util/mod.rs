@@ -5,7 +5,6 @@
 pub mod array;
 pub mod cached_chain;
 mod impl_const_id;
-#[cfg(feature = "snp")]
 pub mod parser;
 
 use std::{

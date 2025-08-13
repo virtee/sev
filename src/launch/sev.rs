@@ -8,6 +8,7 @@ use crate::{
     error::{FirmwareError, SevError},
     firmware::host::Version,
     util::{TypeLoad, TypeSave},
+    Decoder, Encoder,
 };
 
 #[cfg(target_os = "linux")]
@@ -377,7 +378,7 @@ pub struct Start {
     pub session: Session,
 }
 
-impl codicon::Decoder<()> for Start {
+impl Decoder<()> for Start {
     type Error = std::io::Error;
 
     fn decode(mut reader: impl Read, _: ()) -> std::io::Result<Self> {
@@ -385,7 +386,7 @@ impl codicon::Decoder<()> for Start {
     }
 }
 
-impl codicon::Encoder<()> for Start {
+impl Encoder<()> for Start {
     type Error = std::io::Error;
 
     fn encode(&self, mut writer: impl Write, _: ()) -> std::io::Result<()> {
@@ -454,7 +455,7 @@ pub struct Secret {
     pub ciphertext: Vec<u8>,
 }
 
-impl codicon::Decoder<()> for Secret {
+impl Decoder<()> for Secret {
     type Error = std::io::Error;
 
     fn decode(mut reader: impl Read, _: ()) -> std::io::Result<Self> {
@@ -465,7 +466,7 @@ impl codicon::Decoder<()> for Secret {
     }
 }
 
-impl codicon::Encoder<()> for Secret {
+impl Encoder<()> for Secret {
     type Error = std::io::Error;
 
     fn encode(&self, mut writer: impl Write, _: ()) -> std::io::Result<()> {
@@ -485,7 +486,7 @@ pub struct Measurement {
     pub mnonce: [u8; 16],
 }
 
-impl codicon::Decoder<()> for Measurement {
+impl Decoder<()> for Measurement {
     type Error = std::io::Error;
 
     fn decode(mut reader: impl Read, _: ()) -> std::io::Result<Self> {
@@ -493,7 +494,7 @@ impl codicon::Decoder<()> for Measurement {
     }
 }
 
-impl codicon::Encoder<()> for Measurement {
+impl Encoder<()> for Measurement {
     type Error = std::io::Error;
 
     fn encode(&self, mut writer: impl Write, _: ()) -> std::io::Result<()> {

@@ -288,8 +288,6 @@ impl Generation {
 #[cfg(all(feature = "sev", feature = "openssl"))]
 impl From<Generation> for CertSevCaChain {
     fn from(generation: Generation) -> CertSevCaChain {
-        use codicon::Decoder;
-
         let (ark, ask) = match generation {
             #[cfg(feature = "sev")]
             Generation::Naples => (SevBuiltin::naples::ARK, SevBuiltin::naples::ASK),
@@ -414,4 +412,44 @@ impl Generation {
             Self::Turin => "Turin".to_string(),
         }
     }
+}
+
+/// Trait used to express encoding relationships.
+pub trait Encoder<T> {
+    /// The error type returned when encoding fails.
+    ///
+    /// This is typically an [`std::io::Error`] if the encoding process
+    /// involves I/O, but it can be any type that implements [`std::error::Error`].
+    /// Implementors should use an error type that captures all possible
+    /// failure modes for their encoding logic, including I/O failures
+    /// and serialization errors.
+    type Error;
+
+    /// Encodes to the writer with the given parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Self::Error`] if writing to the output fails or
+    /// if the value cannot be encoded for any reason.
+    fn encode(&self, writer: impl Write, params: T) -> Result<(), Self::Error>;
+}
+
+/// Trait used to express decoding relationships.
+pub trait Decoder<T>: Sized {
+    /// The error type returned when decoding fails.
+    ///
+    /// This is typically an [`std::io::Error`] if the decoding process
+    /// involves I/O, but it can be any type that implements [`std::error::Error`].
+    /// Implementors should use an error type that captures all possible
+    /// failure modes for their decoding logic, including I/O failures,
+    /// data corruption, or invalid formats.
+    type Error;
+
+    /// Decodes from the reader with the given parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Self::Error`] if reading from the input fails or
+    /// if the value cannot be decoded due to invalid or incomplete data.
+    fn decode(reader: impl Read, params: T) -> Result<Self, Self::Error>;
 }

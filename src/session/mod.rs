@@ -5,7 +5,7 @@
 
 mod key;
 
-use crate::{error::SessionError, firmware::host::Build};
+use crate::{error::SessionError, firmware::host::Build, Encoder};
 
 use super::*;
 

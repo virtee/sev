@@ -17,7 +17,7 @@ impl<U> PrivateKey<U> {
 macro_rules! prv_decoder {
     ($($cert:path => $usage:path),+) => {
         $(
-            impl codicon::Decoder<&$cert> for PrivateKey<$usage> {
+            impl Decoder<&$cert> for PrivateKey<$usage> {
                 type Error = Error;
 
                 fn decode(mut reader: impl Read, params: &$cert) -> Result<Self> {
@@ -47,7 +47,7 @@ prv_decoder! {
     ca::Certificate => ca::Usage
 }
 
-impl<U> codicon::Encoder<()> for PrivateKey<U> {
+impl<U> Encoder<()> for PrivateKey<U> {
     type Error = Error;
 
     fn encode(&self, mut writer: impl Write, _: ()) -> Result<()> {
@@ -98,11 +98,7 @@ where
     Usage: PartialEq<U>,
 {
     /// Verifies the provided signatures signed or did not sign the message digest provided.
-    pub fn verify(
-        &self,
-        msg: &impl codicon::Encoder<Body, Error = Error>,
-        sig: &Signature,
-    ) -> Result<()> {
+    pub fn verify(&self, msg: &impl Encoder<Body, Error = Error>, sig: &Signature) -> Result<()> {
         let usage = sig.usage == self.usage;
         let kind = sig.kind == self.key.id();
         let hash = sig.hash == self.hash;

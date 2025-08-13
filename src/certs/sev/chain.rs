@@ -17,7 +17,7 @@ pub struct Chain {
     pub sev: sev::Chain,
 }
 
-impl codicon::Decoder<()> for Chain {
+impl Decoder<()> for Chain {
     type Error = Error;
 
     fn decode(mut reader: impl Read, _: ()) -> Result<Self> {
@@ -27,7 +27,7 @@ impl codicon::Decoder<()> for Chain {
     }
 }
 
-impl codicon::Encoder<()> for Chain {
+impl Encoder<()> for Chain {
     type Error = Error;
 
     fn encode(&self, mut writer: impl Write, _: ()) -> Result<()> {
