@@ -119,7 +119,7 @@ macro_rules! traits {
                 }
             }
 
-            impl codicon::Decoder<Preamble> for Contents<[u8; $size]> {
+            impl Decoder<Preamble> for Contents<[u8; $size]> {
                 type Error = Error;
 
                 fn decode(mut reader: impl Read, preamble: Preamble) -> Result<Self> {
@@ -188,7 +188,7 @@ impl PartialEq for Certificate {
     }
 }
 
-impl codicon::Decoder<()> for Certificate {
+impl Decoder<()> for Certificate {
     type Error = Error;
 
     fn decode(mut reader: impl Read, _: ()) -> Result<Self> {
@@ -207,7 +207,7 @@ impl codicon::Decoder<()> for Certificate {
     }
 }
 
-impl codicon::Encoder<()> for Certificate {
+impl Encoder<()> for Certificate {
     type Error = Error;
 
     fn encode(&self, mut writer: impl Write, _: ()) -> Result<()> {
@@ -219,7 +219,7 @@ impl codicon::Encoder<()> for Certificate {
 }
 
 #[cfg(feature = "openssl")]
-impl codicon::Encoder<super::Body> for Certificate {
+impl Encoder<super::Body> for Certificate {
     type Error = Error;
 
     fn encode(&self, mut writer: impl Write, _: super::Body) -> Result<()> {

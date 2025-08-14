@@ -31,8 +31,8 @@ impl std::fmt::Debug for Certificate {
 #[cfg(feature = "openssl")]
 impl std::fmt::Display for Certificate {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        use codicon::Encoder;
         use std::fmt::Error;
+        use Encoder;
 
         let key = PublicKey::try_from(self).or(Err(Error))?;
 
@@ -72,7 +72,7 @@ impl<U: Copy + Into<crate::certs::sev::Usage>> PartialEq<U> for Certificate {
     }
 }
 
-impl codicon::Decoder<()> for Certificate {
+impl Decoder<()> for Certificate {
     type Error = Error;
 
     fn decode(mut reader: impl Read, params: ()) -> Result<Self> {
@@ -85,7 +85,7 @@ impl codicon::Decoder<()> for Certificate {
     }
 }
 
-impl codicon::Encoder<()> for Certificate {
+impl Encoder<()> for Certificate {
     type Error = Error;
 
     fn encode(&self, mut writer: impl Write, _: ()) -> Result<()> {
@@ -97,7 +97,7 @@ impl codicon::Encoder<()> for Certificate {
 }
 
 #[cfg(feature = "openssl")]
-impl codicon::Encoder<Body> for Certificate {
+impl Encoder<Body> for Certificate {
     type Error = Error;
 
     fn encode(&self, mut writer: impl Write, _: Body) -> Result<()> {
@@ -113,7 +113,7 @@ impl<'de> de::Deserialize<'de> for Certificate {
     where
         D: de::Deserializer<'de>,
     {
-        use codicon::Decoder;
+        use Decoder;
 
         let bytes = ByteBuf::deserialize(deserializer)?;
         Self::decode(bytes.as_slice(), ()).map_err(serde::de::Error::custom)

@@ -29,7 +29,7 @@ impl Certificate {
     }
 }
 
-impl codicon::Decoder<()> for Certificate {
+impl Decoder<()> for Certificate {
     type Error = Error;
 
     fn decode(mut reader: impl Read, _: ()) -> Result<Self> {

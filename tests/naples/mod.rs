@@ -17,4 +17,4 @@ const PDH: &[u8] = include_bytes!("pdh.cert");
 use ::sev::certs::sev::*;
 
 #[allow(unused_imports)]
-use codicon::*;
+use ::sev::{Decoder, Encoder};

@@ -18,7 +18,7 @@ use crate::{
     certs::sev::{ca::Chain as CaChain, Chain as FullChain},
     firmware::host::Firmware,
     sev::Certificate,
-    Generation,
+    Decoder, Generation,
 };
 
 #[cfg(feature = "openssl")]
@@ -34,9 +34,6 @@ use std::{
 
 #[cfg(feature = "openssl")]
 use std::io::Cursor;
-
-#[cfg(feature = "openssl")]
-use codicon::Decoder;
 
 fn append_rest<P: AsRef<Path>>(path: P) -> PathBuf {
     let mut path = path.as_ref().to_path_buf();
