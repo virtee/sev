@@ -308,6 +308,7 @@ pub(crate) fn write_tcb(
     h.write_bytes(match generation {
         Generation::Milan | Generation::Genoa => tcb.to_legacy_bytes(),
         Generation::Turin => tcb.to_turin_bytes(),
+        #[cfg(feature = "sev")]
         _ => {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Unsupported,
@@ -327,6 +328,7 @@ pub(crate) fn parse_tcb(
             Ok(TcbVersion::from_legacy_bytes(&stepper.parse_bytes()?))
         }
         Generation::Turin => Ok(TcbVersion::from_turin_bytes(&stepper.parse_bytes()?)),
+        #[cfg(feature = "sev")]
         _ => Err(std::io::Error::new(
             std::io::ErrorKind::Unsupported,
             "Unsupported Processor Generation for TCB parsing",
