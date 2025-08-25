@@ -44,6 +44,9 @@ use super::linux::host::types::SnpCommit;
 #[cfg(all(target_os = "linux", feature = "snp"))]
 use super::linux::host::types::{SnpPlatformStatus as FFISnpPlatformStatus, SnpSetConfig};
 
+#[cfg(all(target_os = "linux", feature = "snp"))]
+use crate::parser::ByteParser;
+
 /// The CPU-unique identifier for the platform.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Identifier(pub Vec<u8>);
@@ -216,6 +219,7 @@ impl Firmware {
     #[cfg(feature = "snp")]
     pub fn snp_platform_status(&mut self) -> Result<SnpPlatformStatus, UserApiError> {
         // Create an empty buffer for the SNP Platform Status to be written to by the Kernel.
+
         let mut platform_status: FFISnpPlatformStatus = FFISnpPlatformStatus::default();
 
         let mut cmd_buf = Command::from_mut(&mut platform_status);
@@ -227,7 +231,10 @@ impl Firmware {
         // Determine SEV-SNP CPU generation in order to parse platform status accordingly.
         let generation = Generation::identify_host_generation()?;
 
-        Ok((generation, &*platform_status).try_into()?)
+        Ok(SnpPlatformStatus::from_bytes_with(
+            &platform_status.buffer,
+            generation,
+        )?)
     }
 
     /// The firmware will perform the following actions:  
@@ -303,9 +310,7 @@ impl Firmware {
 
         let generation = Generation::identify_host_generation()?;
 
-        let mut buffer: [u8; 432] = [0; 432];
-
-        hashstick.write_bytes(&mut buffer[..], generation)?;
+        let buffer = hashstick.to_bytes_with(generation)?;
 
         let parsed_bytes: FFIWrappedVlekHashstick =
             FFIWrappedVlekHashstick::try_from(buffer.as_slice())?;

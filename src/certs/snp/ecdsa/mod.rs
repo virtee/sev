@@ -3,7 +3,15 @@
 #[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
 use super::*;
 
-use crate::{util::array::Array, util::parser::ByteParser};
+use crate::{
+    parser::{ByteParser, Decoder, Encoder},
+    util::{
+        array::Array,
+        parser_helper::{ReadExt, WriteExt},
+    },
+};
+
+use std::io::{Read, Result, Write};
 
 #[cfg(feature = "openssl")]
 use crate::certs::snp::{AsLeBytes, FromLe};
@@ -11,15 +19,11 @@ use crate::certs::snp::{AsLeBytes, FromLe};
 #[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
 use std::convert::TryFrom;
 
-use serde::{Deserialize, Serialize};
-
 #[cfg(feature = "openssl")]
 use openssl::{bn, ecdsa};
 
-use bincode::{Decode, Encode};
-
 #[repr(C)]
-#[derive(Default, Copy, Clone, Deserialize, Serialize, Decode, Encode, PartialOrd, Ord)]
+#[derive(Default, Copy, Clone, PartialOrd, Ord)]
 /// ECDSA signature.
 pub struct Signature {
     r: Array<u8, 72>,
@@ -42,6 +46,24 @@ impl Signature {
     }
 }
 
+impl Decoder<()> for Signature {
+    fn decode(reader: &mut impl Read, _: ()) -> Result<Self> {
+        let r = reader.read_bytes()?;
+        let s = reader.read_bytes()?;
+        Ok(Self { r, s })
+    }
+}
+
+impl Encoder<()> for Signature {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<()> {
+        writer.write_bytes(self.r, ())?;
+        writer.write_bytes(self.s, ())?;
+        // Reserved bytes
+        writer.skip_bytes::<368>()?;
+        Ok(())
+    }
+}
+
 impl std::fmt::Debug for Signature {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
@@ -53,28 +75,9 @@ impl std::fmt::Debug for Signature {
     }
 }
 
-impl ByteParser for Signature {
+impl ByteParser<()> for Signature {
     type Bytes = [u8; 512];
-    #[inline(always)]
-    fn from_bytes(bytes: Self::Bytes) -> Self {
-        let mut r = [0; 72];
-        let mut s = [0; 72];
-        r.copy_from_slice(&bytes[0..72]);
-        s.copy_from_slice(&bytes[72..144]);
-
-        Self::new(Array(r), Array(s))
-    }
-    #[inline(always)]
-    fn to_bytes(&self) -> Self::Bytes {
-        let mut bytes = [0u8; 512];
-        bytes[0..72].copy_from_slice(&*self.r);
-        bytes[72..144].copy_from_slice(&*self.s);
-        bytes
-    }
-    #[inline(always)]
-    fn default() -> Self {
-        Default::default()
-    }
+    const EXPECTED_LEN: Option<usize> = Some(512);
 }
 
 impl Eq for Signature {}
@@ -164,7 +167,6 @@ impl TryFrom<&Signature> for Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::BINCODE_CFG;
 
     #[test]
     fn test_signature_default() {
@@ -294,12 +296,13 @@ mod tests {
     }
 
     #[test]
-    fn test_signature_bincode() {
+    fn test_signature_serialization() {
         let sig: Signature = Default::default();
-        let serialized: Vec<u8> = bincode::encode_to_vec(sig, BINCODE_CFG).unwrap();
-        let (deserialized, _): (Signature, usize) =
-            bincode::decode_from_slice(&serialized, BINCODE_CFG).unwrap();
-        assert_eq!(sig, deserialized);
+
+        let buffer = sig.to_bytes().unwrap();
+        // Decode back
+        let decoded = Signature::from_bytes(&buffer).unwrap();
+        assert_eq!(sig, decoded);
     }
 
     #[test]
