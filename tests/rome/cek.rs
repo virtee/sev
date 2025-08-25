@@ -22,8 +22,11 @@ fn encode() {
 fn verify() {
     use ::sev::certs::sev::builtin::rome::ASK;
 
-    let ask = ca::Certificate::decode(ASK, ()).unwrap();
-    let cek = sev::Certificate::decode(CEK, ()).unwrap();
+    let mut mut_cek = CEK;
+    let mut mut_ask = ASK;
+
+    let ask = ca::Certificate::decode(&mut mut_ask, ()).unwrap();
+    let cek = sev::Certificate::decode(&mut mut_cek, ()).unwrap();
 
     (&ask, &cek).verify().unwrap();
 }

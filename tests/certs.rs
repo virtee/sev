@@ -13,7 +13,7 @@ mod sev {
     #[test]
     fn test_for_verify_false_positive() {
         use ::sev::certs::sev::*;
-        use codicon::Decoder;
+        use ::sev::parser::Decoder;
 
         // https://github.com/enarx/enarx/issues/520
         let naples_cek = sev::Certificate::decode(&mut &naples::CEK[..], ()).unwrap();
@@ -26,6 +26,7 @@ mod sev {
 mod snp {
 
     use sev::certs::snp::{builtin::milan, ca, Certificate, Chain, Verifiable};
+    use sev::parser::ByteParser;
 
     const TEST_MILAN_VCEK_DER: &[u8] = include_bytes!("certs_data/vcek_milan.der");
 
@@ -86,7 +87,7 @@ mod snp {
         let chain = Chain { ca, vek: vcek };
 
         let report_bytes = hex::decode(TEST_MILAN_ATTESTATION_REPORT).unwrap();
-        let report: AttestationReport = AttestationReport::from_bytes(&report_bytes).unwrap();
+        let report = AttestationReport::from_bytes(report_bytes.as_slice()).unwrap();
 
         assert_eq!((&chain, &report).verify().ok(), Some(()));
     }
@@ -105,7 +106,7 @@ mod snp {
 
         let mut report_bytes = hex::decode(TEST_MILAN_ATTESTATION_REPORT).unwrap();
         report_bytes[21] ^= 0x80;
-        let report = AttestationReport::from_bytes(&report_bytes).unwrap();
+        let report = AttestationReport::from_bytes(report_bytes.as_slice()).unwrap();
 
         assert_eq!((&chain, &report).verify().ok(), None);
     }
