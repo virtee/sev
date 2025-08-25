@@ -720,9 +720,6 @@ impl error::Error for CertError {}
 #[derive(Debug)]
 /// Errors which may be encountered when handling attestation reports
 pub enum AttestationReportError {
-    /// Bincode Error Handling
-    BincodeError(BincodeError),
-
     /// Unsuported Attestation Report Version
     UnsupportedReportVersion(u32),
 
@@ -736,7 +733,6 @@ pub enum AttestationReportError {
 impl std::fmt::Display for AttestationReportError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            AttestationReportError::BincodeError(e) => write!(f, "Bincode error encountered: {e}"),
             AttestationReportError::MaskedChipId => write!(f, "MASK_CHIP_ID is enabled, preventing the identification of the CPU generation."),
             AttestationReportError::UnsupportedReportVersion(version) => write!(f, "The encountered Attestation Report version {version} is not supported by the library yet."),
             AttestationReportError::UnsupportedField(field) => write!(f,"The field {field} is not supported in the provided Attestation Report version"),
@@ -747,12 +743,6 @@ impl std::fmt::Display for AttestationReportError {
 impl From<AttestationReportError> for std::io::Error {
     fn from(value: AttestationReportError) -> Self {
         std::io::Error::new(std::io::ErrorKind::Other, value)
-    }
-}
-
-impl std::convert::From<bincode::error::DecodeError> for AttestationReportError {
-    fn from(value: bincode::error::DecodeError) -> Self {
-        Self::BincodeError(BincodeError::DecodeError(value))
     }
 }
 
@@ -924,9 +914,6 @@ pub enum IdBlockError {
     /// File Error Handling
     FileError(std::io::Error),
 
-    /// Bincode Error Handling
-    BincodeError(BincodeError),
-
     /// TryFrom Slice Error handling
     FromSliceError(TryFromSliceError),
 
@@ -944,7 +931,6 @@ impl std::fmt::Display for IdBlockError {
             IdBlockError::CryptoErrorStack(e) => write!(f, "Error when with OPENSSL: {e}"),
             IdBlockError::LargeArrayError(e) => write!(f, "{e}"),
             IdBlockError::FileError(e) => write!(f, "Failed handling file: {e}"),
-            IdBlockError::BincodeError(e) => write!(f, "Bincode error encountered: {e}"),
             IdBlockError::FromSliceError(e) => write!(f, "Error converting slice: {e}"),
             IdBlockError::SevCurveError() => {
                 write!(f, "Wrong curve used in the provided private key")
@@ -983,49 +969,6 @@ impl std::convert::From<TryFromSliceError> for IdBlockError {
     }
 }
 
-/// Errors when decoding/encoding binary data
-#[derive(Debug)]
-pub enum BincodeError {
-    /// Error when decoding binary data
-    DecodeError(bincode::error::DecodeError),
-
-    /// Error when encoding binary data
-    EncodeError(bincode::error::EncodeError),
-}
-
-impl std::fmt::Display for BincodeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::DecodeError(e) => write!(f, "Bincode decode error: {e}"),
-            Self::EncodeError(e) => write!(f, "Bincode encode error: {e}"),
-        }
-    }
-}
-
-impl From<bincode::error::DecodeError> for MeasurementError {
-    fn from(e: bincode::error::DecodeError) -> Self {
-        Self::BincodeError(BincodeError::DecodeError(e))
-    }
-}
-
-impl From<bincode::error::EncodeError> for MeasurementError {
-    fn from(e: bincode::error::EncodeError) -> Self {
-        Self::BincodeError(BincodeError::EncodeError(e))
-    }
-}
-
-impl From<bincode::error::DecodeError> for IdBlockError {
-    fn from(e: bincode::error::DecodeError) -> Self {
-        Self::BincodeError(BincodeError::DecodeError(e))
-    }
-}
-
-impl From<bincode::error::EncodeError> for IdBlockError {
-    fn from(e: bincode::error::EncodeError) -> Self {
-        Self::BincodeError(BincodeError::EncodeError(e))
-    }
-}
-
 /// Errors which may be encountered when calculating the guest measurement.
 #[derive(Debug)]
 pub enum MeasurementError {
@@ -1034,9 +977,6 @@ pub enum MeasurementError {
 
     /// UUID Error handling
     UUIDError(uuid::Error),
-
-    /// Bincode Error Handling
-    BincodeError(BincodeError),
 
     /// File Error Handling
     FileError(std::io::Error),
@@ -1083,7 +1023,6 @@ impl std::fmt::Display for MeasurementError {
         match self {
             MeasurementError::FromSliceError(e) => write!(f, "Error converting slice: {e}"),
             MeasurementError::UUIDError(e) => write!(f, "UUID Error encountered: {e}"),
-            MeasurementError::BincodeError(e) => write!(f, "Bincode error encountered: {e}"),
             MeasurementError::FileError(e) => write!(f, "Failed handling file: {e}"),
             MeasurementError::FromHexError(e) => write!(f, "Converting hex to vector error: {e}"),
             MeasurementError::GCTXError(e) => write!(f, "GCTX Error Encountered: {e}"),
@@ -1210,7 +1149,6 @@ impl From<ErrorStack> for SessionError {
 
 #[cfg(test)]
 mod tests {
-    use bincode::error::DecodeError;
 
     use super::*;
     use std::{
@@ -1466,12 +1404,10 @@ mod tests {
     #[test]
     fn test_id_block_error_complete() {
         let slice_err: Result<[u8; 2], TryFromSliceError> = vec![1u8].as_slice().try_into();
-        let bincode_err: DecodeError = DecodeError::Other("test");
 
         let variants = vec![
             ArrayError::VectorError("test".into()).into(),
             std::io::Error::new(std::io::ErrorKind::Other, "test").into(),
-            bincode_err.into(),
             slice_err.unwrap_err().into(),
             IdBlockError::SevCurveError(),
             IdBlockError::SevEcsdsaSigError("test".into()),
@@ -1493,14 +1429,12 @@ mod tests {
     #[test]
     fn test_measurement_error_complete() {
         let slice_err: Result<[u8; 2], TryFromSliceError> = vec![1u8].as_slice().try_into();
-        let bincode_err: DecodeError = DecodeError::Other("test");
 
         let uuid_err = uuid::Uuid::try_from("").unwrap_err();
 
         let variants = vec![
             slice_err.unwrap_err().into(),
             uuid_err.into(),
-            bincode_err.into(),
             std::io::Error::new(std::io::ErrorKind::Other, "test").into(),
             hex::FromHexError::OddLength.into(),
             GCTXError::UnknownError.into(),
@@ -1524,7 +1458,6 @@ mod tests {
                         err,
                         MeasurementError::FromSliceError(_)
                             | MeasurementError::UUIDError(_)
-                            | MeasurementError::BincodeError(_)
                             | MeasurementError::FileError(_)
                             | MeasurementError::FromHexError(_)
                             | MeasurementError::GCTXError(_)

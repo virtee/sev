@@ -5,20 +5,20 @@
 use std::{
     convert::{TryFrom, TryInto},
     fs,
-    io::Read,
     path::PathBuf,
 };
 
 use base64::{engine::general_purpose, Engine as _};
 use hex::{self, FromHex};
 
-use sev::measurement::{
-    idblock::{load_priv_key, snp_calculate_id},
-    idblock_types::{IdAuth, SevEcdsaPubKey, SevEcdsaSig},
-    snp::SnpLaunchDigest,
+use sev::{
+    measurement::{
+        idblock::{load_priv_key, snp_calculate_id},
+        idblock_types::{IdAuth, SevEcdsaPubKey, SevEcdsaSig},
+        snp::SnpLaunchDigest,
+    },
+    parser::{ByteParser, Decoder},
 };
-
-use sev::BINCODE_CFG;
 
 // Testing that the appropriate id-block and key digests are being generated.
 #[test]
@@ -47,12 +47,12 @@ fn test_id_block_and_key_digests() {
     .unwrap();
 
     // Converting ID-block and key digests into BASE64
-    let id_block_string = general_purpose::STANDARD
-        .encode(bincode::encode_to_vec(block_calculations.id_block, BINCODE_CFG).unwrap());
-    let id_key_digest_string = general_purpose::STANDARD
-        .encode::<Vec<u8>>(block_calculations.id_key_digest.try_into().unwrap());
-    let auth_key_digest_string = general_purpose::STANDARD
-        .encode::<Vec<u8>>(block_calculations.auth_key_digest.try_into().unwrap());
+    let id_block_string =
+        general_purpose::STANDARD.encode(block_calculations.id_block.to_bytes().unwrap());
+    let id_key_digest_string =
+        general_purpose::STANDARD.encode(block_calculations.id_key_digest.to_bytes().unwrap());
+    let auth_key_digest_string =
+        general_purpose::STANDARD.encode(block_calculations.auth_key_digest.to_bytes().unwrap());
 
     // Comparing results
     assert_eq!(id_block_string, expected_id_block);
@@ -136,10 +136,8 @@ fn test_auth_block_generation() {
 
     // Get id signature from file (can't regenerate, different each time)
     let mut id_sig_file = fs::File::open("./tests/measurement/test_id_sig.bin").unwrap();
-    let mut id_block_bytes = Vec::new();
-    id_sig_file.read_to_end(&mut id_block_bytes).unwrap();
-    let (id_block_sig, _): (SevEcdsaSig, usize) =
-        bincode::decode_from_slice(&id_block_bytes, BINCODE_CFG).unwrap();
+
+    let id_block_sig = SevEcdsaSig::decode(&mut id_sig_file, ()).unwrap();
 
     // Get author private test key from pem
     let author_ec_priv_key = load_priv_key(auth_path).unwrap();
@@ -149,10 +147,7 @@ fn test_auth_block_generation() {
 
     // Get auth signature from file (can't regenerate, different each time)
     let mut auth_sig_file = fs::File::open("./tests/measurement/test_auth_sig.bin").unwrap();
-    let mut auth_block_bytes = Vec::new();
-    auth_sig_file.read_to_end(&mut auth_block_bytes).unwrap();
-    let (auth_block_sig, _): (SevEcdsaSig, usize) =
-        bincode::decode_from_slice(&auth_block_bytes, BINCODE_CFG).unwrap();
+    let auth_block_sig = SevEcdsaSig::decode(&mut auth_sig_file, ()).unwrap();
 
     let auth_block = IdAuth::new(
         None,
@@ -164,7 +159,7 @@ fn test_auth_block_generation() {
     );
 
     // Generate Generate auth_block string
-    let id_auth_bytes = bincode::encode_to_vec(auth_block, BINCODE_CFG).unwrap();
+    let id_auth_bytes = auth_block.to_bytes().unwrap();
     let id_auth_str = general_purpose::STANDARD.encode(id_auth_bytes);
 
     // Comparing auth_blocks

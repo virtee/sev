@@ -20,9 +20,12 @@ fn encode() {
 #[cfg(feature = "openssl")]
 #[test]
 fn verify() {
-    let cek = sev::Certificate::decode(CEK, ()).unwrap();
-    let oca = sev::Certificate::decode(OCA, ()).unwrap();
-    let pek = sev::Certificate::decode(PEK, ()).unwrap();
+    let mut mut_cek = CEK;
+    let mut mut_oca = OCA;
+    let mut mut_pek = PEK;
+    let cek = sev::Certificate::decode(&mut mut_cek, ()).unwrap();
+    let oca = sev::Certificate::decode(&mut mut_oca, ()).unwrap();
+    let pek = sev::Certificate::decode(&mut mut_pek, ()).unwrap();
 
     (&cek, &pek).verify().unwrap();
     assert!((&pek, &cek).verify().is_err());
