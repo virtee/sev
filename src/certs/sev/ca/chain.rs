@@ -17,10 +17,8 @@ pub struct Chain {
     pub ark: Certificate,
 }
 
-impl codicon::Decoder<()> for Chain {
-    type Error = Error;
-
-    fn decode(mut reader: impl Read, _: ()) -> Result<Self> {
+impl Decoder<()> for Chain {
+    fn decode(mut reader: &mut impl Read, _: ()) -> Result<Self> {
         let ask = Certificate::decode(&mut reader, ())?;
         if Usage::try_from(&ask)? != Usage::ASK {
             return Err(ErrorKind::InvalidInput)?;
@@ -35,10 +33,8 @@ impl codicon::Decoder<()> for Chain {
     }
 }
 
-impl codicon::Encoder<()> for Chain {
-    type Error = Error;
-
-    fn encode(&self, mut writer: impl Write, _: ()) -> Result<()> {
+impl Encoder<()> for Chain {
+    fn encode(&self, mut writer: &mut impl Write, _: ()) -> Result<()> {
         self.ask.encode(&mut writer, ())?;
         self.ark.encode(&mut writer, ())
     }

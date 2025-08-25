@@ -119,10 +119,9 @@ macro_rules! traits {
                 }
             }
 
-            impl codicon::Decoder<Preamble> for Contents<[u8; $size]> {
-                type Error = Error;
+            impl Decoder<Preamble> for Contents<[u8; $size]> {
 
-                fn decode(mut reader: impl Read, preamble: Preamble) -> Result<Self> {
+                fn decode(reader: &mut impl Read, preamble: Preamble) -> Result<Self> {
                     let mut pubexp = [0u8; $size];
                     let mut modulus = [0u8; $size];
                     let mut signature = [0u8; $size];
@@ -188,10 +187,8 @@ impl PartialEq for Certificate {
     }
 }
 
-impl codicon::Decoder<()> for Certificate {
-    type Error = Error;
-
-    fn decode(mut reader: impl Read, _: ()) -> Result<Self> {
+impl Decoder<()> for Certificate {
+    fn decode(reader: &mut impl Read, _: ()) -> Result<Self> {
         let p = Preamble {
             ver: 1u32.to_le(),
             data: reader.load()?,
@@ -207,10 +204,8 @@ impl codicon::Decoder<()> for Certificate {
     }
 }
 
-impl codicon::Encoder<()> for Certificate {
-    type Error = Error;
-
-    fn encode(&self, mut writer: impl Write, _: ()) -> Result<()> {
+impl Encoder<()> for Certificate {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<()> {
         match unsafe { self.preamble.size()? } {
             Size::Small => writer.save(unsafe { &self.small }),
             Size::Large => writer.save(unsafe { &self.large }),
@@ -219,10 +214,8 @@ impl codicon::Encoder<()> for Certificate {
 }
 
 #[cfg(feature = "openssl")]
-impl codicon::Encoder<super::Body> for Certificate {
-    type Error = Error;
-
-    fn encode(&self, mut writer: impl Write, _: super::Body) -> Result<()> {
+impl Encoder<super::Body> for Certificate {
+    fn encode(&self, writer: &mut impl Write, _: super::Body) -> Result<()> {
         match unsafe { self.preamble.size()? } {
             Size::Small => writer.save(unsafe { &self.small.body }),
             Size::Large => writer.save(unsafe { &self.large.body }),

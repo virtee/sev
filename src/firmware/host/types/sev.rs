@@ -2,9 +2,10 @@
 
 //! Operations for managing the SEV platform.
 
-pub use crate::firmware::linux::host::types::PlatformStatusFlags;
-
 use crate::firmware::host::State;
+pub use crate::firmware::linux::host::types::PlatformStatusFlags;
+use crate::parser::{Decoder, Encoder};
+use crate::util::{array::Array, TypeLoad, TypeSave};
 
 #[cfg(feature = "openssl")]
 use std::convert::TryInto;
@@ -17,11 +18,6 @@ use crate::certs::sev::{
 
 #[cfg(feature = "openssl")]
 use openssl::{ec::EcKey, ecdsa::EcdsaSig, pkey::Public, sha::Sha256};
-
-use crate::util::{TypeLoad, TypeSave};
-
-use crate::util::array::Array;
-use serde::{Deserialize, Serialize};
 
 use std::{
     fmt::Debug,
@@ -36,7 +32,7 @@ const MEASURABLE_BYTES: usize = MNONCE_SIZE + DIGEST_SIZE + POLICY_SIZE;
 
 /// Information about the SEV platform version.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Version {
     /// The major version number.
     pub major: u8,
@@ -62,7 +58,7 @@ impl From<u16> for Version {
 
 /// A description of the SEV platform's build information.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd)]
 pub struct Build {
     /// The version information.
     pub version: Version,
@@ -77,18 +73,14 @@ impl std::fmt::Display for Build {
     }
 }
 
-impl codicon::Decoder<()> for Build {
-    type Error = std::io::Error;
-
-    fn decode(mut reader: impl Read, _: ()) -> std::io::Result<Self> {
+impl Decoder<()> for Build {
+    fn decode(reader: &mut impl Read, _: ()) -> std::io::Result<Self> {
         reader.load()
     }
 }
 
-impl codicon::Encoder<()> for Build {
-    type Error = std::io::Error;
-
-    fn encode(&self, mut writer: impl Write, _: ()) -> std::io::Result<()> {
+impl Encoder<()> for Build {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> std::io::Result<()> {
         writer.save(self)
     }
 }
@@ -113,7 +105,7 @@ pub struct Status {
 }
 
 /// An attestation report structure.
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default)]
 #[repr(C)]
 pub struct LegacyAttestationReport {
     /// 128-bit Nonce from the Command Buffer.

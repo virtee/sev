@@ -5,11 +5,11 @@
 
 mod key;
 
-use crate::{error::SessionError, firmware::host::Build};
+use crate::{error::SessionError, firmware::host::Build, parser::Encoder};
 
 use super::*;
 
-use std::io::{Error, ErrorKind, Result};
+use std::io::{ErrorKind, Result};
 
 use rdrand::{ErrorCode, RdRand};
 

@@ -7,6 +7,7 @@
 use crate::{
     error::{FirmwareError, SevError},
     firmware::host::Version,
+    parser::{Decoder, Encoder},
     util::{TypeLoad, TypeSave},
 };
 
@@ -315,7 +316,7 @@ impl<'de> Deserialize<'de> for PolicyFlags {
 /// Describes a policy that the AMD Secure Processor will
 /// enforce.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct Policy {
     /// The various policy optons are encoded as bit flags.
     pub flags: PolicyFlags,
@@ -365,7 +366,7 @@ pub struct Session {
 
 /// Used to establish a secure session with the AMD SP.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Start {
     /// The tenant's policy for this SEV guest.
     pub policy: Policy,
@@ -377,18 +378,14 @@ pub struct Start {
     pub session: Session,
 }
 
-impl codicon::Decoder<()> for Start {
-    type Error = std::io::Error;
-
-    fn decode(mut reader: impl Read, _: ()) -> std::io::Result<Self> {
+impl Decoder<()> for Start {
+    fn decode(reader: &mut impl Read, _: ()) -> std::io::Result<Self> {
         reader.load()
     }
 }
 
-impl codicon::Encoder<()> for Start {
-    type Error = std::io::Error;
-
-    fn encode(&self, mut writer: impl Write, _: ()) -> std::io::Result<()> {
+impl Encoder<()> for Start {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> std::io::Result<()> {
         writer.save(self)
     }
 }
@@ -454,10 +451,8 @@ pub struct Secret {
     pub ciphertext: Vec<u8>,
 }
 
-impl codicon::Decoder<()> for Secret {
-    type Error = std::io::Error;
-
-    fn decode(mut reader: impl Read, _: ()) -> std::io::Result<Self> {
+impl Decoder<()> for Secret {
+    fn decode(reader: &mut impl Read, _: ()) -> std::io::Result<Self> {
         let header = reader.load()?;
         let mut ciphertext = vec![];
         let _ = reader.read_to_end(&mut ciphertext)?;
@@ -465,10 +460,8 @@ impl codicon::Decoder<()> for Secret {
     }
 }
 
-impl codicon::Encoder<()> for Secret {
-    type Error = std::io::Error;
-
-    fn encode(&self, mut writer: impl Write, _: ()) -> std::io::Result<()> {
+impl Encoder<()> for Secret {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> std::io::Result<()> {
         writer.save(&self.header)?;
         writer.write_all(&self.ciphertext)
     }
@@ -485,18 +478,14 @@ pub struct Measurement {
     pub mnonce: [u8; 16],
 }
 
-impl codicon::Decoder<()> for Measurement {
-    type Error = std::io::Error;
-
-    fn decode(mut reader: impl Read, _: ()) -> std::io::Result<Self> {
+impl Decoder<()> for Measurement {
+    fn decode(reader: &mut impl Read, _: ()) -> std::io::Result<Self> {
         reader.load()
     }
 }
 
-impl codicon::Encoder<()> for Measurement {
-    type Error = std::io::Error;
-
-    fn encode(&self, mut writer: impl Write, _: ()) -> std::io::Result<()> {
+impl Encoder<()> for Measurement {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> std::io::Result<()> {
         writer.save(self)
     }
 }

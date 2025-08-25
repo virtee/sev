@@ -5,6 +5,7 @@
 use super::*;
 
 use serde::{Deserialize, Serialize};
+// use std::result::Result;
 
 /// A complete certificate chain.
 #[repr(C)]
@@ -17,20 +18,16 @@ pub struct Chain {
     pub sev: sev::Chain,
 }
 
-impl codicon::Decoder<()> for Chain {
-    type Error = Error;
-
-    fn decode(mut reader: impl Read, _: ()) -> Result<Self> {
+impl Decoder<()> for Chain {
+    fn decode(mut reader: &mut impl Read, _: ()) -> Result<Self> {
         let sev = sev::Chain::decode(&mut reader, ())?;
         let ca = ca::Chain::decode(&mut reader, ())?;
         Ok(Self { ca, sev })
     }
 }
 
-impl codicon::Encoder<()> for Chain {
-    type Error = Error;
-
-    fn encode(&self, mut writer: impl Write, _: ()) -> Result<()> {
+impl Encoder<()> for Chain {
+    fn encode(&self, mut writer: &mut impl Write, _: ()) -> Result<()> {
         self.sev.encode(&mut writer, ())?;
         self.ca.encode(&mut writer, ())
     }
