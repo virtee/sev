@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
-use super::byte_parser::ByteParser;
+use crate::parser::Encoder;
 use std::io::Write;
 
 pub trait WriteExt: Write {
-    fn write_bytes<T: ByteParser>(&mut self, value: T) -> Result<(), std::io::Error> {
-        self.write_all(value.to_bytes().as_ref())
+    /// Write a value using its Encoder implementation and the provided params
+    fn write_bytes<T, P>(&mut self, value: T, params: P) -> Result<(), std::io::Error>
+    where
+        Self: Sized,
+        T: Encoder<P>,
+    {
+        value.encode(self, params)
     }
 
     fn skip_bytes<const SKIP: usize>(&mut self) -> Result<&mut Self, std::io::Error>
@@ -45,7 +50,7 @@ mod write_ext_tests {
     fn test_write_bytes_no_skip() -> Result<(), std::io::Error> {
         let mut writer = MockWriter::default();
         let value: u32 = 0x12345678;
-        writer.write_bytes(value)?;
+        writer.write_bytes(value, ())?;
 
         assert_eq!(writer.written, [0x78, 0x56, 0x34, 0x12]);
         Ok(())
@@ -55,7 +60,7 @@ mod write_ext_tests {
     fn test_write_bytes_with_skip() -> Result<(), std::io::Error> {
         let mut writer = MockWriter::default();
         let value: u16 = 0xABCD;
-        writer.skip_bytes::<2>()?.write_bytes(value)?;
+        writer.skip_bytes::<2>()?.write_bytes(value, ())?;
 
         assert_eq!(writer.written, [0, 0, 0xCD, 0xAB]);
         Ok(())

@@ -5,8 +5,7 @@
 pub mod array;
 pub mod cached_chain;
 mod impl_const_id;
-#[cfg(feature = "snp")]
-pub mod parser;
+pub mod parser_helper;
 
 use std::{
     io::{Read, Result, Write},

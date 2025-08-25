@@ -1,30 +1,45 @@
 // SPDX-License-Identifier: Apache-2.0
-use super::byte_parser::ByteParser;
+// use super::byte_parser::ByteParser;
+use crate::parser::Decoder;
 use std::io::Read;
 
 pub trait ReadExt: Read {
-    fn parse_bytes<T>(&mut self) -> Result<T, std::io::Error>
-    where
-        T: ByteParser<Bytes: AsMut<[u8]>>,
-    {
-        let mut bytes = T::default().to_bytes();
-        self.read_exact(bytes.as_mut())?;
-        Ok(T::from_bytes(bytes))
-    }
-
-    fn skip_bytes<const SKIP: usize>(mut self) -> Result<Self, std::io::Error>
+    /// Convenience: read a value with unit params.
+    fn read_bytes<T>(&mut self) -> Result<T, std::io::Error>
     where
         Self: Sized,
+        T: Decoder<()>,
     {
-        if SKIP != 0 {
-            let mut skipped_bytes = [0u8; SKIP];
-            self.read_exact(&mut skipped_bytes)?;
+        T::decode(self, ())
+    }
 
-            if skipped_bytes != [0; SKIP] {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Skipped bytes were expected to be zeroed.",
-                ));
+    /// Full version with explicit params.
+    fn read_bytes_with<T, P>(&mut self, params: P) -> Result<T, std::io::Error>
+    where
+        Self: Sized,
+        T: Decoder<P>,
+    {
+        T::decode(self, params)
+    }
+
+    /// Read SKIP bytes and verify they are zero; returns a mutable reference to the same reader.
+    fn skip_bytes<const SKIP: usize>(&mut self) -> Result<&mut Self, std::io::Error> {
+        if SKIP != 0 {
+            // Read in chunks to avoid huge stack allocations for large SKIP.
+            const CHUNK: usize = 256;
+            let mut buf = [0u8; CHUNK];
+            let mut remaining = SKIP;
+
+            while remaining > 0 {
+                let n = remaining.min(CHUNK);
+                self.read_exact(&mut buf[..n])?;
+                if buf[..n].iter().any(|&b| b != 0) {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "Skipped bytes were expected to be zeroed.",
+                    ));
+                }
+                remaining -= n;
             }
         }
         Ok(self)
@@ -69,7 +84,7 @@ mod read_ext_tests {
     fn test_no_skip_valid_data() {
         let data = vec![0x12, 0x34, 0x56, 0x78];
         let mut reader = MockReader::new(data);
-        let result: Result<u32, _> = reader.parse_bytes();
+        let result: Result<u32, _> = reader.read_bytes();
         assert_eq!(result.unwrap(), 0x78563412);
     }
 
@@ -77,8 +92,8 @@ mod read_ext_tests {
     #[test]
     fn test_skip_valid_data() {
         let data = vec![0, 0, 0, 0, 0x12, 0x34, 0x56, 0x78];
-        let reader = MockReader::new(data);
-        let result: Result<u32, _> = reader.skip_bytes::<4>().unwrap().parse_bytes();
+        let mut reader = MockReader::new(data);
+        let result: Result<u32, _> = reader.skip_bytes::<4>().unwrap().read_bytes();
         assert_eq!(result.unwrap(), 0x78563412);
     }
 
@@ -86,7 +101,7 @@ mod read_ext_tests {
     #[test]
     fn test_skip_invalid_data() {
         let data = vec![0, 0, 1, 0, 0x12, 0x34, 0x56, 0x78];
-        let reader = MockReader::new(data);
+        let mut reader = MockReader::new(data);
         let result = reader.skip_bytes::<4>();
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidData);
@@ -97,7 +112,7 @@ mod read_ext_tests {
     fn test_read_fails() {
         let data = vec![0x12, 0x34];
         let mut reader = MockReader::new(data);
-        let result: Result<u32, _> = reader.parse_bytes();
+        let result: Result<u32, _> = reader.read_bytes();
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().kind(), io::ErrorKind::UnexpectedEof);
     }
@@ -107,7 +122,7 @@ mod read_ext_tests {
     fn test_zero_length_read() {
         let data: Vec<u8> = vec![];
         let mut reader = MockReader::new(data);
-        let result: Result<[u8; 0], _> = reader.parse_bytes();
+        let result: Result<[u8; 0], _> = reader.read_bytes();
         assert!(result.is_ok());
     }
 
@@ -116,7 +131,7 @@ mod read_ext_tests {
     fn test_empty_reader() {
         let data: Vec<u8> = vec![];
         let mut reader = MockReader::new(data);
-        let result: Result<u32, _> = reader.parse_bytes();
+        let result: Result<u32, _> = reader.read_bytes();
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().kind(), io::ErrorKind::UnexpectedEof);
     }

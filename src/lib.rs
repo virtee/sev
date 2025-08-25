@@ -110,6 +110,11 @@ pub mod vmsa;
 /// Error module.
 pub mod error;
 
+/// Module for Encoding and Decoding types.
+pub mod parser;
+
+use crate::parser::Decoder;
+
 #[cfg(all(feature = "sev", feature = "dangerous_hw_tests"))]
 pub use util::cached_chain;
 
@@ -142,14 +147,6 @@ use std::convert::TryFrom;
 use std::io::{Read, Write};
 
 use serde::{Deserialize, Serialize};
-
-use bincode::config::{Configuration, Fixint, LittleEndian};
-
-/// Bincode configuration for serializing and deserializing using little-endian and fixed
-/// integer encoding.
-pub const BINCODE_CFG: Configuration<LittleEndian, Fixint> = bincode::config::standard()
-    .with_little_endian()
-    .with_fixed_int_encoding();
 
 /// A representation for EPYC generational product lines.
 ///
@@ -311,8 +308,6 @@ impl Generation {
 #[cfg(feature = "sev")]
 impl From<Generation> for CertSevCaChain {
     fn from(generation: Generation) -> CertSevCaChain {
-        use codicon::Decoder;
-
         let (ark, ask) = match generation {
             #[cfg(feature = "sev")]
             Generation::Naples => (SevBuiltin::naples::ARK, SevBuiltin::naples::ASK),
