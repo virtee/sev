@@ -21,6 +21,8 @@ use crate::util::*;
 #[cfg(feature = "openssl")]
 use util::*;
 
+use crate::parser::{Decoder, Encoder};
+
 use std::{
     convert::*,
     io::{Error, ErrorKind, Read, Result, Write},

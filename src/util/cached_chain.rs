@@ -36,7 +36,7 @@ use std::{
 use std::io::Cursor;
 
 #[cfg(feature = "openssl")]
-use codicon::Decoder;
+use crate::parser::Decoder;
 
 fn append_rest<P: AsRef<Path>>(path: P) -> PathBuf {
     let mut path = path.as_ref().to_path_buf();
@@ -115,9 +115,9 @@ pub fn get_chain() -> FullChain {
     };
 
     // Create a Cursor around the byte vector
-    let cursor = Cursor::new(cek_resp_bytes);
+    let mut cursor = Cursor::new(cek_resp_bytes);
 
-    sev_chain.cek = Certificate::decode(cursor, ()).expect("Failed to decode CEK cert");
+    sev_chain.cek = Certificate::decode(&mut cursor, ()).expect("Failed to decode CEK cert");
 
     let ca_chain: CaChain = Generation::try_from(&sev_chain)
         .expect("Failed to generate SEV CA chain")

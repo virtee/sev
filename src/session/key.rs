@@ -39,9 +39,8 @@ impl DerefMut for Key {
     }
 }
 
-impl codicon::Encoder<()> for Key {
-    type Error = Error;
-    fn encode(&self, mut writer: impl Write, _: ()) -> std::io::Result<()> {
+impl Encoder<()> for Key {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> std::io::Result<()> {
         writer.write_all(&self.0)?;
 
         Ok(())

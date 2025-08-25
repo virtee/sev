@@ -3,10 +3,10 @@
 //! Types and abstractions regarding Virtual Machine Save Areas (VMSAs).
 
 #![allow(dead_code)]
-
-use codicon::{Decoder, Encoder};
-
-use crate::util::array::Array;
+use crate::{
+    parser::{Decoder, Encoder},
+    util::array::Array,
+};
 
 use super::{
     util::{TypeLoad, TypeSave},
@@ -304,18 +304,14 @@ pub struct Vmsa {
     x87_state_gpa: u64,
 }
 
-impl codicon::Decoder<()> for Vmsa {
-    type Error = std::io::Error;
-
-    fn decode(mut reader: impl Read, _: ()) -> std::io::Result<Self> {
+impl Decoder<()> for Vmsa {
+    fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
         reader.load()
     }
 }
 
-impl codicon::Encoder<()> for Vmsa {
-    type Error = std::io::Error;
-
-    fn encode(&self, mut writer: impl Write, _: ()) -> std::io::Result<()> {
+impl Encoder<()> for Vmsa {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
         writer.save(self)
     }
 }
@@ -450,7 +446,7 @@ impl Vmsa {
                 format!("Expected VMSA length 4096, was {}", data.len()),
             ));
         }
-        let vmsa = Vmsa::decode(&data[..], ())?;
+        let vmsa = Vmsa::decode(&mut &data[..], ())?;
         Ok(vmsa)
     }
 

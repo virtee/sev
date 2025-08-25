@@ -23,10 +23,8 @@ pub struct Chain {
     pub cek: Certificate,
 }
 
-impl codicon::Decoder<()> for Chain {
-    type Error = Error;
-
-    fn decode(mut reader: impl Read, _: ()) -> Result<Self> {
+impl Decoder<()> for Chain {
+    fn decode(mut reader: &mut impl Read, _: ()) -> Result<Self> {
         let pdh = Certificate::decode(&mut reader, ())?;
         if Usage::try_from(&pdh)? != Usage::PDH {
             return Err(ErrorKind::InvalidInput)?;
@@ -51,10 +49,8 @@ impl codicon::Decoder<()> for Chain {
     }
 }
 
-impl codicon::Encoder<()> for Chain {
-    type Error = Error;
-
-    fn encode(&self, mut writer: impl Write, _: ()) -> Result<()> {
+impl Encoder<()> for Chain {
+    fn encode(&self, mut writer: &mut impl Write, _: ()) -> Result<()> {
         self.pdh.encode(&mut writer, ())?;
         self.pek.encode(&mut writer, ())?;
         self.oca.encode(&mut writer, ())?;

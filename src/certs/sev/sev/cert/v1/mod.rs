@@ -29,10 +29,8 @@ impl Certificate {
     }
 }
 
-impl codicon::Decoder<()> for Certificate {
-    type Error = Error;
-
-    fn decode(mut reader: impl Read, _: ()) -> Result<Self> {
+impl Decoder<()> for Certificate {
+    fn decode(reader: &mut impl Read, _: ()) -> Result<Self> {
         Ok(Self {
             body: body::Body {
                 ver: 1u32.to_le(),

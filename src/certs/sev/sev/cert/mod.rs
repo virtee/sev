@@ -31,8 +31,8 @@ impl std::fmt::Debug for Certificate {
 #[cfg(feature = "openssl")]
 impl std::fmt::Display for Certificate {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        use codicon::Encoder;
         use std::fmt::Error;
+        use Encoder;
 
         let key = PublicKey::try_from(self).or(Err(Error))?;
 
@@ -72,10 +72,8 @@ impl<U: Copy + Into<crate::certs::sev::Usage>> PartialEq<U> for Certificate {
     }
 }
 
-impl codicon::Decoder<()> for Certificate {
-    type Error = Error;
-
-    fn decode(mut reader: impl Read, params: ()) -> Result<Self> {
+impl Decoder<()> for Certificate {
+    fn decode(reader: &mut impl Read, params: ()) -> Result<Self> {
         Ok(match u32::from_le(reader.load()?) {
             1 => Certificate {
                 v1: v1::Certificate::decode(reader, params)?,
@@ -85,10 +83,8 @@ impl codicon::Decoder<()> for Certificate {
     }
 }
 
-impl codicon::Encoder<()> for Certificate {
-    type Error = Error;
-
-    fn encode(&self, mut writer: impl Write, _: ()) -> Result<()> {
+impl Encoder<()> for Certificate {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<()> {
         match self.version() {
             1 => unsafe { writer.save(&self.v1) },
             _ => Err(ErrorKind::InvalidInput)?,
@@ -97,10 +93,8 @@ impl codicon::Encoder<()> for Certificate {
 }
 
 #[cfg(feature = "openssl")]
-impl codicon::Encoder<Body> for Certificate {
-    type Error = Error;
-
-    fn encode(&self, mut writer: impl Write, _: Body) -> Result<()> {
+impl Encoder<Body> for Certificate {
+    fn encode(&self, writer: &mut impl Write, _: Body) -> Result<()> {
         match self.version() {
             1 => unsafe { writer.save(&self.v1.body) },
             _ => Err(ErrorKind::InvalidInput)?,
@@ -113,10 +107,10 @@ impl<'de> de::Deserialize<'de> for Certificate {
     where
         D: de::Deserializer<'de>,
     {
-        use codicon::Decoder;
+        use Decoder;
 
         let bytes = ByteBuf::deserialize(deserializer)?;
-        Self::decode(bytes.as_slice(), ()).map_err(serde::de::Error::custom)
+        Self::decode(&mut bytes.as_slice(), ()).map_err(serde::de::Error::custom)
     }
 }
 
