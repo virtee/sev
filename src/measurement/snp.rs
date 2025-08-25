@@ -11,13 +11,18 @@ use crate::{
         vcpu_types::CpuType,
         vmsa::{GuestFeatures, VMMType, VMSA},
     },
-    util::array::Array,
+    parser::{ByteParser, Decoder, Encoder},
+    util::{
+        array::Array,
+        parser_helper::{ReadExt, WriteExt},
+    },
 };
-use bincode::{Decode, Encode};
 use hex::FromHex;
-use serde::{Deserialize, Serialize};
-use std::convert::{TryFrom, TryInto};
 use std::path::PathBuf;
+use std::{
+    convert::{TryFrom, TryInto},
+    io::{Read, Write},
+};
 
 const _PAGE_MASK: u64 = 0xfff;
 
@@ -27,7 +32,7 @@ pub(crate) const LD_BYTES: usize = LD_BITS / 8;
 
 /// The expected launch digest of the guest
 #[repr(C)]
-#[derive(Debug, Default, Serialize, Deserialize, Clone, Copy, Encode, Decode)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct SnpLaunchDigest(Array<u8, LD_BYTES>);
 
 // Try from slice
@@ -46,6 +51,25 @@ impl TryInto<Vec<u8>> for SnpLaunchDigest {
     fn try_into(self) -> Result<Vec<u8>, MeasurementError> {
         Ok((*self.0).to_vec())
     }
+}
+
+impl Encoder<()> for SnpLaunchDigest {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
+        writer.write_bytes(self.0, ())?;
+        Ok(())
+    }
+}
+
+impl Decoder<()> for SnpLaunchDigest {
+    fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
+        let ld = reader.read_bytes()?;
+        Ok(Self(ld))
+    }
+}
+
+impl ByteParser<()> for SnpLaunchDigest {
+    type Bytes = [u8; LD_BYTES];
+    const EXPECTED_LEN: Option<usize> = Some(LD_BYTES);
 }
 
 impl SnpLaunchDigest {

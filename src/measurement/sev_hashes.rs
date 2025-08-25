@@ -2,8 +2,8 @@
 
 //! Operations to handle OVMF SEV-HASHES
 use openssl::sha::sha256;
-use serde::Serialize;
 use std::fs::File;
+use std::io::Write;
 use std::{
     convert::{TryFrom, TryInto},
     io::Read,
@@ -12,18 +12,37 @@ use std::{
     str::FromStr,
 };
 
-use bincode::Encode;
 use uuid::{uuid, Uuid};
 
 use crate::error::*;
-use crate::BINCODE_CFG;
+use crate::parser::{ByteParser, Decoder, Encoder};
+use crate::util::parser_helper::{ReadExt, WriteExt};
 
 type Sha256Hash = [u8; 32];
 
 /// GUID stored as little endian
-#[derive(Debug, Clone, Copy, Serialize, Default, Encode)]
+#[derive(Debug, Clone, Copy, Default)]
 struct GuidLe {
     _data: [u8; 16],
+}
+
+impl Encoder<()> for GuidLe {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
+        writer.write_bytes(self._data, ())?;
+        Ok(())
+    }
+}
+
+impl Decoder<()> for GuidLe {
+    fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
+        let data = reader.read_bytes()?;
+        Ok(Self { _data: data })
+    }
+}
+
+impl ByteParser<()> for GuidLe {
+    type Bytes = [u8; 16];
+    const EXPECTED_LEN: Option<usize> = Some(16);
 }
 
 impl TryFrom<&Uuid> for GuidLe {
@@ -53,7 +72,7 @@ impl FromStr for GuidLe {
 
 /// SEV hash table entry
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Serialize, Default, Encode)]
+#[derive(Debug, Clone, Copy, Default)]
 struct SevHashTableEntry {
     /// GUID of the SEV hash
     guid: GuidLe,
@@ -61,6 +80,29 @@ struct SevHashTableEntry {
     length: u16,
     /// SEV HASH
     hash: Sha256Hash,
+}
+
+impl Encoder<()> for SevHashTableEntry {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
+        writer.write_bytes(self.guid, ())?;
+        writer.write_bytes(self.length, ())?;
+        writer.write_bytes(self.hash, ())?;
+        Ok(())
+    }
+}
+
+impl Decoder<()> for SevHashTableEntry {
+    fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
+        let guid = reader.read_bytes()?;
+        let length = reader.read_bytes()?;
+        let hash = reader.read_bytes()?;
+        Ok(Self { guid, length, hash })
+    }
+}
+
+impl ByteParser<()> for SevHashTableEntry {
+    type Bytes = [u8; 50];
+    const EXPECTED_LEN: Option<usize> = Some(50);
 }
 
 impl SevHashTableEntry {
@@ -75,7 +117,7 @@ impl SevHashTableEntry {
 
 /// Table of SEV hashes
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Serialize, Default, Encode)]
+#[derive(Debug, Clone, Copy, Default)]
 struct SevHashTable {
     /// GUID of the SEV hash table entry
     guid: GuidLe,
@@ -87,6 +129,39 @@ struct SevHashTable {
     initrd: SevHashTableEntry,
     /// Kernel table entry
     kernel: SevHashTableEntry,
+}
+
+impl Encoder<()> for SevHashTable {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
+        writer.write_bytes(self.guid, ())?;
+        writer.write_bytes(self.length, ())?;
+        writer.write_bytes(self.cmdline, ())?;
+        writer.write_bytes(self.initrd, ())?;
+        writer.write_bytes(self.kernel, ())?;
+        Ok(())
+    }
+}
+
+impl Decoder<()> for SevHashTable {
+    fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
+        let guid = reader.read_bytes()?;
+        let length = reader.read_bytes()?;
+        let cmdline = reader.read_bytes()?;
+        let initrd = reader.read_bytes()?;
+        let kernel = reader.read_bytes()?;
+        Ok(Self {
+            guid,
+            length,
+            cmdline,
+            initrd,
+            kernel,
+        })
+    }
+}
+
+impl ByteParser<()> for SevHashTable {
+    type Bytes = [u8; 168];
+    const EXPECTED_LEN: Option<usize> = Some(168);
 }
 
 impl SevHashTable {
@@ -108,10 +183,31 @@ impl SevHashTable {
 
 /// Padded SEV hash table
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Serialize, Default, Encode)]
+#[derive(Debug, Clone, Copy, Default)]
 struct PaddedSevHashTable {
     ht: SevHashTable,
     padding: [u8; PaddedSevHashTable::PADDING_SIZE],
+}
+
+impl Encoder<()> for PaddedSevHashTable {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
+        writer.write_bytes(self.ht, ())?;
+        writer.write_bytes(self.padding, ())?;
+        Ok(())
+    }
+}
+
+impl Decoder<()> for PaddedSevHashTable {
+    fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
+        let ht = reader.read_bytes()?;
+        let padding = reader.read_bytes()?;
+        Ok(Self { ht, padding })
+    }
+}
+
+impl ByteParser<()> for PaddedSevHashTable {
+    type Bytes = [u8; 168 + PaddedSevHashTable::PADDING_SIZE];
+    const EXPECTED_LEN: Option<usize> = Some(168 + PaddedSevHashTable::PADDING_SIZE);
 }
 
 impl PaddedSevHashTable {
@@ -121,7 +217,7 @@ impl PaddedSevHashTable {
     fn new(hash_table: SevHashTable) -> Self {
         PaddedSevHashTable {
             ht: hash_table,
-            ..Default::default()
+            padding: [0; Self::PADDING_SIZE],
         }
     }
 }
@@ -184,7 +280,9 @@ impl SevHashes {
 
     /// Generate the SEV hashes area - this must be *identical* to the way QEMU
     /// generates this info in order for the measurement to match.
-    pub fn construct_table(&self) -> Result<Vec<u8>, MeasurementError> {
+    pub fn construct_table(
+        &self,
+    ) -> Result<[u8; 168 + PaddedSevHashTable::PADDING_SIZE], MeasurementError> {
         let sev_hash_table = SevHashTable::new(
             SEV_HASH_TABLE_HEADER_GUID.to_string().as_str(),
             SevHashTableEntry::new(&SEV_CMDLINE_ENTRY_GUID, self.cmdline_hash)?,
@@ -194,7 +292,7 @@ impl SevHashes {
 
         let padded_hash_table = PaddedSevHashTable::new(sev_hash_table);
 
-        let bytes = bincode::encode_to_vec(padded_hash_table, BINCODE_CFG)?;
+        let bytes = padded_hash_table.to_bytes()?;
 
         Ok(bytes)
     }
