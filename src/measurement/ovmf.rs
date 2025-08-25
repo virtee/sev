@@ -2,11 +2,10 @@
 
 //! Operations to handle ovmf data
 use crate::error::*;
-use crate::BINCODE_CFG;
-use bincode;
-use bincode::Decode;
+use crate::parser::{ByteParser, Decoder, Encoder};
+use crate::util::parser_helper::{ReadExt, WriteExt};
 use byteorder::{ByteOrder, LittleEndian};
-use serde::Deserialize;
+use std::io::Write;
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
@@ -26,8 +25,7 @@ pub fn guid_le_to_slice(guid: &str) -> Result<[u8; 16], MeasurementError> {
 }
 
 /// Types of sections declared by OVMF SEV Metadata, as appears in: https://github.com/tianocore/edk2/blob/edk2-stable202405/OvmfPkg/ResetVector/X64/OvmfSevMetadata.asm
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
-#[serde(into = "u8", try_from = "u8")]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SectionType {
     /// SNP Secure Memory
     SnpSecMemory = 1,
@@ -41,10 +39,43 @@ pub enum SectionType {
     SnpKernelHashes = 0x10,
 }
 
-impl From<SectionType> for u8 {
-    fn from(value: SectionType) -> u8 {
-        value as u8
+impl Default for SectionType {
+    fn default() -> Self {
+        Self::SnpSecMemory
     }
+}
+
+impl Encoder<()> for SectionType {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
+        let value: u8 = match self {
+            SectionType::SnpSecMemory => 1,
+            SectionType::SnpSecrets => 2,
+            SectionType::Cpuid => 3,
+            SectionType::SvsmCaa => 4,
+            SectionType::SnpKernelHashes => 0x10,
+        };
+        writer.write_bytes(value.to_le_bytes(), ())?;
+        Ok(())
+    }
+}
+
+impl Decoder<()> for SectionType {
+    fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
+        let value = u8::from_le_bytes(reader.read_bytes()?);
+        match value {
+            1 => Ok(SectionType::SnpSecMemory),
+            2 => Ok(SectionType::SnpSecrets),
+            3 => Ok(SectionType::Cpuid),
+            4 => Ok(SectionType::SvsmCaa),
+            0x10 => Ok(SectionType::SnpKernelHashes),
+            _ => Err(std::io::ErrorKind::Unsupported.into()),
+        }
+    }
+}
+
+impl ByteParser<()> for SectionType {
+    type Bytes = [u8; 1];
+    const EXPECTED_LEN: Option<usize> = Some(1);
 }
 
 impl TryFrom<u8> for SectionType {
@@ -61,34 +92,51 @@ impl TryFrom<u8> for SectionType {
         }
     }
 }
-/// Creating structure from bytes
-pub trait TryFromBytes {
-    /// Error when attempting to deserialize from bytes
-    type Error;
-    /// Creating structure from bytes function
-    fn try_from_bytes(value: &[u8], offset: usize) -> Result<Self, Self::Error>
-    where
-        Self: std::marker::Sized;
-}
 
 /// OVMF SEV Metadata Section Description
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Deserialize, Decode)]
+#[derive(Debug, Clone, Copy)]
 pub struct OvmfSevMetadataSectionDesc {
     /// Guest Physical Adress
     pub gpa: u32,
     /// Size
     pub size: u32,
     /// Section Type
-    #[bincode(with_serde)]
     pub section_type: SectionType,
 }
 
-impl TryFromBytes for OvmfSevMetadataSectionDesc {
-    type Error = MeasurementError;
-    fn try_from_bytes(value: &[u8], offset: usize) -> Result<Self, Self::Error> {
-        let value = &value[offset..offset + std::mem::size_of::<OvmfSevMetadataSectionDesc>()];
-        let (decoded, _) = bincode::decode_from_slice(value, BINCODE_CFG)?;
+impl Encoder<()> for OvmfSevMetadataSectionDesc {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
+        writer.write_bytes(self.gpa, ())?;
+        writer.write_bytes(self.size, ())?;
+        writer.write_bytes(self.section_type, ())?;
+        Ok(())
+    }
+}
+
+impl Decoder<()> for OvmfSevMetadataSectionDesc {
+    fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
+        let gpa = reader.read_bytes()?;
+        let size = reader.read_bytes()?;
+        let section_type = reader.read_bytes()?;
+        Ok(Self {
+            gpa,
+            size,
+            section_type,
+        })
+    }
+}
+
+impl ByteParser<()> for OvmfSevMetadataSectionDesc {
+    // packed representation: 4 (gpa) + 4 (size) + 1 (section_type) = 9 bytes
+    type Bytes = [u8; 9];
+    const EXPECTED_LEN: Option<usize> = Some(9);
+}
+
+impl OvmfSevMetadataSectionDesc {
+    fn bytes_from_offset(value: &[u8], offset: usize) -> Result<Self, std::io::Error> {
+        let mut bytes = &value[offset..offset + std::mem::size_of::<OvmfSevMetadataSectionDesc>()];
+        let decoded = Self::decode(&mut bytes, ())?;
 
         Ok(decoded)
     }
@@ -96,7 +144,7 @@ impl TryFromBytes for OvmfSevMetadataSectionDesc {
 
 /// OVMF Metadata Header
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Deserialize, Decode)]
+#[derive(Debug, Clone, Copy)]
 struct OvmfSevMetadataHeader {
     /// Header Signature
     signature: [u8; 4],
@@ -108,16 +156,45 @@ struct OvmfSevMetadataHeader {
     num_items: u32,
 }
 
-impl TryFromBytes for OvmfSevMetadataHeader {
-    type Error = MeasurementError;
-    fn try_from_bytes(value: &[u8], offset: usize) -> Result<Self, Self::Error> {
-        let value = &value[offset..offset + std::mem::size_of::<OvmfSevMetadataHeader>()];
-        let (decoded, _) = bincode::decode_from_slice(value, BINCODE_CFG)?;
-        Ok(decoded)
+impl Encoder<()> for OvmfSevMetadataHeader {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
+        writer.write_bytes(self.signature, ())?;
+        writer.write_bytes(self.size, ())?;
+        writer.write_bytes(self.version, ())?;
+        writer.write_bytes(self.num_items, ())?;
+        Ok(())
     }
 }
 
+impl Decoder<()> for OvmfSevMetadataHeader {
+    fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
+        let signature = reader.read_bytes()?;
+        let size = reader.read_bytes()?;
+        let version = reader.read_bytes()?;
+        let num_items = reader.read_bytes()?;
+        Ok(Self {
+            signature,
+            size,
+            version,
+            num_items,
+        })
+    }
+}
+
+impl ByteParser<()> for OvmfSevMetadataHeader {
+    // packed representation: 4 (signature) + 4 (size) + 4 (version) + 4 (num_items) = 16 bytes
+    type Bytes = [u8; 16];
+    const EXPECTED_LEN: Option<usize> = Some(16);
+}
+
 impl OvmfSevMetadataHeader {
+    fn bytes_from_offset(value: &[u8], offset: usize) -> Result<Self, std::io::Error> {
+        let mut bytes = &value[offset..offset + std::mem::size_of::<OvmfSevMetadataHeader>()];
+        let decoded = Self::decode(&mut bytes, ())?;
+
+        Ok(decoded)
+    }
+
     /// Verify Header Signature
     fn verify(&self) -> Result<(), OVMFError> {
         let expected_signature: &[u8] = b"ASEV";
@@ -327,13 +404,13 @@ impl OVMF {
                 let offset_from_end = i32::from_le_bytes(entry[..4].try_into()?);
                 let header_start = self.data.len() - (offset_from_end as usize);
                 let header =
-                    OvmfSevMetadataHeader::try_from_bytes(self.data.as_slice(), header_start)?;
+                    OvmfSevMetadataHeader::bytes_from_offset(self.data.as_slice(), header_start)?;
                 header.verify()?;
                 let items = &self.data[header_start + std::mem::size_of::<OvmfSevMetadataHeader>()
                     ..header_start + header.size as usize];
                 for i in 0..header.num_items {
                     let offset = (i as usize) * std::mem::size_of::<OvmfSevMetadataSectionDesc>();
-                    let item = OvmfSevMetadataSectionDesc::try_from_bytes(items, offset)?;
+                    let item = OvmfSevMetadataSectionDesc::bytes_from_offset(items, offset)?;
                     self.metadata_items.push(item.to_owned());
                 }
             }

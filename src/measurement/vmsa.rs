@@ -2,12 +2,20 @@
 
 //! Operations to build and interact with an SEV-ES VMSA
 use crate::{
-    error::MeasurementError, measurement::vcpu_types::CpuType, util::array::Array, BINCODE_CFG,
+    error::MeasurementError,
+    measurement::vcpu_types::CpuType,
+    parser::{ByteParser, Decoder, Encoder},
+    util::{
+        array::Array,
+        parser_helper::{ReadExt, WriteExt},
+    },
 };
-use bincode::{Decode, Encode};
 use bitfield::bitfield;
-use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, fmt, str::FromStr};
+use std::{
+    fmt,
+    io::{Read, Write},
+    str::FromStr,
+};
 
 /// Different Possible SEV modes
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -44,19 +52,6 @@ pub enum VMMType {
     KRUN = 3,
 }
 
-impl TryFrom<u8> for VMMType {
-    type Error = MeasurementError;
-
-    fn try_from(value: u8) -> Result<Self, MeasurementError> {
-        match value {
-            1 => Ok(VMMType::QEMU),
-            2 => Ok(VMMType::EC2),
-            3 => Ok(VMMType::KRUN),
-            _ => Err(MeasurementError::InvalidVmmError(value.to_string())),
-        }
-    }
-}
-
 impl FromStr for VMMType {
     type Err = MeasurementError;
 
@@ -84,7 +79,7 @@ impl fmt::Debug for VMMType {
 /// The layout of a VMCB struct is documented in Table B-1 of the
 /// AMD64 Architecture Programmer’s Manual, Volume 2: System Programming
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, Encode, Decode)]
+#[derive(Default, Debug, Clone, Copy)]
 struct VmcbSeg {
     /// Segment selector: documented in Figure 4-3 of the
     /// AMD64 Architecture Programmer’s Manual, Volume 2: System Programming
@@ -101,7 +96,39 @@ struct VmcbSeg {
     base: u64,
 }
 
+impl Encoder<()> for VmcbSeg {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
+        writer.write_bytes(self.selector, ())?;
+        writer.write_bytes(self.attrib, ())?;
+        writer.write_bytes(self.limit, ())?;
+        writer.write_bytes(self.base, ())?;
+        Ok(())
+    }
+}
+
+impl Decoder<()> for VmcbSeg {
+    fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
+        let selector = reader.read_bytes()?;
+        let attrib = reader.read_bytes()?;
+        let limit = reader.read_bytes()?;
+        let base = reader.read_bytes()?;
+        Ok(Self {
+            selector,
+            attrib,
+            limit,
+            base,
+        })
+    }
+}
+
+impl ByteParser<()> for VmcbSeg {
+    type Bytes = [u8; Self::SIZE];
+    const EXPECTED_LEN: Option<usize> = Some(Self::SIZE);
+}
+
 impl VmcbSeg {
+    const SIZE: usize = 16;
+
     fn new(selector: u16, attrib: u16, limit: u32, base: u64) -> Self {
         Self {
             selector,
@@ -133,7 +160,7 @@ bitfield! {
     /// | 15 | SmtProtection |
     /// | 63:16 | Reserved, SBZ |
     #[repr(C)]
-    #[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Copy, Clone, PartialEq, Eq)]
     pub struct GuestFeatures(u64);
     impl Debug;
     /// SNPActive
@@ -166,6 +193,25 @@ bitfield! {
     pub smt_protection, _: 15;
 }
 
+impl Encoder<()> for GuestFeatures {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
+        writer.write_bytes(self.0, ())?;
+        Ok(())
+    }
+}
+
+impl Decoder<()> for GuestFeatures {
+    fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
+        let features = reader.read_bytes()?;
+        Ok(Self(features))
+    }
+}
+
+impl ByteParser<()> for GuestFeatures {
+    type Bytes = [u8; 8];
+    const EXPECTED_LEN: Option<usize> = Some(8);
+}
+
 impl Default for GuestFeatures {
     fn default() -> Self {
         Self(0x1)
@@ -177,7 +223,7 @@ impl Default for GuestFeatures {
 /// https://github.com/AMDESE/linux/blob/sev-snp-v12/arch/x86/include/asm/svm.h#L318
 /// (following the definitions in AMD APM Vol 2 Table B-4)
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, Encode, Decode)]
+#[derive(Debug, Clone, Copy, Default)]
 struct SevEsSaveArea {
     es: VmcbSeg,
     cs: VmcbSeg,
@@ -194,12 +240,9 @@ struct SevEsSaveArea {
     vmpl2_ssp: u64,
     vmpl3_ssp: u64,
     u_cet: u64,
-    reserved_0xc8: [u8; 2],
     vmpl: u8,
     cpl: u8,
-    reserved_0xcc: [u8; 4],
     efer: u64,
-    reserved_0xd8: Array<u8, 104>,
     xss: u64,
     cr4: u64,
     cr3: u64,
@@ -216,7 +259,6 @@ struct SevEsSaveArea {
     dr1_addr_mask: u64,
     dr2_addr_mask: u64,
     dr3_addr_mask: u64,
-    reserved_0x1c0: [u8; 24],
     rsp: u64,
     s_cet: u64,
     ssp: u64,
@@ -231,21 +273,17 @@ struct SevEsSaveArea {
     sysenter_esp: u64,
     sysenter_eip: u64,
     cr2: u64,
-    reserved_0x248: [u8; 32],
     g_pat: u64,
     dbgctrl: u64,
     br_from: u64,
     br_to: u64,
     last_excp_from: u64,
     last_excp_to: u64,
-    reserved_0x298: Array<u8, 80>,
     pkru: u32,
     tsc_aux: u32,
-    reserved_0x2f0: [u8; 24],
     rcx: u64,
     rdx: u64,
     rbx: u64,
-    reserved_0x320: u64,
     rbp: u64,
     rsi: u64,
     rdi: u64,
@@ -257,7 +295,6 @@ struct SevEsSaveArea {
     r13: u64,
     r14: u64,
     r15: u64,
-    reserved_0x380: [u8; 16],
     guest_exit_info_1: u64,
     guest_exit_info_2: u64,
     guest_exit_int_info: u64,
@@ -270,7 +307,6 @@ struct SevEsSaveArea {
     pcpu_id: u64,
     event_inj: u64,
     xcr0: u64,
-    reserved_0x3f0: [u8; 16],
 
     /* Floating Point Area */
     x87_dp: u64,
@@ -286,6 +322,337 @@ struct SevEsSaveArea {
     fpreg_xmm: Array<u8, 256>,
     fpreg_ymm: Array<u8, 256>,
     manual_padding: Array<u8, 2448>,
+}
+
+impl Encoder<()> for SevEsSaveArea {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
+        writer.write_bytes(self.es, ())?;
+        writer.write_bytes(self.cs, ())?;
+        writer.write_bytes(self.ss, ())?;
+        writer.write_bytes(self.ds, ())?;
+        writer.write_bytes(self.fs, ())?;
+        writer.write_bytes(self.gs, ())?;
+        writer.write_bytes(self.gdtr, ())?;
+        writer.write_bytes(self.ldtr, ())?;
+        writer.write_bytes(self.idtr, ())?;
+        writer.write_bytes(self.tr, ())?;
+        writer.write_bytes(self.vmpl0_ssp, ())?;
+        writer.write_bytes(self.vmpl1_ssp, ())?;
+        writer.write_bytes(self.vmpl2_ssp, ())?;
+        writer.write_bytes(self.vmpl3_ssp, ())?;
+        writer.write_bytes(self.u_cet, ())?;
+        // reserved_0xc8 [u8;2]
+        writer.skip_bytes::<2>()?.write_bytes(self.vmpl, ())?;
+        writer.write_bytes(self.cpl, ())?;
+        // reserved_0xcc [u8;4]
+        writer.skip_bytes::<4>()?.write_bytes(self.efer, ())?;
+        // reserved_0xd8 [u8;104]
+        writer.skip_bytes::<104>()?.write_bytes(self.xss, ())?;
+        writer.write_bytes(self.cr4, ())?;
+        writer.write_bytes(self.cr3, ())?;
+        writer.write_bytes(self.cr0, ())?;
+        writer.write_bytes(self.dr7, ())?;
+        writer.write_bytes(self.dr6, ())?;
+        writer.write_bytes(self.rflags, ())?;
+        writer.write_bytes(self.rip, ())?;
+        writer.write_bytes(self.dr0, ())?;
+        writer.write_bytes(self.dr1, ())?;
+        writer.write_bytes(self.dr2, ())?;
+        writer.write_bytes(self.dr3, ())?;
+        writer.write_bytes(self.dr0_addr_mask, ())?;
+        writer.write_bytes(self.dr1_addr_mask, ())?;
+        writer.write_bytes(self.dr2_addr_mask, ())?;
+        writer.write_bytes(self.dr3_addr_mask, ())?;
+        // reserved_0x1c0 [u8;24]
+        writer.skip_bytes::<24>()?.write_bytes(self.rsp, ())?;
+        writer.write_bytes(self.s_cet, ())?;
+        writer.write_bytes(self.ssp, ())?;
+        writer.write_bytes(self.isst_addr, ())?;
+        writer.write_bytes(self.rax, ())?;
+        writer.write_bytes(self.star, ())?;
+        writer.write_bytes(self.lstar, ())?;
+        writer.write_bytes(self.cstar, ())?;
+        writer.write_bytes(self.sfmask, ())?;
+        writer.write_bytes(self.kernel_gs_base, ())?;
+        writer.write_bytes(self.sysenter_cs, ())?;
+        writer.write_bytes(self.sysenter_esp, ())?;
+        writer.write_bytes(self.sysenter_eip, ())?;
+        writer.write_bytes(self.cr2, ())?;
+        // reserved_0x248[u8;32]
+        writer.skip_bytes::<32>()?.write_bytes(self.g_pat, ())?;
+        writer.write_bytes(self.dbgctrl, ())?;
+        writer.write_bytes(self.br_from, ())?;
+        writer.write_bytes(self.br_to, ())?;
+        writer.write_bytes(self.last_excp_from, ())?;
+        writer.write_bytes(self.last_excp_to, ())?;
+        // reserved_0x298 [u8;80]
+        writer.skip_bytes::<80>()?.write_bytes(self.pkru, ())?;
+        writer.write_bytes(self.tsc_aux, ())?;
+        // reserved_0x2f0 [u8;24]
+        writer.skip_bytes::<24>()?.write_bytes(self.rcx, ())?;
+        writer.write_bytes(self.rdx, ())?;
+        writer.write_bytes(self.rbx, ())?;
+        // reserved_0x320 u64
+        writer.skip_bytes::<8>()?.write_bytes(self.rbp, ())?;
+        writer.write_bytes(self.rsi, ())?;
+        writer.write_bytes(self.rdi, ())?;
+        writer.write_bytes(self.r8, ())?;
+        writer.write_bytes(self.r9, ())?;
+        writer.write_bytes(self.r10, ())?;
+        writer.write_bytes(self.r11, ())?;
+        writer.write_bytes(self.r12, ())?;
+        writer.write_bytes(self.r13, ())?;
+        writer.write_bytes(self.r14, ())?;
+        writer.write_bytes(self.r15, ())?;
+        // reserved_0x380 [u8;16]
+        writer
+            .skip_bytes::<16>()?
+            .write_bytes(self.guest_exit_info_1, ())?;
+        writer.write_bytes(self.guest_exit_info_2, ())?;
+        writer.write_bytes(self.guest_exit_int_info, ())?;
+        writer.write_bytes(self.guest_nrip, ())?;
+        writer.write_bytes(self.sev_features, ())?;
+        writer.write_bytes(self.vintr_ctrl, ())?;
+        writer.write_bytes(self.guest_exit_code, ())?;
+        writer.write_bytes(self.virtual_tom, ())?;
+        writer.write_bytes(self.tlb_id, ())?;
+        writer.write_bytes(self.pcpu_id, ())?;
+        writer.write_bytes(self.event_inj, ())?;
+        writer.write_bytes(self.xcr0, ())?;
+        // reserved_0x3f0 [u8;16]
+        writer.skip_bytes::<16>()?.write_bytes(self.x87_dp, ())?;
+        writer.write_bytes(self.mxcsr, ())?;
+        writer.write_bytes(self.x87_ftw, ())?;
+        writer.write_bytes(self.x87_fsw, ())?;
+        writer.write_bytes(self.x87_fcw, ())?;
+        writer.write_bytes(self.x87_fop, ())?;
+        writer.write_bytes(self.x87_ds, ())?;
+        writer.write_bytes(self.x87_cs, ())?;
+        writer.write_bytes(self.x87_rip, ())?;
+        writer.write_bytes(self.fpreg_x87, ())?;
+        writer.write_bytes(self.fpreg_xmm, ())?;
+        writer.write_bytes(self.fpreg_ymm, ())?;
+        writer.write_bytes(self.manual_padding, ())?;
+
+        Ok(())
+    }
+}
+
+impl Decoder<()> for SevEsSaveArea {
+    fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
+        let es = reader.read_bytes()?;
+        let cs = reader.read_bytes()?;
+        let ss = reader.read_bytes()?;
+        let ds = reader.read_bytes()?;
+        let fs = reader.read_bytes()?;
+        let gs = reader.read_bytes()?;
+        let gdtr = reader.read_bytes()?;
+        let ldtr = reader.read_bytes()?;
+        let idtr = reader.read_bytes()?;
+        let tr = reader.read_bytes()?;
+        let vmpl0_ssp = reader.read_bytes()?;
+        let vmpl1_ssp = reader.read_bytes()?;
+        let vmpl2_ssp = reader.read_bytes()?;
+        let vmpl3_ssp = reader.read_bytes()?;
+        let u_cet = reader.read_bytes()?;
+        // reserved_0xc8: [u8;2]
+        let vmpl = reader.skip_bytes::<2>()?.read_bytes()?;
+        let cpl = reader.read_bytes()?;
+        // reserved_0xcc: [u8;4]
+        let efer = reader.skip_bytes::<4>()?.read_bytes()?;
+        // reserved 0xd8: [u8;104]
+        let xss = reader.skip_bytes::<104>()?.read_bytes()?;
+        let cr4 = reader.read_bytes()?;
+        let cr3 = reader.read_bytes()?;
+        let cr0 = reader.read_bytes()?;
+        let dr7 = reader.read_bytes()?;
+        let dr6 = reader.read_bytes()?;
+        let rflags = reader.read_bytes()?;
+        let rip = reader.read_bytes()?;
+        let dr0 = reader.read_bytes()?;
+        let dr1 = reader.read_bytes()?;
+        let dr2 = reader.read_bytes()?;
+        let dr3 = reader.read_bytes()?;
+        let dr0_addr_mask = reader.read_bytes()?;
+        let dr1_addr_mask = reader.read_bytes()?;
+        let dr2_addr_mask = reader.read_bytes()?;
+        let dr3_addr_mask = reader.read_bytes()?;
+        // reserved_0x1c0: [u8;24]
+        let rsp = reader.skip_bytes::<24>()?.read_bytes()?;
+        let s_cet = reader.read_bytes()?;
+        let ssp = reader.read_bytes()?;
+        let isst_addr = reader.read_bytes()?;
+        let rax = reader.read_bytes()?;
+        let star = reader.read_bytes()?;
+        let lstar = reader.read_bytes()?;
+        let cstar = reader.read_bytes()?;
+        let sfmask = reader.read_bytes()?;
+        let kernel_gs_base = reader.read_bytes()?;
+        let sysenter_cs = reader.read_bytes()?;
+        let sysenter_esp = reader.read_bytes()?;
+        let sysenter_eip = reader.read_bytes()?;
+        let cr2 = reader.read_bytes()?;
+        // reserved_0x248: [u8;32]
+        let g_pat = reader.skip_bytes::<32>()?.read_bytes()?;
+        let dbgctrl = reader.read_bytes()?;
+        let br_from = reader.read_bytes()?;
+        let br_to = reader.read_bytes()?;
+        let last_excp_from = reader.read_bytes()?;
+        let last_excp_to = reader.read_bytes()?;
+        // reserved_0x298: [u8;80]
+        let pkru = reader.skip_bytes::<80>()?.read_bytes()?;
+        let tsc_aux = reader.read_bytes()?;
+        // reserved_0x2f0: [u8;24]
+        let rcx = reader.skip_bytes::<24>()?.read_bytes()?;
+        let rdx = reader.read_bytes()?;
+        let rbx = reader.read_bytes()?;
+        // reserved_0x320 u64
+        let rbp = reader.skip_bytes::<8>()?.read_bytes()?;
+        let rsi = reader.read_bytes()?;
+        let rdi = reader.read_bytes()?;
+        let r8 = reader.read_bytes()?;
+        let r9 = reader.read_bytes()?;
+        let r10 = reader.read_bytes()?;
+        let r11 = reader.read_bytes()?;
+        let r12 = reader.read_bytes()?;
+        let r13 = reader.read_bytes()?;
+        let r14 = reader.read_bytes()?;
+        let r15 = reader.read_bytes()?;
+        // reserved_0x380 [u8;16]
+        let guest_exit_info_1 = reader.skip_bytes::<16>()?.read_bytes()?;
+        let guest_exit_info_2 = reader.read_bytes()?;
+        let guest_exit_int_info = reader.read_bytes()?;
+        let guest_nrip = reader.read_bytes()?;
+        let sev_features = reader.read_bytes()?;
+        let vintr_ctrl = reader.read_bytes()?;
+        let guest_exit_code = reader.read_bytes()?;
+        let virtual_tom = reader.read_bytes()?;
+        let tlb_id = reader.read_bytes()?;
+        let pcpu_id = reader.read_bytes()?;
+        let event_inj = reader.read_bytes()?;
+        let xcr0 = reader.read_bytes()?;
+        // reserved_0x3f0: [u8;16]
+
+        let x87_dp = reader.skip_bytes::<16>()?.read_bytes()?;
+        let mxcsr = reader.read_bytes()?;
+        let x87_ftw = reader.read_bytes()?;
+        let x87_fsw = reader.read_bytes()?;
+        let x87_fcw = reader.read_bytes()?;
+        let x87_fop = reader.read_bytes()?;
+        let x87_ds = reader.read_bytes()?;
+        let x87_cs = reader.read_bytes()?;
+        let x87_rip = reader.read_bytes()?;
+        let fpreg_x87 = reader.read_bytes()?;
+        let fpreg_xmm = reader.read_bytes()?;
+        let fpreg_ymm = reader.read_bytes()?;
+        let manual_padding = reader.read_bytes()?;
+        Ok(Self {
+            es,
+            cs,
+            ss,
+            ds,
+            fs,
+            gs,
+            gdtr,
+            ldtr,
+            idtr,
+            tr,
+            vmpl0_ssp,
+            vmpl1_ssp,
+            vmpl2_ssp,
+            vmpl3_ssp,
+            u_cet,
+            vmpl,
+            cpl,
+            efer,
+            xss,
+            cr4,
+            cr3,
+            cr0,
+            dr7,
+            dr6,
+            rflags,
+            rip,
+            dr0,
+            dr1,
+            dr2,
+            dr3,
+            dr0_addr_mask,
+            dr1_addr_mask,
+            dr2_addr_mask,
+            dr3_addr_mask,
+            rsp,
+            s_cet,
+            ssp,
+            isst_addr,
+            rax,
+            star,
+            lstar,
+            cstar,
+            sfmask,
+            kernel_gs_base,
+            sysenter_cs,
+            sysenter_esp,
+            sysenter_eip,
+            cr2,
+            g_pat,
+            dbgctrl,
+            br_from,
+            br_to,
+            last_excp_from,
+            last_excp_to,
+            pkru,
+            tsc_aux,
+            rcx,
+            rdx,
+            rbx,
+            rbp,
+            rsi,
+            rdi,
+            r8,
+            r9,
+            r10,
+            r11,
+            r12,
+            r13,
+            r14,
+            r15,
+            guest_exit_info_1,
+            guest_exit_info_2,
+            guest_exit_int_info,
+            guest_nrip,
+            sev_features,
+            vintr_ctrl,
+            guest_exit_code,
+            virtual_tom,
+            tlb_id,
+            pcpu_id,
+            event_inj,
+            xcr0,
+            x87_dp,
+            mxcsr,
+            x87_ftw,
+            x87_fsw,
+            x87_fcw,
+            x87_fop,
+            x87_ds,
+            x87_cs,
+            x87_rip,
+            fpreg_x87,
+            fpreg_xmm,
+            fpreg_ymm,
+            manual_padding,
+        })
+    }
+}
+
+impl ByteParser<()> for SevEsSaveArea {
+    type Bytes = [u8; Self::SIZE];
+    const EXPECTED_LEN: Option<usize> = Some(Self::SIZE);
+}
+impl SevEsSaveArea {
+    /// Size of the SEV-ES Save Area
+    pub const SIZE: usize = 4096;
 }
 
 const BSP_EIP: u64 = 0xffff_fff0;
@@ -404,10 +771,10 @@ impl VMSA {
 
     /// Return a vector containing the save area pages
     pub fn pages(&self, vcpus: usize) -> Result<Vec<Vec<u8>>, MeasurementError> {
-        let bsp_page = bincode::encode_to_vec(self.bsp_save_area, BINCODE_CFG)?;
+        let bsp_page = self.bsp_save_area.to_bytes()?.to_vec();
         let ap_save_area_bytes: Option<Vec<u8>> = self
             .ap_save_area
-            .map(|v| bincode::encode_to_vec(v, BINCODE_CFG))
+            .map(|v| v.to_bytes().map(|b| b.as_ref().to_vec()))
             .transpose()?;
 
         let mut pages = Vec::new();

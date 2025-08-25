@@ -2,7 +2,6 @@
 
 //! Functions to use to calculate the ID-BLOCK and the AUTH-BLOCK.
 
-use bincode;
 use openssl::{ec::EcKey, pkey::Private, sha::sha384};
 use std::{
     convert::{TryFrom, TryInto},
@@ -21,7 +20,7 @@ use crate::{
         },
         snp::SnpLaunchDigest,
     },
-    BINCODE_CFG,
+    parser::ByteParser,
 };
 
 /// Generate an AUTH-BLOCK using 2 EC P-384 keys and an already calculated ID-BlOCK
@@ -32,17 +31,13 @@ pub fn gen_id_auth_block(
 ) -> Result<IdAuth, IdBlockError> {
     let id_ec_priv_key = load_priv_key(id_key_file)?;
     let id_ec_pub_key = SevEcdsaPubKey::try_from(&id_ec_priv_key)?;
-    let id_sig = SevEcdsaSig::try_from((
-        id_ec_priv_key,
-        bincode::encode_to_vec(id_block, BINCODE_CFG)?.as_slice(),
-    ))?;
+    let serialized_id_block = id_block.to_bytes()?;
+    let id_sig = SevEcdsaSig::try_from((id_ec_priv_key, serialized_id_block.as_slice()))?;
 
     let author_ec_priv_key = load_priv_key(author_key_file)?;
     let author_pub_key = SevEcdsaPubKey::try_from(&author_ec_priv_key)?;
-    let author_sig = SevEcdsaSig::try_from((
-        author_ec_priv_key,
-        bincode::encode_to_vec(id_ec_pub_key, BINCODE_CFG)?.as_slice(),
-    ))?;
+    let author_sig =
+        SevEcdsaSig::try_from((author_ec_priv_key, id_ec_pub_key.to_bytes()?.as_slice()))?;
 
     Ok(IdAuth::new(
         None,
@@ -113,7 +108,7 @@ pub fn generate_key_digest(key_path: PathBuf) -> Result<SnpLaunchDigest, IdBlock
     let pub_key = SevEcdsaPubKey::try_from(&ec_key)?;
 
     Ok(SnpLaunchDigest::new(
-        sha384(bincode::encode_to_vec(pub_key, BINCODE_CFG)?.as_slice()).try_into()?,
+        sha384(pub_key.to_bytes()?.as_slice()).try_into()?,
     ))
 }
 
