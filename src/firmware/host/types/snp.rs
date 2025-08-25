@@ -1,31 +1,27 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::firmware::guest::{parse_tcb, write_tcb};
 pub(crate) use crate::firmware::linux::host as FFI;
 /// A representation of the type of data provided to [parse_table](crate::firmware::host::parse_table)
 pub use crate::firmware::linux::host::types::RawData;
-use bincode::{Decode, Encode};
 
 #[cfg(target_os = "linux")]
 use crate::error::CertError;
 use crate::{
+    parser::{ByteParser, Decoder, Encoder},
     util::{
         array::Array,
-        parser::{ByteParser, ReadExt, WriteExt},
+        parser_helper::{ReadExt, WriteExt},
     },
     Generation,
 };
-
 use std::{
     convert::{TryFrom, TryInto},
     fmt::{self, Display, Formatter},
-    io::Write,
+    io::{Read, Write},
     ops::BitOrAssign,
 };
 
 use bitfield::bitfield;
-
-use serde::{Deserialize, Serialize};
 
 use self::FFI::types::SnpSetConfig;
 
@@ -48,7 +44,7 @@ impl BitOrAssign for SnpPlatformStatusFlags {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, Encode, Decode)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[repr(C)]
 /// Certificates which are accepted for [CertTableEntry](self::CertTableEntry)
 pub enum CertType {
@@ -71,7 +67,13 @@ pub enum CertType {
     CRL,
 
     /// Other (Specify GUID)
-    OTHER(#[bincode(with_serde)] uuid::Uuid),
+    OTHER(uuid::Uuid),
+}
+
+impl Default for CertType {
+    fn default() -> Self {
+        Self::Empty
+    }
 }
 
 impl Display for CertType {
@@ -147,13 +149,36 @@ impl Ord for CertType {
     }
 }
 
+impl Encoder<()> for CertType {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
+        let bytes = uuid::Uuid::try_from(self.clone())
+            .map_err(|_| std::io::ErrorKind::InvalidData)?
+            .into_bytes();
+        writer.write_bytes(bytes, ())?;
+        Ok(())
+    }
+}
+
+impl Decoder<()> for CertType {
+    fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
+        let bytes = reader.read_bytes()?;
+        let uuid = uuid::Uuid::from_bytes(bytes);
+        Ok(CertType::try_from(&uuid).map_err(|_| std::io::ErrorKind::InvalidData)?)
+    }
+}
+
+impl ByteParser<()> for CertType {
+    type Bytes = [u8; 16];
+    const EXPECTED_LEN: Option<usize> = Some(16);
+}
+
 impl PartialOrd for CertType {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, Encode, Decode)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[repr(C)]
 /// An entry with information regarding a specific certificate.
 pub struct CertTableEntry {
@@ -162,6 +187,37 @@ pub struct CertTableEntry {
 
     /// The raw data of the certificate.
     pub data: Vec<u8>,
+}
+
+impl Encoder<()> for CertTableEntry {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
+        writer.write_bytes(self.cert_type.clone(), ())?;
+        writer.write_bytes(self.data.clone(), ())?;
+        Ok(())
+    }
+}
+
+impl Decoder<()> for CertTableEntry {
+    fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
+        let cert_type = reader.read_bytes()?;
+        let data = reader.read_bytes()?;
+        Ok(Self { cert_type, data })
+    }
+}
+
+impl ByteParser<()> for CertTableEntry {
+    type Bytes = Vec<u8>;
+
+    fn from_bytes(bytes: &[u8]) -> std::io::Result<Self> {
+        let mut rdr: &[u8] = bytes;
+        Self::decode(&mut rdr, ())
+    }
+
+    fn to_bytes(&self) -> std::io::Result<Self::Bytes> {
+        let mut out = Vec::new();
+        self.encode(&mut out, ())?;
+        Ok(out)
+    }
 }
 
 impl CertTableEntry {
@@ -229,7 +285,7 @@ pub struct TcbStatus {
 bitfield! {
     /// Various platform initialization configuration data. Byte 0x3 in SEV-SNP's
     /// STRUCT_PLATFORM_STATUS.
-    #[derive(PartialEq, Eq, PartialOrd, Ord)]
+    #[derive(Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
     pub struct PlatformInit(u8);
     impl Debug;
 
@@ -247,31 +303,28 @@ bitfield! {
     pub is_tio_en, _: 3;
 }
 
+impl Encoder<()> for PlatformInit {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
+        writer.write_bytes(self.0, ())?;
+        Ok(())
+    }
+}
+
+impl Decoder<()> for PlatformInit {
+    fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
+        let init = reader.read_bytes()?;
+        Ok(Self(init))
+    }
+}
+
+impl ByteParser<()> for PlatformInit {
+    type Bytes = [u8; 1];
+    const EXPECTED_LEN: Option<usize> = Some(1);
+}
+
 impl BitOrAssign for PlatformInit {
     fn bitor_assign(&mut self, rhs: Self) {
         self.0 |= rhs.0;
-    }
-}
-
-impl ByteParser for PlatformInit {
-    type Bytes = [u8; 1];
-
-    fn from_bytes(bytes: Self::Bytes) -> Self {
-        Self(u8::from_le_bytes(bytes))
-    }
-
-    fn to_bytes(&self) -> Self::Bytes {
-        self.0.to_le_bytes()
-    }
-
-    fn default() -> Self {
-        Self(Default::default())
-    }
-}
-
-impl Default for PlatformInit {
-    fn default() -> Self {
-        Self(ByteParser::default())
     }
 }
 
@@ -305,40 +358,45 @@ pub struct SnpPlatformStatus {
     /// Reported TCB version.
     pub reported_tcb_version: TcbVersion,
 }
-#[cfg(feature = "snp")]
-impl TryFrom<(Generation, &[u8])> for SnpPlatformStatus {
-    type Error = std::io::Error;
 
-    fn try_from(mut value: (Generation, &[u8])) -> Result<Self, Self::Error> {
-        //Cast FFI type to rust friendly type
-        let stepper: &mut &[u8] = &mut value.1;
-        let major: u8 = stepper.parse_bytes()?;
-        let minor: u8 = stepper.parse_bytes()?;
+impl Encoder<Generation> for SnpPlatformStatus {
+    fn encode(
+        &self,
+        writer: &mut impl Write,
+        generation: Generation,
+    ) -> Result<(), std::io::Error> {
+        writer.write_bytes(self.version.0, ())?;
+        writer.write_bytes(self.version.1, ())?;
+        writer.write_bytes(self.is_rmp_init, ())?;
+        writer.write_bytes(self.build_id, ())?;
+        writer.write_bytes(self.platform_policy, ())?;
+        writer.write_bytes(self.guest_count, ())?;
+        writer.write_bytes(self.platform_tcb_version, generation)?;
+        writer.write_bytes(self.reported_tcb_version, generation)?;
+        Ok(())
+    }
+}
 
-        // Find generation from CPUID
-        Ok(match value.0 {
-            Generation::Turin => Self {
-                version: (major, minor),
-                state: stepper.parse_bytes()?,
-                is_rmp_init: stepper.parse_bytes()?,
-                build_id: stepper.parse_bytes()?,
-                platform_policy: stepper.parse_bytes()?,
-                guest_count: stepper.parse_bytes()?,
-                platform_tcb_version: TcbVersion::from_turin_bytes(&stepper.parse_bytes()?),
-                reported_tcb_version: TcbVersion::from_turin_bytes(&stepper.parse_bytes()?),
-            },
-            _ => Self {
-                version: (major, minor),
-                state: stepper.parse_bytes()?,
-                is_rmp_init: stepper.parse_bytes()?,
-                build_id: stepper.parse_bytes()?,
-                platform_policy: stepper.parse_bytes()?,
-                guest_count: stepper.parse_bytes()?,
-                platform_tcb_version: TcbVersion::from_legacy_bytes(&stepper.parse_bytes()?),
-                reported_tcb_version: TcbVersion::from_legacy_bytes(&stepper.parse_bytes()?),
-            },
+impl Decoder<Generation> for SnpPlatformStatus {
+    fn decode(reader: &mut impl Read, generation: Generation) -> Result<Self, std::io::Error> {
+        let major = reader.read_bytes()?;
+        let minor = reader.read_bytes()?;
+        Ok(Self {
+            version: (major, minor),
+            state: reader.read_bytes()?,
+            is_rmp_init: reader.read_bytes()?,
+            build_id: reader.read_bytes()?,
+            platform_policy: reader.read_bytes()?,
+            guest_count: reader.read_bytes()?,
+            platform_tcb_version: reader.read_bytes_with(generation)?,
+            reported_tcb_version: reader.read_bytes_with(generation)?,
         })
     }
+}
+
+impl ByteParser<Generation> for SnpPlatformStatus {
+    type Bytes = [u8; 32];
+    const EXPECTED_LEN: Option<usize> = Some(32);
 }
 
 /// Sets the system wide configuration values for SNP.
@@ -377,7 +435,6 @@ impl Config {
     }
 }
 
-#[cfg(feature = "snp")]
 /// TryFrom to FFI Config when manually passing in the CPU generation
 impl TryFrom<(Config, Generation)> for FFI::types::SnpSetConfig {
     type Error = std::io::Error;
@@ -385,22 +442,14 @@ impl TryFrom<(Config, Generation)> for FFI::types::SnpSetConfig {
     fn try_from(args: (Config, Generation)) -> Result<Self, Self::Error> {
         let mut snp_config: SnpSetConfig = Default::default();
         let (value, generation) = args;
-
-        let mut buffer = Vec::new();
-        write_tcb(&mut buffer, &value.reported_tcb, &generation)?;
-        snp_config.reported_tcb = buffer.try_into().map_err(|_| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "Failed to convert TCB into bytes",
-            )
-        })?;
+        let tcb = value.reported_tcb.to_bytes_with(generation)?;
+        snp_config.reported_tcb = tcb;
         snp_config.mask_id = value.mask_id;
 
         Ok(snp_config)
     }
 }
 
-#[cfg(feature = "snp")]
 /// TryFrom to FFI Config type when CPU Generation is unknown
 impl TryFrom<Config> for FFI::types::SnpSetConfig {
     type Error = std::io::Error;
@@ -409,27 +458,20 @@ impl TryFrom<Config> for FFI::types::SnpSetConfig {
         let mut snp_config: SnpSetConfig = Default::default();
         let generation = Generation::identify_host_generation()?;
 
-        let mut buffer = Vec::new();
-        write_tcb(&mut buffer, &value.reported_tcb, &generation)?;
-        snp_config.reported_tcb = buffer.try_into().map_err(|_| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "Failed to convert TCB into bytes",
-            )
-        })?;
+        let tcb = value.reported_tcb.to_bytes_with(generation)?;
+        snp_config.reported_tcb = tcb;
         snp_config.mask_id = value.mask_id;
 
         Ok(snp_config)
     }
 }
 
-#[cfg(feature = "snp")]
 /// TryFrom from FFI Config type when CPU Generation is manually passed in
 impl TryFrom<(FFI::types::SnpSetConfig, Generation)> for Config {
     type Error = std::io::Error;
 
     fn try_from(value: (FFI::types::SnpSetConfig, Generation)) -> Result<Self, Self::Error> {
-        let reported_tcb = parse_tcb(&mut value.0.reported_tcb.as_slice(), &value.1)?;
+        let reported_tcb = TcbVersion::from_bytes_with(&value.0.reported_tcb, value.1)?;
         Ok(Self {
             reported_tcb,
             mask_id: value.0.mask_id,
@@ -438,14 +480,13 @@ impl TryFrom<(FFI::types::SnpSetConfig, Generation)> for Config {
     }
 }
 
-#[cfg(feature = "snp")]
 /// TryFrom from FFI Config type when CPU Generation is unknown
 impl TryFrom<FFI::types::SnpSetConfig> for Config {
     type Error = std::io::Error;
 
     fn try_from(value: FFI::types::SnpSetConfig) -> Result<Self, Self::Error> {
         let generation = Generation::identify_host_generation()?;
-        let reported_tcb = parse_tcb(&mut value.reported_tcb.as_slice(), &generation)?;
+        let reported_tcb = TcbVersion::from_bytes_with(&value.reported_tcb, generation)?;
         Ok(Self {
             reported_tcb,
             mask_id: value.mask_id,
@@ -457,20 +498,7 @@ impl TryFrom<FFI::types::SnpSetConfig> for Config {
 /// TcbVersion represents the version of the firmware.
 ///
 /// (Chapter 2.2; Table 3)
-#[derive(
-    Default,
-    Clone,
-    Copy,
-    Debug,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Serialize,
-    Deserialize,
-    Decode,
-    Encode,
-)]
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(C)]
 pub struct TcbVersion {
     /// Current FMC fw version
@@ -487,6 +515,47 @@ pub struct TcbVersion {
     pub snp: u8,
     /// Lowest current patch level of all the cores.
     pub microcode: u8,
+}
+
+impl Encoder<Generation> for TcbVersion {
+    fn encode(
+        &self,
+        writer: &mut impl Write,
+        generation: Generation,
+    ) -> Result<(), std::io::Error> {
+        let buffer = match generation {
+            Generation::Milan | Generation::Genoa => self.to_legacy_bytes(),
+            Generation::Turin => self.to_turin_bytes(),
+            _ => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Unsupported,
+                    "Unsupported Processor Generation for TCB writing",
+                ))
+            }
+        };
+        writer.write_bytes(buffer, ())?;
+        Ok(())
+    }
+}
+
+impl Decoder<Generation> for TcbVersion {
+    fn decode(reader: &mut impl Read, generation: Generation) -> Result<Self, std::io::Error> {
+        match generation {
+            Generation::Milan | Generation::Genoa => {
+                Ok(TcbVersion::from_legacy_bytes(&reader.read_bytes()?))
+            }
+            Generation::Turin => Ok(TcbVersion::from_turin_bytes(&reader.read_bytes()?)),
+            _ => Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "Unsupported Processor Generation for TCB parsing",
+            )),
+        }
+    }
+}
+
+impl ByteParser<Generation> for TcbVersion {
+    type Bytes = [u8; 8];
+    const EXPECTED_LEN: Option<usize> = Some(8);
 }
 
 impl TcbVersion {
@@ -577,7 +646,7 @@ bitfield! {
     /// |0|MASK_CHIP_ID|Indicates that the CHIP_ID field in the attestation report will alwaysbe zero.|
     /// |1|MASK_CHIP_KEY|Indicates that the VCEK is not used in attestation and guest key derivation.|
     #[repr(C)]
-    #[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Decode, Encode)]
+    #[derive(Default, Copy, Clone, PartialEq, Eq)]
     pub struct MaskId(u32);
     impl Debug;
     /// Indicates that the CHIP_ID field in the attestation report will alwaysbe zero.
@@ -586,26 +655,23 @@ bitfield! {
     pub mask_chip_key, _: 1;
 }
 
-impl Default for MaskId {
-    fn default() -> Self {
-        Self(ByteParser::default())
+impl Encoder<()> for MaskId {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
+        writer.write_bytes(self.0, ())?;
+        Ok(())
     }
 }
 
-impl ByteParser for MaskId {
+impl Decoder<()> for MaskId {
+    fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
+        let mask = reader.read_bytes()?;
+        Ok(Self(mask))
+    }
+}
+
+impl ByteParser<()> for MaskId {
     type Bytes = [u8; 4];
-
-    fn from_bytes(bytes: Self::Bytes) -> Self {
-        Self(u32::from_le_bytes(bytes))
-    }
-
-    fn to_bytes(&self) -> Self::Bytes {
-        self.0.to_le_bytes()
-    }
-
-    fn default() -> Self {
-        Self(0)
-    }
+    const EXPECTED_LEN: Option<usize> = Some(4);
 }
 
 impl Display for MaskId {
@@ -637,7 +703,7 @@ bitfield! {
     /// |6|CIPHERTEXT_HIDING_DRAM_EN|Indicates ciphertext hiding is enabled for the DRAM.|
     /// |31:7|-|Reserved.|
     #[repr(C)]
-    #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    #[derive(Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
     pub struct PlatformPolicy(u32);
     impl Debug;
     /// Indicates that the CHIP_ID field in the attestation report will alwaysbe zero.
@@ -658,26 +724,23 @@ bitfield! {
     pub is_tio_en, _: 7;
 }
 
-impl Default for PlatformPolicy {
-    fn default() -> Self {
-        Self(ByteParser::default())
+impl Encoder<()> for PlatformPolicy {
+    fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
+        writer.write_bytes(self.0, ())?;
+        Ok(())
     }
 }
 
-impl ByteParser for PlatformPolicy {
+impl Decoder<()> for PlatformPolicy {
+    fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
+        let policy = reader.read_bytes()?;
+        Ok(Self(policy))
+    }
+}
+
+impl ByteParser<()> for PlatformPolicy {
     type Bytes = [u8; 4];
-
-    fn from_bytes(bytes: Self::Bytes) -> Self {
-        Self(u32::from_le_bytes(bytes))
-    }
-
-    fn to_bytes(&self) -> Self::Bytes {
-        self.0.to_le_bytes()
-    }
-
-    fn default() -> Self {
-        Self(0)
-    }
+    const EXPECTED_LEN: Option<usize> = Some(4);
 }
 
 impl Display for PlatformPolicy {
@@ -707,7 +770,7 @@ impl Display for PlatformPolicy {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 /// Wrapped VLEK Hashstick strucutre.
 /// As defined in AMD's SEV-SNP specification chapter 8.30
 /// An address to a buffer containing this structure is passed to the snp_vlek_load command.
@@ -715,30 +778,44 @@ pub struct WrappedVlekHashstick {
     /// IV used to wrap chip-unique key
     pub iv: [u8; 12], // 96 bits = 12 bytes
 
+    // Reserved [u8;4]
     /// VLEK hashstick wrapped with a chip-unique key using AES-256-GCM
     pub vlek_wrapped: Array<u8, 384>,
 
     /// The TCB version associated with this VLEK hashstick
     pub tcb_version: TcbVersion,
 
+    // Reserved [u8;8]
     /// AES-256-GCM authentication tag of the wrapped VLEK hashstick and TCB_VERSION
     pub vlek_auth_tag: [u8; 16],
 }
 
-impl WrappedVlekHashstick {
-    /// Parses raw bytes into the WrappedVlekHashstick structure.
-    pub fn from_bytes(mut bytes: &[u8], generation: Generation) -> Result<Self, std::io::Error> {
-        if bytes.len() != 432usize {
-            return Err(std::io::ErrorKind::InvalidData)?;
-        }
+impl Encoder<Generation> for WrappedVlekHashstick {
+    fn encode(
+        &self,
+        writer: &mut impl Write,
+        generation: Generation,
+    ) -> Result<(), std::io::Error> {
+        writer.write_bytes(self.iv, ())?;
+        // Reserved [u8;4]
+        writer
+            .skip_bytes::<4>()?
+            .write_bytes(self.vlek_wrapped, ())?;
+        writer.write_bytes(self.tcb_version, generation)?;
+        // Reserved [u8;8]
+        writer
+            .skip_bytes::<8>()?
+            .write_bytes(self.vlek_auth_tag, ())?;
+        Ok(())
+    }
+}
 
-        let stepper = &mut bytes;
-
-        let iv: [u8; 12] = stepper.parse_bytes()?;
-        let vlek_wrapped: Array<u8, 384> = stepper.skip_bytes::<4>()?.parse_bytes()?;
-        let tcb_version = parse_tcb(stepper, &generation)?;
-        let vlek_auth_tag: [u8; 16] = stepper.skip_bytes::<8>()?.parse_bytes()?;
-
+impl Decoder<Generation> for WrappedVlekHashstick {
+    fn decode(reader: &mut impl Read, generation: Generation) -> Result<Self, std::io::Error> {
+        let iv = reader.read_bytes()?;
+        let vlek_wrapped = reader.skip_bytes::<4>()?.read_bytes()?;
+        let tcb_version = reader.read_bytes_with(generation)?;
+        let vlek_auth_tag = reader.skip_bytes::<8>()?.read_bytes()?;
         Ok(Self {
             iv,
             vlek_wrapped,
@@ -746,22 +823,11 @@ impl WrappedVlekHashstick {
             vlek_auth_tag,
         })
     }
+}
 
-    /// Writes the WrappedVlekHashstick structure to bytes.
-    pub fn write_bytes(
-        self,
-        mut handle: impl Write,
-        generation: Generation,
-    ) -> Result<(), std::io::Error> {
-        handle.write_bytes(self.iv)?;
-        handle.skip_bytes::<4>()?.write_bytes(self.vlek_wrapped)?;
-
-        write_tcb(&mut handle, &self.tcb_version, &generation)?;
-
-        handle.skip_bytes::<8>()?.write_bytes(self.vlek_auth_tag)?;
-
-        Ok(())
-    }
+impl ByteParser<Generation> for WrappedVlekHashstick {
+    type Bytes = [u8; 432];
+    const EXPECTED_LEN: Option<usize> = Some(432);
 }
 
 impl Display for WrappedVlekHashstick {
@@ -784,7 +850,6 @@ impl Display for WrappedVlekHashstick {
 mod tests {
 
     use super::*;
-    use crate::BINCODE_CFG;
     use uuid::Uuid;
 
     #[test]
@@ -1309,9 +1374,8 @@ mod tests {
         ];
 
         for cert_type in cert_types {
-            let serialized = bincode::encode_to_vec(&cert_type, BINCODE_CFG).unwrap();
-            let (deserialized, _): (CertType, usize) =
-                bincode::decode_from_slice(&serialized, BINCODE_CFG).unwrap();
+            let serialized = cert_type.to_bytes().unwrap();
+            let deserialized = CertType::from_bytes(&serialized).unwrap();
             assert_eq!(cert_type, deserialized);
         }
     }
@@ -1368,9 +1432,11 @@ mod tests {
     fn test_cert_table_entry_deserialization() {
         let entry = CertTableEntry::new(CertType::ARK, vec![1, 2, 3, 4]);
 
-        let serialized = bincode::encode_to_vec(&entry, BINCODE_CFG).unwrap();
-        let (deserialized, _): (CertTableEntry, usize) =
-            bincode::decode_from_slice(&serialized, BINCODE_CFG).unwrap();
+        let serialized = entry.to_bytes().unwrap();
+
+        let deserialized = CertTableEntry::from_bytes(&serialized).unwrap();
+
+        let entry = CertTableEntry::new(CertType::ARK, vec![1, 2, 3, 4]);
 
         assert_eq!(entry.cert_type, deserialized.cert_type);
         assert_eq!(entry.data, deserialized.data);
@@ -1398,9 +1464,8 @@ mod tests {
     fn test_tcb_version_deserialization() {
         let tcb = TcbVersion::new(None, 1, 2, 3, 4);
 
-        let serialized = bincode::encode_to_vec(tcb, BINCODE_CFG).unwrap();
-        let (deserialized, _): (TcbVersion, usize) =
-            bincode::decode_from_slice(&serialized, BINCODE_CFG).unwrap();
+        let serialized = tcb.to_legacy_bytes();
+        let deserialized = TcbVersion::from_legacy_bytes(&serialized);
 
         assert_eq!(tcb, deserialized);
     }
@@ -1416,10 +1481,8 @@ mod tests {
         ];
 
         for mask in test_cases {
-            let serialized = bincode::encode_to_vec(mask, BINCODE_CFG).unwrap();
-            let (deserialized, _): (MaskId, usize) =
-                bincode::decode_from_slice(&serialized, BINCODE_CFG).unwrap();
-
+            let serialized = mask.clone().to_bytes().unwrap();
+            let deserialized = MaskId::from_bytes(&serialized).unwrap();
             assert_eq!(mask.0, deserialized.0);
             assert_eq!(mask.mask_chip_id(), deserialized.mask_chip_id());
             assert_eq!(mask.mask_chip_key(), deserialized.mask_chip_key());
@@ -1554,11 +1617,11 @@ mod tests {
         let original = CertTableEntry::new(CertType::ARK, vec![0x41, 0x42, 0x43]);
 
         // Serialize and then deserialize
-        let serialized =
-            bincode::encode_to_vec(&original, BINCODE_CFG).expect("Failed to serialize");
-        let (deserialized, _): (CertTableEntry, usize) =
-            bincode::decode_from_slice(&serialized, BINCODE_CFG).expect("Failed to deserialize");
+        let serialized = original.to_bytes().unwrap();
+        let deserialized = CertTableEntry::from_bytes(&serialized).unwrap();
 
+        // Create a test entry
+        let original = CertTableEntry::new(CertType::ARK, vec![0x41, 0x42, 0x43]);
         // Verify deserialized data matches original
         assert_eq!(deserialized.cert_type, original.cert_type);
         assert_eq!(deserialized.data(), original.data());
@@ -1600,38 +1663,18 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn test_chain_visitor_methods() {
         // Test sequence visiting
         let chain_data = vec![
             CertTableEntry::new(CertType::ARK, vec![1]),
             CertTableEntry::new(CertType::ASK, vec![2]),
         ];
-        let serialized =
-            bincode::encode_to_vec(&chain_data, BINCODE_CFG).expect("Failed to serialize");
-        let (deserialized, _): (Vec<CertTableEntry>, usize) =
-            bincode::decode_from_slice(&serialized, BINCODE_CFG).expect("Failed to deserialize");
+        let mut serialized = CertTableEntry::cert_table_to_vec_bytes(&chain_data).unwrap();
+        let deserialized = CertTableEntry::vec_bytes_to_cert_table(&mut serialized).unwrap();
 
         assert_eq!(deserialized.len(), chain_data.len());
         assert_eq!(deserialized[0].cert_type, chain_data[0].cert_type);
-    }
-
-    #[test]
-    fn test_field_visitor_methods() {
-        // Test various field types
-        let bytes = vec![1u8, 2u8, 3u8];
-        let serialized = bincode::encode_to_vec(&bytes, BINCODE_CFG).expect("Failed to serialize");
-        let (deserialized, _): (Vec<u8>, usize) =
-            bincode::decode_from_slice(&serialized, BINCODE_CFG).expect("Failed to deserialize");
-
-        assert_eq!(deserialized, bytes);
-
-        // Test string field
-        let text = "test";
-        let serialized = bincode::encode_to_vec(text, BINCODE_CFG).expect("Failed to serialize");
-        let (deserialized, _): (String, usize) =
-            bincode::decode_from_slice(&serialized, BINCODE_CFG).expect("Failed to deserialize");
-
-        assert_eq!(deserialized, text);
     }
 
     #[test]
@@ -1672,7 +1715,7 @@ mod tests {
     #[test]
     fn test_mask_id_from_bytes() {
         let bytes: [u8; 4] = [0b11, 0b11, 0b11, 0b11];
-        let mask_id = MaskId::from_bytes(bytes);
+        let mask_id = MaskId::from_bytes(&bytes).unwrap();
         assert!(mask_id.mask_chip_id());
         assert!(mask_id.mask_chip_key());
     }
@@ -1680,7 +1723,7 @@ mod tests {
     #[test]
     fn test_mask_id_to_bytes() {
         let mask_id = MaskId(0x01020304);
-        let bytes = mask_id.to_bytes();
+        let bytes = mask_id.to_bytes().unwrap();
         assert_eq!(bytes, [0x04, 0x03, 0x02, 0x01]);
     }
 
@@ -1721,7 +1764,8 @@ mod tests {
                 1, 1, 0, 0, 0, 0, 1, 1, //Reported TCB
             ],
         };
-        let actual: SnpPlatformStatus = (Generation::Milan, &*raw_actual).try_into().unwrap();
+        let actual =
+            SnpPlatformStatus::from_bytes_with(&raw_actual.buffer, Generation::Milan).unwrap();
         assert_eq!(actual, expected);
     }
 
@@ -1756,7 +1800,8 @@ mod tests {
                 1, 1, 1, 1, 0, 0, 0, 1, //Reported TCB
             ],
         };
-        let actual: SnpPlatformStatus = (Generation::Turin, &*raw_actual).try_into().unwrap();
+        let actual =
+            SnpPlatformStatus::from_bytes_with(&raw_actual.buffer, Generation::Turin).unwrap();
         assert_eq!(actual, expected);
     }
 
@@ -1784,7 +1829,9 @@ mod tests {
         test_buffer.extend_from_slice(&[9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0]);
 
         // Parse the buffer
-        let hashstick = WrappedVlekHashstick::from_bytes(&test_buffer, Generation::Milan).unwrap();
+        let hashstick =
+            WrappedVlekHashstick::from_bytes_with(test_buffer.as_slice(), Generation::Milan)
+                .unwrap();
 
         // Verify the fields
         assert_eq!(hashstick.iv, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
@@ -1800,20 +1847,7 @@ mod tests {
     }
 
     #[test]
-    fn test_wrapped_vlek_hashstick_invalid_length() {
-        // Test with a buffer that's too short
-        let test_buffer = [0u8; 431]; // One byte too short
-        let result = WrappedVlekHashstick::from_bytes(&test_buffer, Generation::Milan);
-        assert!(result.is_err());
-
-        // Test with a buffer that's too long
-        let test_buffer = [0u8; 433]; // One byte too long
-        let result = WrappedVlekHashstick::from_bytes(&test_buffer, Generation::Milan);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_wrapped_vlek_hashstick_write_bytes() {
+    fn test_wrapped_vlek_hashstick_to_bytes() {
         // Create a test hashstick
         let hashstick = WrappedVlekHashstick {
             iv: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
@@ -1822,12 +1856,7 @@ mod tests {
             vlek_auth_tag: [9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0],
         };
 
-        // Write it to a buffer
-        let mut buffer = Vec::with_capacity(432);
-
-        hashstick
-            .write_bytes(&mut buffer, Generation::Milan)
-            .unwrap();
+        let buffer = hashstick.to_bytes_with(Generation::Milan).unwrap();
 
         // Verify the buffer is the correct length
         assert_eq!(buffer.len(), 432);
@@ -1840,7 +1869,7 @@ mod tests {
         // TCB_VERSION format depends on the CPU generation, so we'll read it back
         let tcb_bytes = &buffer[0x190..0x198];
 
-        let tcb = TcbVersion::from_legacy_bytes(&tcb_bytes.try_into().unwrap());
+        let tcb = TcbVersion::from_bytes_with(tcb_bytes, Generation::Milan).unwrap();
         assert_eq!(tcb.bootloader, 1);
         assert_eq!(tcb.tee, 2);
         assert_eq!(tcb.snp, 3);
@@ -1851,6 +1880,19 @@ mod tests {
             &buffer[0x1A0..0x1B0],
             &[9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0]
         ); // VLEK_AUTH_TAG
+    }
+
+    #[test]
+    fn test_wrapped_vlek_hashstick_invalid_length() {
+        // Test with a buffer that's too short
+        let test_buffer = [0u8; 431]; // One byte too short
+        let result = WrappedVlekHashstick::from_bytes_with(&test_buffer, Generation::Milan);
+        assert!(result.is_err());
+
+        // Test with a buffer that's too long
+        let test_buffer = [0u8; 433]; // One byte too long
+        let result = WrappedVlekHashstick::from_bytes_with(&test_buffer, Generation::Milan);
+        assert!(result.is_err());
     }
 
     #[test]
