@@ -4,9 +4,6 @@
 
 use crate::error::ArrayError;
 
-#[cfg(feature = "snp")]
-use crate::util::parser::ByteParser;
-
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 use std::{
@@ -15,12 +12,8 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use bincode::{Decode, Encode};
-
 /// Large array structure to serialize and default arrays larger than 32 bytes.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Encode, Decode,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(bound(serialize = "T: Serialize", deserialize = "T: Deserialize<'de>"))]
 pub struct Array<T, const N: usize>(#[serde(with = "BigArray")] pub [T; N]);
 
@@ -78,26 +71,6 @@ where
             write!(f, "{byte:02X}")?;
         }
         Ok(())
-    }
-}
-
-#[cfg(feature = "snp")]
-impl<const N: usize> ByteParser for Array<u8, N> {
-    type Bytes = [u8; N];
-
-    #[inline]
-    fn from_bytes(bytes: Self::Bytes) -> Self {
-        Self(bytes)
-    }
-
-    #[inline]
-    fn to_bytes(&self) -> Self::Bytes {
-        self.0
-    }
-
-    #[inline]
-    fn default() -> Self {
-        Self([0; N])
     }
 }
 
