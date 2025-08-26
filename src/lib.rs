@@ -286,10 +286,17 @@ impl Generation {
     pub fn identify_host_generation() -> Result<Self, std::io::Error> {
         use std::convert::TryInto;
 
-        let raw_cpuid = unsafe { std::arch::x86_64::__cpuid(0x8000_0001) }
+        #[cfg(target_arch = "x86_64")]
+        return unsafe { std::arch::x86_64::__cpuid(0x8000_0001) }
             .eax
-            .to_le_bytes();
-        raw_cpuid.as_slice().try_into()
+            .to_le_bytes()
+            .as_slice()
+            .try_into();
+
+        #[cfg(not(target_arch = "x86_64"))]
+        Err(std::io::Error::other(
+            "Cannot get EPYC generation on non-x86 platform",
+        ))
     }
 }
 
