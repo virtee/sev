@@ -5,7 +5,6 @@
 use super::*;
 
 use serde::{Deserialize, Serialize};
-// use std::result::Result;
 
 /// A complete certificate chain.
 #[repr(C)]
