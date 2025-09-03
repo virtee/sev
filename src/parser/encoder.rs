@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-use crate::util::array::*;
+
 use std::io::Write;
 /// Trait used to express encoding relationships.
 pub trait Encoder<T> {
@@ -17,13 +17,6 @@ impl<const N: usize> Encoder<()> for [u8; N] {
 impl Encoder<()> for Vec<u8> {
     fn encode(&self, writer: &mut impl Write, _params: ()) -> Result<(), std::io::Error> {
         writer.write_all(self)?;
-        Ok(())
-    }
-}
-
-impl<const N: usize> Encoder<()> for Array<u8, N> {
-    fn encode(&self, writer: &mut impl Write, _params: ()) -> Result<(), std::io::Error> {
-        writer.write_all(&self.0)?;
         Ok(())
     }
 }
