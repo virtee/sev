@@ -2,7 +2,7 @@
 
 //! Helpful primitives for developing the crate.
 
-pub mod array;
+// pub mod array;
 pub mod cached_chain;
 mod impl_const_id;
 pub mod parser_helper;
