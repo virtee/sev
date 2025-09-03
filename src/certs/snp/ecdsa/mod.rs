@@ -5,7 +5,10 @@ use super::*;
 
 use crate::{
     parser::{ByteParser, Decoder, Encoder},
-    util::parser_helper::{ReadExt, WriteExt},
+    util::{
+        hexline::HexLine,
+        parser_helper::{ReadExt, WriteExt},
+    },
 };
 
 use std::io::{Read, Result, Write};
@@ -107,9 +110,10 @@ impl std::fmt::Display for Signature {
         write!(
             f,
             r#"Signature:
-  R:{:?}
-  S:{:?}"#,
-            self.r, self.s
+  R:{}
+  S:{}"#,
+            HexLine(&self.r),
+            HexLine(&self.s)
         )
     }
 }
