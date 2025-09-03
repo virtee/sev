@@ -8,14 +8,14 @@ use crate::{
     error::AttestationReportError,
     firmware::host::TcbVersion,
     parser::{ByteParser, Decoder, Encoder},
-    util::{
-        array::Array,
-        parser_helper::{ReadExt, WriteExt},
-    },
+    util::parser_helper::{ReadExt, WriteExt},
     Generation,
 };
 
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde")]
+use serde_big_array::BigArray;
 
 use std::{
     fmt::Display,
@@ -130,7 +130,8 @@ bitfield! {
     pub get_launch_mit_vector, set_launch_mit_vector: 6;
 }
 
-#[derive(Default, Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 /// A semver formatted version.
 pub struct Version {
     /// Major Version
@@ -236,7 +237,8 @@ impl ByteParser<()> for ReportVariant {
 /// The launch_mit_vector and current_mit_vector fields
 /// The SEV-TIO field in the PlatformInfo field
 #[repr(C)]
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AttestationReport {
     /// Version number of this attestation report. Set to 2h for this specification.
     pub version: u32,
@@ -245,9 +247,9 @@ pub struct AttestationReport {
     /// The guest policy.
     pub policy: GuestPolicy,
     /// The family ID provided at launch.
-    pub family_id: Array<u8, 16>,
+    pub family_id: [u8; 16],
     /// The image ID provided at launch.
-    pub image_id: Array<u8, 16>,
+    pub image_id: [u8; 16],
     /// The request VMPL for the attestation report.
     pub vmpl: u32,
     /// The signature algorithm used to sign this report.
@@ -260,24 +262,29 @@ pub struct AttestationReport {
     pub key_info: KeyInfo,
 
     /// Guest-provided 512 Bits of Data
-    pub report_data: Array<u8, 64>,
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    pub report_data: [u8; 64],
 
     /// The measurement calculated at launch.
-    pub measurement: Array<u8, 48>,
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    pub measurement: [u8; 48],
+
     /// Data provided by the hypervisor at launch.
-    pub host_data: Array<u8, 32>,
+    pub host_data: [u8; 32],
 
     /// SHA-384 digest of the ID public key that signed the ID block provided
     /// in SNP_LANUNCH_FINISH.
-    pub id_key_digest: Array<u8, 48>,
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    pub id_key_digest: [u8; 48],
 
     /// SHA-384 digest of the Author public key that certified the ID key,
     /// if provided in SNP_LAUNCH_FINSIH. Zeroes if AUTHOR_KEY_EN is 1.
-    pub author_key_digest: Array<u8, 48>,
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    pub author_key_digest: [u8; 48],
     /// Report ID of this guest.
-    pub report_id: Array<u8, 32>,
+    pub report_id: [u8; 32],
     /// Report ID of this guest's migration agent (if applicable).
-    pub report_id_ma: Array<u8, 32>,
+    pub report_id_ma: [u8; 32],
     /// Reported TCB version used to derive the VCEK that signed this report.
     pub reported_tcb: TcbVersion,
     /// CPUID Familiy ID (Combined Extended Family ID and Family ID)
@@ -289,7 +296,8 @@ pub struct AttestationReport {
 
     /// If MaskChipId is set to 0, Identifier unique to the chip.
     /// Otherwise set to 0h.
-    pub chip_id: Array<u8, 64>,
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    pub chip_id: [u8; 64],
     /// CommittedTCB
     pub committed_tcb: TcbVersion,
     /// The build number of CurrentVersion
@@ -307,6 +315,42 @@ pub struct AttestationReport {
     pub signature: Signature,
 }
 
+impl Default for AttestationReport {
+    fn default() -> Self {
+        Self {
+            version: Default::default(),
+            guest_svn: Default::default(),
+            policy: Default::default(),
+            family_id: Default::default(),
+            image_id: Default::default(),
+            vmpl: Default::default(),
+            sig_algo: Default::default(),
+            current_tcb: Default::default(),
+            plat_info: Default::default(),
+            key_info: Default::default(),
+            report_data: [0u8; 64],
+            measurement: [0u8; 48],
+            host_data: Default::default(),
+            id_key_digest: [0u8; 48],
+            author_key_digest: [0u8; 48],
+            report_id: Default::default(),
+            report_id_ma: Default::default(),
+            reported_tcb: Default::default(),
+            cpuid_fam_id: Default::default(),
+            cpuid_mod_id: Default::default(),
+            cpuid_step: Default::default(),
+            chip_id: [0u8; 64],
+            committed_tcb: Default::default(),
+            current: Default::default(),
+            committed: Default::default(),
+            launch_tcb: Default::default(),
+            launch_mit_vector: Default::default(),
+            current_mit_vector: Default::default(),
+            signature: Default::default(),
+        }
+    }
+}
+
 impl Encoder<()> for AttestationReport {
     fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
         // Determine the variant based on version and CPUID step
@@ -318,7 +362,7 @@ impl Encoder<()> for AttestationReport {
 
         let generation = match variant {
             ReportVariant::V2 => {
-                if Self::chip_id_is_turin_like(&*self.chip_id)? {
+                if Self::chip_id_is_turin_like(&self.chip_id)? {
                     Generation::Turin
                 } else {
                     Generation::Genoa
@@ -534,9 +578,9 @@ Guest SVN:                    {}
 
 {}
 
-Family ID:{}
+Family ID:{:?}
 
-Image ID:{}
+Image ID:{:?}
 
 VMPL:                         {}
 
@@ -550,19 +594,19 @@ Current TCB:
 
 {}
 
-Report Data:{}
+Report Data:{:?}
 
-Measurement:{}
+Measurement:{:?}
 
-Host Data:{}
+Host Data:{:?}
 
-ID Key Digest:{}
+ID Key Digest:{:?}
 
-Author Key Digest:{}
+Author Key Digest:{:?}
 
-Report ID:{}
+Report ID:{:?}
 
-Report ID Migration Agent:{}
+Report ID Migration Agent:{:?}
 
 Reported TCB:
 
@@ -574,7 +618,7 @@ CPUID Model ID:               {}
 
 CPUID Stepping:               {}
 
-Chip ID:{}
+Chip ID:{:?}
 
 Committed TCB:
 
@@ -773,7 +817,8 @@ bitfield! {
     /// | 63:25  | -                 | Reserved. MBZ.                                                                                                     >
     ///
     #[repr(C)]
-    #[derive(Default, Deserialize, Clone, Copy, Eq, PartialEq, Serialize, PartialOrd, Ord)]
+    #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+    #[derive(Default, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
     pub struct GuestPolicy(u64);
     impl Debug;
     /// ABI_MINOR field: Indicates the minor API version.
@@ -886,7 +931,8 @@ bitfield! {
     /// Bit 7 indicates that SEV-TIO is enabled.
     /// Bits 8-63 are reserved.
     #[repr(C)]
-    #[derive(Default, Deserialize, Clone, Copy, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+    #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+    #[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     pub struct PlatformInfo(u64);
     impl Debug;
     /// Returns the bit state of SMT
@@ -972,7 +1018,8 @@ bitfield! {
     /// | 4:2    | SIGNING_KEY       | Encodes the key used to sign this report.                                                                          >
     /// | 5:31   | -                 | Reserved. Must be zero.                                                                                            >
     #[repr(C)]
-    #[derive(Default, Deserialize, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+    #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+    #[derive(Default, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
     pub struct KeyInfo(u32);
     impl Debug;
     /// AUTHOR_KEY_EN field: Indicates that the digest of the author key is present in AUTHOR_KEY_DIGEST
@@ -1583,7 +1630,7 @@ Signature:
         assert_eq!(report.version, 2);
         assert_eq!(report.guest_svn, 1);
         assert_eq!(report.vmpl, 3);
-        assert_eq!(report.measurement, [0; 48].try_into().unwrap());
+        assert_eq!(report.measurement, [0; 48]);
     }
 
     #[test]
@@ -1688,9 +1735,7 @@ Signature:
                 0xEF, 0x6A, 0x3A, 0xBC, 0x15, 0xD7, 0xAF, 0x38, 0xDB, 0x75, 0x70, 0x39, 0x02, 0x9F,
                 0x0E, 0xFA, 0xCF, 0xD0, 0x8E, 0x24, 0x43, 0x24, 0x88, 0x47, 0x38, 0xC7, 0x2B, 0x08,
                 0x2E, 0x2F, 0x87, 0xA4, 0x4D, 0x54, 0x1E, 0xB6,
-            ]
-            .try_into()
-            .unwrap(),
+            ],
             ..Default::default()
         };
 
@@ -1759,17 +1804,15 @@ Signature:
             version: 2,
             guest_svn: 1,
             policy: GuestPolicy::from(0xFF),
-            family_id: [0xAA; 16].try_into().unwrap(),
-            image_id: [0xBB; 16].try_into().unwrap(),
+            family_id: [0xAA; 16],
+            image_id: [0xBB; 16],
             chip_id: [
                 0xD4, 0x95, 0x54, 0xEC, 0x71, 0x7F, 0x4E, 0x5B, 0x0F, 0xE6, 0xB1, 0x43, 0xBC, 0xF0,
                 0x40, 0x5B, 0xD7, 0xAE, 0x30, 0x47, 0x27, 0xED, 0xF4, 0x66, 0x03, 0xF2, 0xA7, 0x6A,
                 0xEF, 0x6A, 0x3A, 0xBC, 0x15, 0xD7, 0xAF, 0x38, 0xDB, 0x75, 0x70, 0x39, 0x02, 0x9F,
                 0x0E, 0xFA, 0xCF, 0xD0, 0x8E, 0x24, 0x43, 0x24, 0x88, 0x47, 0x38, 0xC7, 0x2B, 0x08,
                 0x2E, 0x2F, 0x87, 0xA4, 0x4D, 0x54, 0x1E, 0xB6,
-            ]
-            .try_into()
-            .unwrap(),
+            ],
             ..Default::default()
         };
 
@@ -1780,8 +1823,8 @@ Signature:
         let read_back = AttestationReport::from_bytes(&buffer.unwrap()).unwrap();
         assert_eq!(read_back.version, 2);
         assert_eq!(read_back.guest_svn, 1);
-        assert_eq!(read_back.family_id, Array([0xAA; 16]));
-        assert_eq!(read_back.image_id, Array([0xBB; 16]));
+        assert_eq!(read_back.family_id, [0xAA; 16]);
+        assert_eq!(read_back.image_id, [0xBB; 16]);
     }
 
     #[test]
@@ -1798,9 +1841,7 @@ Signature:
                 0xEF, 0x6A, 0x3A, 0xBC, 0x15, 0xD7, 0xAF, 0x38, 0xDB, 0x75, 0x70, 0x39, 0x02, 0x9F,
                 0x0E, 0xFA, 0xCF, 0xD0, 0x8E, 0x24, 0x43, 0x24, 0x88, 0x47, 0x38, 0xC7, 0x2B, 0x08,
                 0x2E, 0x2F, 0x87, 0xA4, 0x4D, 0x54, 0x1E, 0xB6,
-            ]
-            .try_into()
-            .unwrap(),
+            ],
             ..Default::default()
         };
 
