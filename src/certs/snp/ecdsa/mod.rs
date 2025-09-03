@@ -5,10 +5,7 @@ use super::*;
 
 use crate::{
     parser::{ByteParser, Decoder, Encoder},
-    util::{
-        array::Array,
-        parser_helper::{ReadExt, WriteExt},
-    },
+    util::parser_helper::{ReadExt, WriteExt},
 };
 
 use std::io::{Read, Result, Write};
@@ -22,17 +19,35 @@ use std::convert::TryFrom;
 #[cfg(feature = "openssl")]
 use openssl::{bn, ecdsa};
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "serde")]
+use serde_big_array::BigArray;
+
 #[repr(C)]
-#[derive(Default, Copy, Clone, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, PartialOrd, Ord)]
 /// ECDSA signature.
 pub struct Signature {
-    r: Array<u8, 72>,
-    s: Array<u8, 72>,
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    r: [u8; 72],
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    s: [u8; 72],
+}
+
+impl Default for Signature {
+    fn default() -> Self {
+        Self {
+            r: [0u8; 72],
+            s: [0u8; 72],
+        }
+    }
 }
 
 impl Signature {
     /// Creates a new signature from the values specified
-    pub fn new(r: Array<u8, 72>, s: Array<u8, 72>) -> Self {
+    pub fn new(r: [u8; 72], s: [u8; 72]) -> Self {
         Self { r, s }
     }
     /// Returns the signatures `r` component
@@ -92,8 +107,8 @@ impl std::fmt::Display for Signature {
         write!(
             f,
             r#"Signature:
-  R:{}
-  S:{}"#,
+  R:{:?}
+  S:{:?}"#,
             self.r, self.s
         )
     }
@@ -104,8 +119,8 @@ impl From<ecdsa::EcdsaSig> for Signature {
     #[inline]
     fn from(value: ecdsa::EcdsaSig) -> Self {
         Signature {
-            r: Array(value.r().as_le_bytes()),
-            s: Array(value.s().as_le_bytes()),
+            r: value.r().as_le_bytes(),
+            s: value.s().as_le_bytes(),
         }
     }
 }
@@ -126,8 +141,8 @@ impl TryFrom<&Signature> for ecdsa::EcdsaSig {
 
     #[inline]
     fn try_from(value: &Signature) -> Result<Self> {
-        let r = bn::BigNum::from_le(&*value.r)?;
-        let s = bn::BigNum::from_le(&*value.s)?;
+        let r = bn::BigNum::from_le(&value.r)?;
+        let s = bn::BigNum::from_le(&value.s)?;
         Ok(ecdsa::EcdsaSig::from_private_components(r, s)?)
     }
 }
@@ -178,8 +193,8 @@ mod tests {
     #[test]
     fn test_signature_getters() {
         let sig: Signature = Signature {
-            r: Array([1u8; 72]),
-            s: Array([2u8; 72]),
+            r: [1u8; 72],
+            s: [2u8; 72],
         };
         assert_eq!(sig.r(), &[1u8; 72]);
         assert_eq!(sig.s(), &[2u8; 72]);
@@ -190,8 +205,8 @@ mod tests {
         let sig1: Signature = Default::default();
         let sig2: Signature = Default::default();
         let sig3: Signature = Signature {
-            r: Array([1u8; 72]),
-            s: Array([0u8; 72]),
+            r: [1u8; 72],
+            s: [0u8; 72],
         };
 
         assert_eq!(sig1, sig2);
@@ -202,8 +217,8 @@ mod tests {
     fn test_signature_ord() {
         let sig1: Signature = Default::default();
         let sig2: Signature = Signature {
-            r: Array([1u8; 72]),
-            s: Array([0u8; 72]),
+            r: [1u8; 72],
+            s: [0u8; 72],
         };
 
         assert!(sig1 < sig2);
@@ -286,8 +301,8 @@ mod tests {
         fn test_try_into_p384_signature() {
             // Test with non-zero values
             let sig = Signature {
-                r: Array([1u8; 72]),
-                s: Array([2u8; 72]),
+                r: [1u8; 72],
+                s: [2u8; 72],
             };
             let p384_sig: p384::ecdsa::Signature = (&sig).try_into().unwrap();
             assert_eq!(p384_sig.r().to_bytes().as_slice(), &[1u8; 48]);
@@ -308,8 +323,8 @@ mod tests {
     #[test]
     fn test_signature_max_values() {
         let sig: Signature = Signature {
-            r: Array([0xFF; 72]),
-            s: Array([0xFF; 72]),
+            r: [0xFF; 72],
+            s: [0xFF; 72],
         };
         assert_eq!(sig.r(), &[0xFF; 72]);
         assert_eq!(sig.s(), &[0xFF; 72]);
