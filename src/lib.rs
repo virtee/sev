@@ -146,8 +146,6 @@ use std::convert::TryFrom;
 
 use std::io::{Read, Write};
 
-use serde::{Deserialize, Serialize};
-
 /// A representation for EPYC generational product lines.
 ///
 /// Implements type conversion traits to determine which generation

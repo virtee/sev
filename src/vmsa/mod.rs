@@ -3,10 +3,7 @@
 //! Types and abstractions regarding Virtual Machine Save Areas (VMSAs).
 
 #![allow(dead_code)]
-use crate::{
-    parser::{Decoder, Encoder},
-    util::array::Array,
-};
+use crate::parser::{Decoder, Encoder};
 
 use super::{
     util::{TypeLoad, TypeSave},
@@ -14,6 +11,11 @@ use super::{
 };
 
 use std::{fs, io, mem::size_of};
+
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde")]
+use serde_big_array::BigArray;
 
 const ATTR_G_SHIFT: usize = 23;
 const ATTR_B_SHIFT: usize = 22;
@@ -49,7 +51,8 @@ const ATTR_W_MASK: u16 = 1 << ATTR_W_SHIFT;
 /// The layout of a VMCB struct is documented in Table B-1 of the
 /// AMD64 Architecture Programmer’s Manual, Volume 2: System Programming
 #[repr(C, packed)]
-#[derive(Default, Serialize, Deserialize, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Default, Clone, Copy)]
 pub struct VmcbSegment {
     /// Segment selector: documented in Figure 4-3 of the
     /// AMD64 Architecture Programmer’s Manual, Volume 2: System Programming
@@ -70,7 +73,8 @@ pub struct VmcbSegment {
 /// The layout of a VMCB struct is documented in Table B-4 of the
 /// AMD64 Architecture Programmer’s Manual, Volume 2: System Programming
 #[repr(C, packed)]
-#[derive(Default, Copy, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone)]
 pub struct Vmsa {
     /// Extra segment.
     es: VmcbSegment,
@@ -103,7 +107,8 @@ pub struct Vmsa {
     tr: VmcbSegment,
 
     /// Reserved.
-    reserved_1: Array<u8, 43>,
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    reserved_1: [u8; 43],
 
     /// Current privilege level.
     cpl: u8,
@@ -115,7 +120,8 @@ pub struct Vmsa {
     efer: u64,
 
     /// Reserved.
-    reserved_3: Array<u8, 104>,
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    reserved_3: [u8; 104],
 
     /// Bitmap of supervisor-level state components. System software sets bits
     /// in the XSS register bitmap to enable management of corresponding state
@@ -145,7 +151,8 @@ pub struct Vmsa {
     rip: u64,
 
     /// Reserved.
-    reserved_4: Array<u8, 88>,
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    reserved_4: [u8; 88],
 
     /// Stack pointer.
     rsp: u64,
@@ -211,7 +218,8 @@ pub struct Vmsa {
     last_excp_to: u64,
 
     /// Reserved.
-    reserved_7: Array<u8, 72>,
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    reserved_7: [u8; 72],
 
     /// Speculation Control of MSRs. Documented in Section 3.2.9 of the
     /// AMD64 Architecture Programmer’s Manual, Volume 2: System Programming
@@ -292,7 +300,8 @@ pub struct Vmsa {
     sw_scratch: u64,
 
     /// Reserved.
-    reserved_11: Array<u8, 56>,
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    reserved_11: [u8; 56],
 
     /// XCR0 register.
     xcr0: u64,
@@ -302,6 +311,86 @@ pub struct Vmsa {
 
     /// gPA of the x87 state.
     x87_state_gpa: u64,
+}
+
+impl Default for Vmsa {
+    fn default() -> Self {
+        Self {
+            es: Default::default(),
+            cs: Default::default(),
+            ss: Default::default(),
+            ds: Default::default(),
+            fs: Default::default(),
+            gs: Default::default(),
+            gdtr: Default::default(),
+            ldtr: Default::default(),
+            idtr: Default::default(),
+            tr: Default::default(),
+            reserved_1: [0u8; 43],
+            cpl: Default::default(),
+            reserved_2: Default::default(),
+            efer: Default::default(),
+            reserved_3: [0u8; 104],
+            xss: Default::default(),
+            cr4: Default::default(),
+            cr3: Default::default(),
+            cr0: Default::default(),
+            dr7: Default::default(),
+            dr6: Default::default(),
+            rflags: Default::default(),
+            rip: Default::default(),
+            reserved_4: [0u8; 88],
+            rsp: Default::default(),
+            reserved_5: Default::default(),
+            rax: Default::default(),
+            star: Default::default(),
+            lstar: Default::default(),
+            cstar: Default::default(),
+            sfmask: Default::default(),
+            kernel_gs_base: Default::default(),
+            sysenter_cs: Default::default(),
+            sysenter_esp: Default::default(),
+            sysenter_eip: Default::default(),
+            cr2: Default::default(),
+            reserved_6: Default::default(),
+            g_pat: Default::default(),
+            dbgctl: Default::default(),
+            br_from: Default::default(),
+            br_to: Default::default(),
+            last_excp_from: Default::default(),
+            last_excp_to: Default::default(),
+            reserved_7: [0u8; 72],
+            spec_ctrl: Default::default(),
+            reserved_7b: Default::default(),
+            pkru: Default::default(),
+            reserved_7a: Default::default(),
+            reserved_8: Default::default(),
+            rcx: Default::default(),
+            rdx: Default::default(),
+            rbx: Default::default(),
+            reserved_9: Default::default(),
+            rbp: Default::default(),
+            rsi: Default::default(),
+            rdi: Default::default(),
+            r8: Default::default(),
+            r9: Default::default(),
+            r10: Default::default(),
+            r11: Default::default(),
+            r12: Default::default(),
+            r13: Default::default(),
+            r14: Default::default(),
+            r15: Default::default(),
+            reserved_10: Default::default(),
+            sw_exit_code: Default::default(),
+            sw_exit_info_1: Default::default(),
+            sw_exit_info_2: Default::default(),
+            sw_scratch: Default::default(),
+            reserved_11: [0u8; 56],
+            xcr0: Default::default(),
+            valid_bitmap: Default::default(),
+            x87_state_gpa: Default::default(),
+        }
+    }
 }
 
 impl Decoder<()> for Vmsa {

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::util::array::*;
 use std::io::Read;
 /// Trait used to express decoding relationships.
 pub trait Decoder<T>: Sized {
@@ -21,14 +20,6 @@ impl Decoder<()> for Vec<u8> {
         let mut buf = Vec::new();
         reader.read_to_end(&mut buf)?;
         Ok(buf)
-    }
-}
-
-impl<const N: usize> Decoder<()> for Array<u8, N> {
-    fn decode(reader: &mut impl Read, _params: ()) -> Result<Self, std::io::Error> {
-        let mut buf = [0u8; N];
-        reader.read_exact(&mut buf)?;
-        Ok(Array(buf))
     }
 }
 
@@ -107,29 +98,6 @@ mod tests {
         let mut extra = [0u8; 1];
         let n = rdr.read(&mut extra).expect("read after end");
         assert_eq!(n, 0);
-    }
-
-    #[test]
-    fn array_wrapper_encode_decode() {
-        const N: usize = 16;
-        let orig_inner: [u8; N] = *b"0123456789ABCDEF";
-        let orig = Array(orig_inner);
-
-        let enc = encode_to_vec(&orig);
-        assert_eq!(enc, orig_inner);
-
-        let dec: Array<u8, N> = decode_from_slice(&enc);
-        assert_eq!(dec.0, orig_inner);
-    }
-
-    #[test]
-    fn array_wrapper_decode_short_errors() {
-        const N: usize = 16;
-        let short = [0u8; N - 2];
-        let mut rdr: &[u8] = &short;
-
-        let err = <Array<u8, N> as Decoder<()>>::decode(&mut rdr, ()).unwrap_err();
-        assert_eq!(err.kind(), std::io::ErrorKind::UnexpectedEof);
     }
 
     #[test]

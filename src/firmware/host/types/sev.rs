@@ -5,17 +5,16 @@
 use crate::firmware::host::State;
 pub use crate::firmware::linux::host::types::PlatformStatusFlags;
 use crate::parser::{Decoder, Encoder};
-use crate::util::{array::Array, TypeLoad, TypeSave};
+use crate::util::{TypeLoad, TypeSave};
 
 #[cfg(feature = "openssl")]
 use std::convert::TryInto;
 
 #[cfg(feature = "openssl")]
 use crate::certs::sev::{
-    sev::{Certificate, Usage},
+    sev::{Certificate, EcdsaSignature, Usage},
     PublicKey, Verifiable,
 };
-
 #[cfg(feature = "openssl")]
 use openssl::{ec::EcKey, ecdsa::EcdsaSig, pkey::Public, sha::Sha256};
 
@@ -23,6 +22,12 @@ use std::{
     fmt::Debug,
     io::{Read, Write},
 };
+
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "serde")]
+use serde_big_array::BigArray;
 
 const MNONCE_SIZE: usize = 128 / 8;
 const DIGEST_SIZE: usize = 256 / 8;
@@ -32,6 +37,7 @@ const MEASURABLE_BYTES: usize = MNONCE_SIZE + DIGEST_SIZE + POLICY_SIZE;
 
 /// Information about the SEV platform version.
 #[repr(C)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Version {
     /// The major version number.
@@ -58,6 +64,7 @@ impl From<u16> for Version {
 
 /// A description of the SEV platform's build information.
 #[repr(C)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd)]
 pub struct Build {
     /// The version information.
@@ -105,8 +112,8 @@ pub struct Status {
 }
 
 /// An attestation report structure.
-#[derive(Default)]
 #[repr(C)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LegacyAttestationReport {
     /// 128-bit Nonce from the Command Buffer.
     pub mnonce: [u8; MNONCE_SIZE], // 0x00
@@ -121,7 +128,22 @@ pub struct LegacyAttestationReport {
     /// Reserved
     _reserved_0: u32, // 0x3C
     /// Signature of the report.
-    pub signature: Array<u8, 144>, // 0x40 - 0xCF
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    pub signature: [u8; 144], // 0x40 - 0xCF
+}
+
+impl Default for LegacyAttestationReport {
+    fn default() -> Self {
+        Self {
+            mnonce: Default::default(),
+            launch_digest: Default::default(),
+            policy: Default::default(),
+            sig_usage: Default::default(),
+            sig_algo: Default::default(),
+            _reserved_0: Default::default(),
+            signature: [0u8; 144],
+        }
+    }
 }
 
 impl LegacyAttestationReport {
@@ -140,10 +162,14 @@ impl Verifiable for (&Certificate, &LegacyAttestationReport) {
     type Output = ();
 
     fn verify(self) -> std::io::Result<Self::Output> {
+        use std::convert::TryFrom;
+
         let sev_pub_key: PublicKey<Usage> = self.0.try_into()?;
         let pub_key: &EcKey<Public> = &sev_pub_key.ec_key()?;
 
-        let sig: EcdsaSig = (&self.1.signature).try_into()?;
+        let sig = EcdsaSignature::try_from(self.1.signature.as_slice())?;
+
+        let sig: EcdsaSig = sig.try_into()?;
 
         let mut hasher = Sha256::new();
         hasher.update(&self.1.measurable_bytes());

@@ -20,6 +20,8 @@ use crate::*;
 use std::{convert::TryFrom, mem::MaybeUninit, os::unix::io::AsRawFd, result::Result};
 
 use bitflags::bitflags;
+
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 /// Launcher type-state that indicates a brand new launch.
@@ -274,6 +276,7 @@ bitflags! {
     }
 }
 
+#[cfg(feature = "serde")]
 impl Serialize for PolicyFlags {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -302,6 +305,7 @@ impl Serialize for PolicyFlags {
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for PolicyFlags {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -342,7 +346,8 @@ impl From<u32> for Policy {
 /// A secure channel between the tenant and the AMD Secure
 /// Processor.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Session {
     /// Used for deriving a shared secret between the tenant
     /// and the AMD SP.
@@ -400,6 +405,7 @@ bitflags! {
     }
 }
 
+#[cfg(feature = "serde")]
 impl Serialize for HeaderFlags {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -413,6 +419,7 @@ impl Serialize for HeaderFlags {
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for HeaderFlags {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -427,7 +434,8 @@ impl<'de> Deserialize<'de> for HeaderFlags {
 /// The header for a data packet that contains secret information
 /// to be injected into the guest.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Header {
     /// Describes the secret packet (for example: if it is
     /// compressed).
@@ -442,7 +450,8 @@ pub struct Header {
 
 /// A packet containing secret information to be injected
 /// into the guest.
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Secret {
     /// The header for this packet.
     pub header: Header,
@@ -469,7 +478,8 @@ impl Encoder<()> for Secret {
 
 /// A measurement of the SEV guest.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Measurement {
     /// The measurement.
     pub measure: [u8; 32],

@@ -5,10 +5,7 @@ use crate::{
     error::MeasurementError,
     measurement::vcpu_types::CpuType,
     parser::{ByteParser, Decoder, Encoder},
-    util::{
-        array::Array,
-        parser_helper::{ReadExt, WriteExt},
-    },
+    util::parser_helper::{ReadExt, WriteExt},
 };
 use bitfield::bitfield;
 use std::{
@@ -16,6 +13,12 @@ use std::{
     io::{Read, Write},
     str::FromStr,
 };
+
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "serde")]
+use serde_big_array::BigArray;
 
 /// Different Possible SEV modes
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -79,6 +82,7 @@ impl fmt::Debug for VMMType {
 /// The layout of a VMCB struct is documented in Table B-1 of the
 /// AMD64 Architecture Programmer’s Manual, Volume 2: System Programming
 #[repr(C)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Default, Debug, Clone, Copy)]
 struct VmcbSeg {
     /// Segment selector: documented in Figure 4-3 of the
@@ -160,6 +164,7 @@ bitfield! {
     /// | 15 | SmtProtection |
     /// | 63:16 | Reserved, SBZ |
     #[repr(C)]
+    #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
     #[derive(Copy, Clone, PartialEq, Eq)]
     pub struct GuestFeatures(u64);
     impl Debug;
@@ -223,7 +228,8 @@ impl Default for GuestFeatures {
 /// https://github.com/AMDESE/linux/blob/sev-snp-v12/arch/x86/include/asm/svm.h#L318
 /// (following the definitions in AMD APM Vol 2 Table B-4)
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Copy)]
 struct SevEsSaveArea {
     es: VmcbSeg,
     cs: VmcbSeg,
@@ -318,10 +324,116 @@ struct SevEsSaveArea {
     x87_ds: u16,
     x87_cs: u16,
     x87_rip: u64,
-    fpreg_x87: Array<u8, 80>,
-    fpreg_xmm: Array<u8, 256>,
-    fpreg_ymm: Array<u8, 256>,
-    manual_padding: Array<u8, 2448>,
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    fpreg_x87: [u8; 80],
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    fpreg_xmm: [u8; 256],
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    fpreg_ymm: [u8; 256],
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    manual_padding: [u8; 2448],
+}
+
+impl Default for SevEsSaveArea {
+    fn default() -> Self {
+        Self {
+            es: Default::default(),
+            cs: Default::default(),
+            ss: Default::default(),
+            ds: Default::default(),
+            fs: Default::default(),
+            gs: Default::default(),
+            gdtr: Default::default(),
+            ldtr: Default::default(),
+            idtr: Default::default(),
+            tr: Default::default(),
+            vmpl0_ssp: Default::default(),
+            vmpl1_ssp: Default::default(),
+            vmpl2_ssp: Default::default(),
+            vmpl3_ssp: Default::default(),
+            u_cet: Default::default(),
+            vmpl: Default::default(),
+            cpl: Default::default(),
+            efer: Default::default(),
+            xss: Default::default(),
+            cr4: Default::default(),
+            cr3: Default::default(),
+            cr0: Default::default(),
+            dr7: Default::default(),
+            dr6: Default::default(),
+            rflags: Default::default(),
+            rip: Default::default(),
+            dr0: Default::default(),
+            dr1: Default::default(),
+            dr2: Default::default(),
+            dr3: Default::default(),
+            dr0_addr_mask: Default::default(),
+            dr1_addr_mask: Default::default(),
+            dr2_addr_mask: Default::default(),
+            dr3_addr_mask: Default::default(),
+            rsp: Default::default(),
+            s_cet: Default::default(),
+            ssp: Default::default(),
+            isst_addr: Default::default(),
+            rax: Default::default(),
+            star: Default::default(),
+            lstar: Default::default(),
+            cstar: Default::default(),
+            sfmask: Default::default(),
+            kernel_gs_base: Default::default(),
+            sysenter_cs: Default::default(),
+            sysenter_esp: Default::default(),
+            sysenter_eip: Default::default(),
+            cr2: Default::default(),
+            g_pat: Default::default(),
+            dbgctrl: Default::default(),
+            br_from: Default::default(),
+            br_to: Default::default(),
+            last_excp_from: Default::default(),
+            last_excp_to: Default::default(),
+            pkru: Default::default(),
+            tsc_aux: Default::default(),
+            rcx: Default::default(),
+            rdx: Default::default(),
+            rbx: Default::default(),
+            rbp: Default::default(),
+            rsi: Default::default(),
+            rdi: Default::default(),
+            r8: Default::default(),
+            r9: Default::default(),
+            r10: Default::default(),
+            r11: Default::default(),
+            r12: Default::default(),
+            r13: Default::default(),
+            r14: Default::default(),
+            r15: Default::default(),
+            guest_exit_info_1: Default::default(),
+            guest_exit_info_2: Default::default(),
+            guest_exit_int_info: Default::default(),
+            guest_nrip: Default::default(),
+            sev_features: Default::default(),
+            vintr_ctrl: Default::default(),
+            guest_exit_code: Default::default(),
+            virtual_tom: Default::default(),
+            tlb_id: Default::default(),
+            pcpu_id: Default::default(),
+            event_inj: Default::default(),
+            xcr0: Default::default(),
+            x87_dp: Default::default(),
+            mxcsr: Default::default(),
+            x87_ftw: Default::default(),
+            x87_fsw: Default::default(),
+            x87_fcw: Default::default(),
+            x87_fop: Default::default(),
+            x87_ds: Default::default(),
+            x87_cs: Default::default(),
+            x87_rip: Default::default(),
+            fpreg_x87: [0u8; 80],
+            fpreg_xmm: [0u8; 256],
+            fpreg_ymm: [0u8; 256],
+            manual_padding: [0u8; 2448],
+        }
+    }
 }
 
 impl Encoder<()> for SevEsSaveArea {

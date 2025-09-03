@@ -9,7 +9,7 @@ use crate::error::CertError;
 use crate::{
     parser::{ByteParser, Decoder, Encoder},
     util::{
-        array::Array,
+        hexline::HexLine,
         parser_helper::{ReadExt, WriteExt},
     },
     Generation,
@@ -24,6 +24,9 @@ use std::{
 use bitfield::bitfield;
 
 use self::FFI::types::SnpSetConfig;
+
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 bitfield! {
     /// The platform's status flags.
@@ -44,6 +47,7 @@ impl BitOrAssign for SnpPlatformStatusFlags {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[repr(C)]
 /// Certificates which are accepted for [CertTableEntry](self::CertTableEntry)
@@ -178,6 +182,7 @@ impl PartialOrd for CertType {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[repr(C)]
 /// An entry with information regarding a specific certificate.
@@ -498,6 +503,7 @@ impl TryFrom<FFI::types::SnpSetConfig> for Config {
 /// TcbVersion represents the version of the firmware.
 ///
 /// (Chapter 2.2; Table 3)
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Default, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(C)]
 pub struct TcbVersion {
@@ -646,6 +652,7 @@ bitfield! {
     /// |0|MASK_CHIP_ID|Indicates that the CHIP_ID field in the attestation report will alwaysbe zero.|
     /// |1|MASK_CHIP_KEY|Indicates that the VCEK is not used in attestation and guest key derivation.|
     #[repr(C)]
+    #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
     #[derive(Default, Copy, Clone, PartialEq, Eq)]
     pub struct MaskId(u32);
     impl Debug;
@@ -770,7 +777,7 @@ impl Display for PlatformPolicy {
     }
 }
 
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// Wrapped VLEK Hashstick strucutre.
 /// As defined in AMD's SEV-SNP specification chapter 8.30
 /// An address to a buffer containing this structure is passed to the snp_vlek_load command.
@@ -780,7 +787,7 @@ pub struct WrappedVlekHashstick {
 
     // Reserved [u8;4]
     /// VLEK hashstick wrapped with a chip-unique key using AES-256-GCM
-    pub vlek_wrapped: Array<u8, 384>,
+    pub vlek_wrapped: [u8; 384],
 
     /// The TCB version associated with this VLEK hashstick
     pub tcb_version: TcbVersion,
@@ -788,6 +795,17 @@ pub struct WrappedVlekHashstick {
     // Reserved [u8;8]
     /// AES-256-GCM authentication tag of the wrapped VLEK hashstick and TCB_VERSION
     pub vlek_auth_tag: [u8; 16],
+}
+
+impl Default for WrappedVlekHashstick {
+    fn default() -> Self {
+        Self {
+            iv: Default::default(),
+            vlek_wrapped: [0u8; 384],
+            tcb_version: Default::default(),
+            vlek_auth_tag: Default::default(),
+        }
+    }
 }
 
 impl Encoder<Generation> for WrappedVlekHashstick {
@@ -836,12 +854,15 @@ impl Display for WrappedVlekHashstick {
             f,
             r#"
     Wrapped VLEK Hashstick:
-    IV:                      {:?}
+    IV:                      {}
     VLEK hashstic Wrapped:   {}
     TCB: 
     {}
-    VLEK authentication tag: {:?}"#,
-            self.iv, self.vlek_wrapped, self.tcb_version, self.vlek_auth_tag
+    VLEK authentication tag: {}"#,
+            HexLine(&self.iv),
+            HexLine(&self.vlek_wrapped),
+            self.tcb_version,
+            HexLine(&self.vlek_auth_tag)
         )
     }
 }
@@ -1851,7 +1872,7 @@ mod tests {
         // Create a test hashstick
         let hashstick = WrappedVlekHashstick {
             iv: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-            vlek_wrapped: Array([42; 384]),
+            vlek_wrapped: [42; 384],
             tcb_version: TcbVersion::new(None, 1, 2, 3, 4),
             vlek_auth_tag: [9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0],
         };
@@ -1900,7 +1921,7 @@ mod tests {
         // Create a test hashstick
         let hashstick = WrappedVlekHashstick {
             iv: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-            vlek_wrapped: Array([42; 384]),
+            vlek_wrapped: [42; 384],
             tcb_version: TcbVersion::new(None, 1, 2, 3, 4),
             vlek_auth_tag: [9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0],
         };

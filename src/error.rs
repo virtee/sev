@@ -922,6 +922,9 @@ pub enum IdBlockError {
 
     /// Error when handling SEV ECDSA Signature
     SevEcsdsaSigError(String),
+
+    /// Error when converting vector into array
+    BadVectorError(usize, usize),
 }
 
 impl std::fmt::Display for IdBlockError {
@@ -938,6 +941,10 @@ impl std::fmt::Display for IdBlockError {
             IdBlockError::SevEcsdsaSigError(msg) => {
                 write!(f, "Error validation SEV signature: {msg}")
             }
+            IdBlockError::BadVectorError(vec_size, expected) => write!(
+                f,
+                "Bad vector length: Got {vec_size}, and expected: {expected}"
+            ),
         }
     }
 }

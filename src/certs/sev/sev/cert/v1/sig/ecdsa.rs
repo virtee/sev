@@ -3,21 +3,36 @@
 #[cfg(feature = "openssl")]
 use {super::*, openssl::ecdsa};
 
-use crate::util::array::Array;
+use crate::util::hexline::HexLine;
 
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde")]
+use serde_big_array::BigArray;
 
 const SIG_PIECE_SIZE: usize = std::mem::size_of::<[u8; 72]>();
 
 /// An ECDSA Signature.
 #[repr(C)]
-#[derive(Default, Copy, Clone, Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone)]
 pub struct Signature {
-    r: Array<u8, 72>,
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    r: [u8; 72],
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    s: [u8; 72],
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    _reserved: [u8; 512 - (SIG_PIECE_SIZE * 2)],
+}
 
-    s: Array<u8, 72>,
-
-    _reserved: Array<u8, { 512 - (SIG_PIECE_SIZE * 2) }>,
+impl Default for Signature {
+    fn default() -> Self {
+        Self {
+            r: [0u8; 72],
+            s: [0u8; 72],
+            _reserved: [0u8; 512 - (SIG_PIECE_SIZE * 2)],
+        }
+    }
 }
 
 impl std::fmt::Debug for Signature {
@@ -47,7 +62,8 @@ Signature:
   R: {}
   S: {}
             "#,
-            self.r, self.s
+            HexLine(&self.r),
+            HexLine(&self.s)
         )
     }
 }
@@ -57,9 +73,9 @@ impl From<ecdsa::EcdsaSig> for Signature {
     #[inline]
     fn from(value: ecdsa::EcdsaSig) -> Self {
         Signature {
-            r: Array(value.r().as_le_bytes()),
-            s: Array(value.s().as_le_bytes()),
-            _reserved: Array([0; 512 - (SIG_PIECE_SIZE * 2)]),
+            r: value.r().as_le_bytes(),
+            s: value.s().as_le_bytes(),
+            _reserved: [0; 512 - (SIG_PIECE_SIZE * 2)],
         }
     }
 }
@@ -75,14 +91,13 @@ impl TryFrom<&[u8]> for Signature {
 }
 
 #[cfg(feature = "openssl")]
-impl TryFrom<&Array<u8, 144>> for ecdsa::EcdsaSig {
+impl TryFrom<Signature> for ecdsa::EcdsaSig {
     type Error = Error;
 
     #[inline]
-    fn try_from(value: &Array<u8, 144>) -> Result<Self> {
-        let arr: &[u8] = value.as_ref();
-        let r = bn::BigNum::from_le(&arr[..SIG_PIECE_SIZE])?;
-        let s = bn::BigNum::from_le(&arr[SIG_PIECE_SIZE..])?;
+    fn try_from(value: Signature) -> Result<Self> {
+        let r = bn::BigNum::from_le(&value.r)?;
+        let s = bn::BigNum::from_le(&value.s)?;
         Ok(ecdsa::EcdsaSig::from_private_components(r, s)?)
     }
 }
@@ -93,8 +108,8 @@ impl TryFrom<&Signature> for ecdsa::EcdsaSig {
 
     #[inline]
     fn try_from(value: &Signature) -> Result<Self> {
-        let r = bn::BigNum::from_le(&*value.r)?;
-        let s = bn::BigNum::from_le(&*value.s)?;
+        let r = bn::BigNum::from_le(&value.r)?;
+        let s = bn::BigNum::from_le(&value.s)?;
         Ok(ecdsa::EcdsaSig::from_private_components(r, s)?)
     }
 }

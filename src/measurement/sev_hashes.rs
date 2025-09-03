@@ -18,9 +18,13 @@ use crate::error::*;
 use crate::parser::{ByteParser, Decoder, Encoder};
 use crate::util::parser_helper::{ReadExt, WriteExt};
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 type Sha256Hash = [u8; 32];
 
 /// GUID stored as little endian
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, Default)]
 struct GuidLe {
     _data: [u8; 16],
@@ -72,6 +76,7 @@ impl FromStr for GuidLe {
 
 /// SEV hash table entry
 #[repr(C)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, Default)]
 struct SevHashTableEntry {
     /// GUID of the SEV hash
@@ -117,6 +122,7 @@ impl SevHashTableEntry {
 
 /// Table of SEV hashes
 #[repr(C)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, Default)]
 struct SevHashTable {
     /// GUID of the SEV hash table entry
@@ -183,6 +189,7 @@ impl SevHashTable {
 
 /// Padded SEV hash table
 #[repr(C)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, Default)]
 struct PaddedSevHashTable {
     ht: SevHashTable,

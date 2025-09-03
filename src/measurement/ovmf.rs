@@ -15,6 +15,9 @@ use std::{
 };
 use uuid::{uuid, Uuid};
 
+#[cfg(feature = "serde")]
+use serde::Deserialize;
+
 /// Convert a UUID into a little endian slice
 pub fn guid_le_to_slice(guid: &str) -> Result<[u8; 16], MeasurementError> {
     let guid = Uuid::try_from(guid)?;
@@ -25,6 +28,7 @@ pub fn guid_le_to_slice(guid: &str) -> Result<[u8; 16], MeasurementError> {
 }
 
 /// Types of sections declared by OVMF SEV Metadata, as appears in: https://github.com/tianocore/edk2/blob/edk2-stable202405/OvmfPkg/ResetVector/X64/OvmfSevMetadata.asm
+#[cfg_attr(feature = "serde", derive(Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SectionType {
     /// SNP Secure Memory
@@ -95,6 +99,7 @@ impl TryFrom<u8> for SectionType {
 
 /// OVMF SEV Metadata Section Description
 #[repr(C)]
+#[cfg_attr(feature = "serde", derive(Deserialize))]
 #[derive(Debug, Clone, Copy)]
 pub struct OvmfSevMetadataSectionDesc {
     /// Guest Physical Adress
@@ -144,6 +149,7 @@ impl OvmfSevMetadataSectionDesc {
 
 /// OVMF Metadata Header
 #[repr(C)]
+#[cfg_attr(feature = "serde", derive(Deserialize))]
 #[derive(Debug, Clone, Copy)]
 struct OvmfSevMetadataHeader {
     /// Header Signature

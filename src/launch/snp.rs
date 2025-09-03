@@ -14,6 +14,8 @@ use crate::{
 use std::{marker::PhantomData, os::unix::io::AsRawFd, result::Result};
 
 use bitflags::bitflags;
+
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 /// Launcher type-state that indicates a brand new launch.
@@ -147,7 +149,8 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
 }
 
 /// Encapsulates the various data needed to begin the launch process.
-#[derive(Default, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Default, Clone, Debug, PartialEq, Eq)]
 pub struct Start {
     /// Describes a policy that the AMD Secure Processor will enforce.
     pub(crate) policy: GuestPolicy,
@@ -172,7 +175,8 @@ impl Start {
 
 /// Encoded page types for a launch update. See Table 58 of the SNP Firmware
 /// specification for further details.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(C)]
 #[non_exhaustive]
 pub enum PageType {
@@ -196,7 +200,8 @@ pub enum PageType {
 }
 
 /// Encapsulates the various data needed to begin the update process.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Update<'a> {
     /// guest start frame number.
     pub(crate) start_gfn: u64,
@@ -237,6 +242,7 @@ bitflags! {
     }
 }
 
+#[cfg(feature = "serde")]
 impl Serialize for VmplPerms {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -246,6 +252,7 @@ impl Serialize for VmplPerms {
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for VmplPerms {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

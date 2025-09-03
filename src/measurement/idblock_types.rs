@@ -21,11 +21,14 @@ use crate::{
     firmware::guest::GuestPolicy,
     measurement::snp::SnpLaunchDigest,
     parser::{ByteParser, Decoder, Encoder},
-    util::{
-        array::Array,
-        parser_helper::{ReadExt, WriteExt},
-    },
+    util::parser_helper::{ReadExt, WriteExt},
 };
+
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "serde")]
+use serde_big_array::BigArray;
 
 pub(crate) const DEFAULT_ID_VERSION: u32 = 1;
 pub(crate) const DEFAULT_ID_POLICY: u64 = 0x30000;
@@ -45,6 +48,7 @@ pub(crate) const ECDSA_SIG_RESERVED: usize = 0x1ff - 0x90 + 1;
 
 /// Family-Id of the guest, provided by the guest owner and uninterpreted by the firmware.
 #[repr(C)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Default, Clone, Copy, Debug)]
 pub struct FamilyId([u8; ID_BLK_ID_BYTES]);
 
@@ -88,11 +92,25 @@ pub type ImageId = FamilyId;
 
 /// The way the ECDSA SEV signature is strucutred. Need it in this format to calculate the AUTH-ID.
 #[repr(C)]
-#[derive(Default, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Copy)]
 pub struct SevEcdsaSig {
-    r: Array<u8, ECDSA_POINT_SIZE_BYTES>,
-    s: Array<u8, ECDSA_POINT_SIZE_BYTES>,
-    reserved: Array<u8, ECDSA_SIG_RESERVED>,
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    r: [u8; ECDSA_POINT_SIZE_BYTES],
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    s: [u8; ECDSA_POINT_SIZE_BYTES],
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    reserved: [u8; ECDSA_SIG_RESERVED],
+}
+
+impl Default for SevEcdsaSig {
+    fn default() -> Self {
+        Self {
+            r: [0u8; ECDSA_POINT_SIZE_BYTES],
+            s: [0u8; ECDSA_POINT_SIZE_BYTES],
+            reserved: [0u8; ECDSA_SIG_RESERVED],
+        }
+    }
 }
 
 impl Encoder<()> for SevEcdsaSig {
@@ -167,9 +185,17 @@ impl TryFrom<(EcKey<Private>, &[u8])> for SevEcdsaSig {
             .map_err(IdBlockError::CryptoErrorStack)?;
         pad_s.reverse();
 
+        let r: [u8; ECDSA_POINT_SIZE_BYTES] = pad_r
+            .try_into()
+            .map_err(|v: Vec<u8>| IdBlockError::BadVectorError(v.len(), ECDSA_POINT_SIZE_BYTES))?;
+
+        let s: [u8; ECDSA_POINT_SIZE_BYTES] = pad_s
+            .try_into()
+            .map_err(|v: Vec<u8>| IdBlockError::BadVectorError(v.len(), ECDSA_POINT_SIZE_BYTES))?;
+
         Ok(SevEcdsaSig {
-            r: pad_r.try_into()?,
-            s: pad_s.try_into()?,
+            r,
+            s,
             ..Default::default()
         })
     }
@@ -177,14 +203,28 @@ impl TryFrom<(EcKey<Private>, &[u8])> for SevEcdsaSig {
 
 /// Data inside the SEV ECDSA key
 #[repr(C)]
-#[derive(Default, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Copy)]
 pub struct SevEcdsaKeyData {
     /// QX component of the ECDSA public key
-    pub qx: Array<u8, ECDSA_POINT_SIZE_BYTES>,
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    pub qx: [u8; ECDSA_POINT_SIZE_BYTES],
     /// QY component of the ECDSA public key
-    pub qy: Array<u8, ECDSA_POINT_SIZE_BYTES>,
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    pub qy: [u8; ECDSA_POINT_SIZE_BYTES],
     /// Reserved
-    reserved: Array<u8, ECDSA_PUBKEY_RESERVED>,
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    reserved: [u8; ECDSA_PUBKEY_RESERVED],
+}
+
+impl Default for SevEcdsaKeyData {
+    fn default() -> Self {
+        Self {
+            qx: [0u8; ECDSA_POINT_SIZE_BYTES],
+            qy: [0u8; ECDSA_POINT_SIZE_BYTES],
+            reserved: [0u8; ECDSA_PUBKEY_RESERVED],
+        }
+    }
 }
 
 impl SevEcdsaKeyData {
@@ -215,6 +255,7 @@ impl ByteParser<()> for SevEcdsaKeyData {
 }
 
 /// SEV ECDSA public key. Need it in this format to calculate the AUTH-ID.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Default, Clone, Copy)]
 pub struct SevEcdsaPubKey {
     /// curve type for the public key (defaults to P384)
@@ -282,9 +323,17 @@ impl TryFrom<&EcKey<Private>> for SevEcdsaPubKey {
             .map_err(IdBlockError::CryptoErrorStack)?;
         pad_y.reverse();
 
+        let qx: [u8; ECDSA_POINT_SIZE_BYTES] = pad_x
+            .try_into()
+            .map_err(|v: Vec<u8>| IdBlockError::BadVectorError(v.len(), ECDSA_POINT_SIZE_BYTES))?;
+
+        let qy: [u8; ECDSA_POINT_SIZE_BYTES] = pad_y
+            .try_into()
+            .map_err(|v: Vec<u8>| IdBlockError::BadVectorError(v.len(), ECDSA_POINT_SIZE_BYTES))?;
+
         let key_data = SevEcdsaKeyData {
-            qx: pad_x.try_into()?,
-            qy: pad_y.try_into()?,
+            qx,
+            qy,
             ..Default::default()
         };
 
@@ -296,6 +345,7 @@ impl TryFrom<&EcKey<Private>> for SevEcdsaPubKey {
 
 /// SEV-SNP ID-BLOCK
 #[repr(C)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, Debug)]
 pub struct IdBlock {
     /// The expected launch digest of the guest (aka measurement)
@@ -397,6 +447,7 @@ impl IdBlock {
 }
 
 #[repr(C)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy)]
 ///ID Authentication Information Structure
 pub struct IdAuth {
