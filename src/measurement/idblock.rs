@@ -3,12 +3,7 @@
 //! Functions to use to calculate the ID-BLOCK and the AUTH-BLOCK.
 
 use openssl::{ec::EcKey, pkey::Private, sha::sha384};
-use std::{
-    convert::{TryFrom, TryInto},
-    fs::File,
-    io::Read,
-    path::PathBuf,
-};
+use std::{convert::TryFrom, fs::File, io::Read, path::PathBuf};
 
 use crate::{
     error::IdBlockError,
@@ -107,9 +102,7 @@ pub fn generate_key_digest(key_path: PathBuf) -> Result<SnpLaunchDigest, IdBlock
 
     let pub_key = SevEcdsaPubKey::try_from(&ec_key)?;
 
-    Ok(SnpLaunchDigest::new(
-        sha384(pub_key.to_bytes()?.as_slice()).try_into()?,
-    ))
+    Ok(SnpLaunchDigest::new(sha384(pub_key.to_bytes()?.as_slice())))
 }
 
 /// Calculate the different pieces needed for a complete pre-attestation.
