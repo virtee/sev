@@ -4,6 +4,7 @@
 
 // pub mod array;
 pub mod cached_chain;
+pub(crate) mod hexline;
 mod impl_const_id;
 pub mod parser_helper;
 

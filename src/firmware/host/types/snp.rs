@@ -8,7 +8,10 @@ pub use crate::firmware::linux::host::types::RawData;
 use crate::error::CertError;
 use crate::{
     parser::{ByteParser, Decoder, Encoder},
-    util::parser_helper::{ReadExt, WriteExt},
+    util::{
+        hexline::HexLine,
+        parser_helper::{ReadExt, WriteExt},
+    },
     Generation,
 };
 use std::{
@@ -851,12 +854,15 @@ impl Display for WrappedVlekHashstick {
             f,
             r#"
     Wrapped VLEK Hashstick:
-    IV:                      {:?}
-    VLEK hashstic Wrapped:   {:?}
+    IV:                      {}
+    VLEK hashstic Wrapped:   {}
     TCB: 
     {}
-    VLEK authentication tag: {:?}"#,
-            self.iv, self.vlek_wrapped, self.tcb_version, self.vlek_auth_tag
+    VLEK authentication tag: {}"#,
+            HexLine(&self.iv),
+            HexLine(&self.vlek_wrapped),
+            self.tcb_version,
+            HexLine(&self.vlek_auth_tag)
         )
     }
 }

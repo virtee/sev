@@ -3,6 +3,8 @@
 #[cfg(feature = "openssl")]
 use {super::*, openssl::ecdsa};
 
+use crate::util::hexline::HexLine;
+
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "serde")]
@@ -57,10 +59,11 @@ impl std::fmt::Display for Signature {
             f,
             r#"
 Signature:
-  R: {:?}
-  S: {:?}
+  R: {}
+  S: {}
             "#,
-            self.r, self.s
+            HexLine(&self.r),
+            HexLine(&self.s)
         )
     }
 }

@@ -8,7 +8,10 @@ use crate::{
     error::AttestationReportError,
     firmware::host::TcbVersion,
     parser::{ByteParser, Decoder, Encoder},
-    util::parser_helper::{ReadExt, WriteExt},
+    util::{
+        hexline::HexLine,
+        parser_helper::{ReadExt, WriteExt},
+    },
     Generation,
 };
 
@@ -578,9 +581,9 @@ Guest SVN:                    {}
 
 {}
 
-Family ID:{:?}
+Family ID:{}
 
-Image ID:{:?}
+Image ID:{}
 
 VMPL:                         {}
 
@@ -594,19 +597,19 @@ Current TCB:
 
 {}
 
-Report Data:{:?}
+Report Data:{}
 
-Measurement:{:?}
+Measurement:{}
 
-Host Data:{:?}
+Host Data:{}
 
-ID Key Digest:{:?}
+ID Key Digest:{}
 
-Author Key Digest:{:?}
+Author Key Digest:{}
 
-Report ID:{:?}
+Report ID:{}
 
-Report ID Migration Agent:{:?}
+Report ID Migration Agent:{}
 
 Reported TCB:
 
@@ -618,7 +621,7 @@ CPUID Model ID:               {}
 
 CPUID Stepping:               {}
 
-Chip ID:{:?}
+Chip ID:{}
 
 Committed TCB:
 
@@ -640,20 +643,20 @@ Current Mitigation Vector:    {}
             self.version,
             self.guest_svn,
             self.policy,
-            self.family_id,
-            self.image_id,
+            HexLine(&self.family_id),
+            HexLine(&self.image_id),
             self.vmpl,
             self.sig_algo,
             self.current_tcb,
             self.plat_info,
             self.key_info,
-            self.report_data,
-            self.measurement,
-            self.host_data,
-            self.id_key_digest,
-            self.author_key_digest,
-            self.report_id,
-            self.report_id_ma,
+            HexLine(&self.report_data),
+            HexLine(&self.measurement),
+            HexLine(&self.host_data),
+            HexLine(&self.id_key_digest),
+            HexLine(&self.author_key_digest),
+            HexLine(&self.report_id),
+            HexLine(&self.report_id_ma),
             self.reported_tcb,
             self.cpuid_fam_id
                 .map_or("None".to_string(), |fam| fam.to_string()),
@@ -661,7 +664,7 @@ Current Mitigation Vector:    {}
                 .map_or("None".to_string(), |model| model.to_string()),
             self.cpuid_step
                 .map_or("None".to_string(), |step| step.to_string()),
-            self.chip_id,
+            HexLine(&self.chip_id),
             self.committed_tcb,
             self.current,
             self.committed,
