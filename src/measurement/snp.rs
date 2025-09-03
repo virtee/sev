@@ -12,17 +12,20 @@ use crate::{
         vmsa::{GuestFeatures, VMMType, VMSA},
     },
     parser::{ByteParser, Decoder, Encoder},
-    util::{
-        array::Array,
-        parser_helper::{ReadExt, WriteExt},
-    },
+    util::parser_helper::{ReadExt, WriteExt},
 };
 use hex::FromHex;
-use std::path::PathBuf;
 use std::{
     convert::{TryFrom, TryInto},
     io::{Read, Write},
 };
+use std::{fmt, path::PathBuf};
+
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "serde")]
+use serde_big_array::BigArray;
 
 const _PAGE_MASK: u64 = 0xfff;
 
@@ -32,8 +35,15 @@ pub(crate) const LD_BYTES: usize = LD_BITS / 8;
 
 /// The expected launch digest of the guest
 #[repr(C)]
-#[derive(Debug, Default, Clone, Copy)]
-pub struct SnpLaunchDigest(Array<u8, LD_BYTES>);
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Copy)]
+pub struct SnpLaunchDigest(#[cfg_attr(feature = "serde", serde(with = "BigArray"))] [u8; LD_BYTES]);
+
+impl Default for SnpLaunchDigest {
+    fn default() -> Self {
+        Self([0u8; LD_BYTES])
+    }
+}
 
 // Try from slice
 impl TryFrom<&[u8]> for SnpLaunchDigest {
@@ -49,7 +59,7 @@ impl TryInto<Vec<u8>> for SnpLaunchDigest {
     type Error = MeasurementError;
 
     fn try_into(self) -> Result<Vec<u8>, MeasurementError> {
-        Ok((*self.0).to_vec())
+        Ok((self.0).to_vec())
     }
 }
 
@@ -72,15 +82,24 @@ impl ByteParser<()> for SnpLaunchDigest {
     const EXPECTED_LEN: Option<usize> = Some(LD_BYTES);
 }
 
+impl fmt::LowerHex for SnpLaunchDigest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for b in &self.0 {
+            write!(f, "{:02x}", b)?;
+        }
+        Ok(())
+    }
+}
+
 impl SnpLaunchDigest {
     /// Create Launch Digest from large array
-    pub fn new(data: Array<u8, LD_BYTES>) -> Self {
+    pub fn new(data: [u8; LD_BYTES]) -> Self {
         Self(data)
     }
 
     /// Get the launch digest as a hex string
     pub fn get_hex_ld(self) -> String {
-        format!("{:x}", self.0)
+        format!("{:x}", self)
     }
 }
 
