@@ -4,11 +4,13 @@
 
 use super::*;
 
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 /// A complete certificate chain.
 #[repr(C)]
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Chain {
     /// The Certificate Authority chain.
     pub ca: ca::Chain,

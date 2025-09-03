@@ -6,10 +6,12 @@ mod v1;
 
 use super::*;
 
-use std::mem::size_of;
-
+#[cfg(feature = "serde")]
 use serde::{de, ser};
+#[cfg(feature = "serde")]
 use serde_bytes::{ByteBuf, Bytes};
+#[cfg(feature = "serde")]
+use std::mem::size_of;
 
 /// An OCA certificate.
 #[derive(Clone, Copy)]
@@ -110,6 +112,7 @@ impl Encoder<Body> for Certificate {
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'de> de::Deserialize<'de> for Certificate {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
@@ -120,6 +123,7 @@ impl<'de> de::Deserialize<'de> for Certificate {
     }
 }
 
+#[cfg(feature = "serde")]
 impl ser::Serialize for Certificate {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
