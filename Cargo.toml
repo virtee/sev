@@ -37,10 +37,10 @@ doc = false
 
 [features]
 default = ["sev", "snp", "openssl?/vendored"]
-openssl = ["dep:openssl", "dep:rdrand"]
+openssl = ["dep:openssl"]
 hw_tests = []
 dangerous_hw_tests = ["hw_tests", "dep:reqwest", "dep:tokio"]
-sev = []
+sev = ["dep:rdrand"]
 snp = []
 crypto_nossl = ["dep:p384", "dep:rsa", "dep:sha2", "dep:x509-cert"]
 serde = ["dep:serde", "dep:serde-big-array", "dep:serde_bytes"]
