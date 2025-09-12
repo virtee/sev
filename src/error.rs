@@ -10,7 +10,7 @@ use std::{
     io,
 };
 
-#[cfg(feature = "openssl")]
+#[cfg(all(feature = "openssl", feature = "sev"))]
 use rdrand::ErrorCode;
 
 use std::os::raw::c_int;
@@ -1119,7 +1119,7 @@ impl std::convert::From<ArrayError> for MeasurementError {
     }
 }
 
-#[cfg(feature = "openssl")]
+#[cfg(all(feature = "openssl", feature = "sev"))]
 #[derive(Debug)]
 /// Used to describe errors related to SEV-ES "Sessions".
 pub enum SessionError {
@@ -1133,21 +1133,21 @@ pub enum SessionError {
     IOError(std::io::Error),
 }
 
-#[cfg(feature = "openssl")]
+#[cfg(all(feature = "openssl", feature = "sev"))]
 impl From<ErrorCode> for SessionError {
     fn from(value: ErrorCode) -> Self {
         Self::RandError(value)
     }
 }
 
-#[cfg(feature = "openssl")]
+#[cfg(all(feature = "openssl", feature = "sev"))]
 impl From<std::io::Error> for SessionError {
     fn from(value: std::io::Error) -> Self {
         Self::IOError(value)
     }
 }
 
-#[cfg(feature = "openssl")]
+#[cfg(all(feature = "openssl", feature = "sev"))]
 impl From<ErrorStack> for SessionError {
     fn from(value: ErrorStack) -> Self {
         Self::OpenSSLStack(value)
@@ -1483,7 +1483,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "openssl")]
+    #[cfg(all(feature = "openssl", feature = "sev"))]
     #[test]
     fn test_openssl_features_complete() {
         // Test CertFormatError
