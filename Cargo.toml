@@ -43,7 +43,7 @@ dangerous_hw_tests = ["hw_tests", "dep:reqwest", "dep:tokio"]
 sev = []
 snp = []
 crypto_nossl = ["dep:p384", "dep:rsa", "dep:sha2", "dep:x509-cert"]
-serde = ["dep:serde", "dep:serde-big-array"]
+serde = ["dep:serde", "dep:serde-big-array", "dep:serde_bytes"]
 
 [target.'cfg(target_os = "linux")'.dependencies]
 iocuddle = "^0.1"
@@ -69,6 +69,7 @@ base64 = "0.22.1"
 rdrand = { version = "^0.8", optional = true }
 reqwest = { version = "^0.12", features = ["blocking"], optional = true }
 tokio = { version = "1.29.1", features = ["rt-multi-thread"], optional = true }
+serde_bytes = { version = "0.11.19", optional = true }
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 kvm-ioctls = ">=0.16"
