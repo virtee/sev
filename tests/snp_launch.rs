@@ -5,7 +5,7 @@
 use kvm_bindings::{kvm_create_guest_memfd, kvm_userspace_memory_region2, KVM_MEM_GUEST_MEMFD};
 use kvm_ioctls::{Kvm, VcpuExit};
 use sev::firmware::{guest::GuestPolicy, host::Firmware};
-use sev::launch::snp::*;
+use sev::launch::{snp::*, PageType};
 use std::os::fd::RawFd;
 use std::slice::from_raw_parts_mut;
 
