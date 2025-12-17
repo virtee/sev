@@ -238,6 +238,7 @@ impl ByteParser<()> for ReportVariant {
 /// The Alias_Check_Complete field in the PlatformInfo field
 /// Added in version 5:
 /// The launch_mit_vector and current_mit_vector fields
+/// The page_swap_disabled field in the GuestPolicy field
 /// The SEV-TIO field in the PlatformInfo field
 #[repr(C)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
