@@ -33,6 +33,7 @@ pub trait ReadExt: Read {
             while remaining > 0 {
                 let n = remaining.min(CHUNK);
                 self.read_exact(&mut buf[..n])?;
+                #[cfg(not(feature = "lax-parser"))]
                 if buf[..n].iter().any(|&b| b != 0) {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::InvalidData,
@@ -98,6 +99,7 @@ mod read_ext_tests {
     }
 
     // Test case 3: Skip, Invalid Data
+    #[cfg(not(feature = "lax-parser"))]
     #[test]
     fn test_skip_invalid_data() {
         let data = vec![0, 0, 1, 0, 0x12, 0x34, 0x56, 0x78];

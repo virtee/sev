@@ -12,6 +12,7 @@ pub trait WriteExt: Write {
         value.encode(self, params)
     }
 
+    #[cfg(not(feature = "lax-parser"))]
     fn skip_bytes<const SKIP: usize>(&mut self) -> Result<&mut Self, std::io::Error>
     where
         Self: Sized,
@@ -56,6 +57,7 @@ mod write_ext_tests {
         Ok(())
     }
 
+    #[cfg(not(feature = "lax-parser"))]
     #[test]
     fn test_write_bytes_with_skip() -> Result<(), std::io::Error> {
         let mut writer = MockWriter::default();
