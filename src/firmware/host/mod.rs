@@ -286,6 +286,7 @@ impl Firmware {
         Ok(())
     }
 
+    #[cfg(not(feature = "lax-parser"))]
     #[cfg(feature = "snp")]
     /// Insert a Version Loaded Endorsement Key Hashstick into the AMD Secure Processor.
     ///

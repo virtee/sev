@@ -72,6 +72,7 @@ impl Decoder<()> for Signature {
     }
 }
 
+#[cfg(not(feature = "lax-parser"))]
 impl Encoder<()> for Signature {
     fn encode(&self, writer: &mut impl Write, _: ()) -> Result<()> {
         writer.write_bytes(self.r, ())?;
@@ -314,6 +315,7 @@ mod tests {
         }
     }
 
+    #[cfg(not(feature = "lax-parser"))]
     #[test]
     fn test_signature_serialization() {
         let sig: Signature = Default::default();
