@@ -4,7 +4,6 @@
 //! This ensures (at compile time) that the right steps are called in the
 //! right order.
 
-use crate::launch::PageType;
 #[cfg(target_os = "linux")]
 use crate::{
     error::FirmwareError,
@@ -18,6 +17,8 @@ use bitflags::bitflags;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+
+pub use crate::launch::PageType;
 
 /// Launcher type-state that indicates a brand new launch.
 pub struct New;
