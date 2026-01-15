@@ -265,6 +265,8 @@ pub struct AttestationReport {
     /// Information related to signing keys in the report. See KeyInfo
     pub key_info: KeyInfo,
 
+    _reserved_after_key_info: [u8; 4],
+
     /// Guest-provided 512 Bits of Data
     #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
     pub report_data: [u8; 64],
@@ -298,6 +300,8 @@ pub struct AttestationReport {
     /// CPUID Stepping
     pub cpuid_step: Option<u8>,
 
+    _reserved_after_cpuid: [u8; 21],
+
     /// If MaskChipId is set to 0, Identifier unique to the chip.
     /// Otherwise set to 0h.
     #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
@@ -306,14 +310,17 @@ pub struct AttestationReport {
     pub committed_tcb: TcbVersion,
     /// The build number of CurrentVersion
     pub current: Version,
+    _reserved_after_current: [u8; 1],
     /// The build number of CommittedVersion
     pub committed: Version,
+    _reserved_after_committed: [u8; 1],
     /// The CurrentTcb at the time the guest was launched or imported.
     pub launch_tcb: TcbVersion,
     /// The verified mitigation vecor value at the time the guest was launched (LaunchMitVector).
     pub launch_mit_vector: Option<u64>,
     /// Value is set to the current verified mitigation vectore value (CurrentMitVector).
     pub current_mit_vector: Option<u64>,
+    _reserved_after_mit_vectors: [u8; 152],
     /// Signature of bytes 0 to 0x29F inclusive of this report.
     /// The format of the signature is found within Signature.
     pub signature: Signature,
@@ -332,6 +339,7 @@ impl Default for AttestationReport {
             current_tcb: Default::default(),
             plat_info: Default::default(),
             key_info: Default::default(),
+            _reserved_after_key_info: Default::default(),
             report_data: [0u8; 64],
             measurement: [0u8; 48],
             host_data: Default::default(),
@@ -343,13 +351,17 @@ impl Default for AttestationReport {
             cpuid_fam_id: Default::default(),
             cpuid_mod_id: Default::default(),
             cpuid_step: Default::default(),
+            _reserved_after_cpuid: Default::default(),
             chip_id: [0u8; 64],
             committed_tcb: Default::default(),
             current: Default::default(),
+            _reserved_after_current: Default::default(),
             committed: Default::default(),
+            _reserved_after_committed: Default::default(),
             launch_tcb: Default::default(),
             launch_mit_vector: Default::default(),
             current_mit_vector: Default::default(),
+            _reserved_after_mit_vectors: [0u8; 152],
             signature: Default::default(),
         }
     }
@@ -390,9 +402,8 @@ impl Encoder<()> for AttestationReport {
         writer.write_bytes(self.current_tcb, generation)?;
         writer.write_bytes(self.plat_info, ())?;
         writer.write_bytes(self.key_info, ())?;
-        writer
-            .skip_bytes::<4>()?
-            .write_bytes(self.report_data, ())?;
+        writer.write_bytes(self._reserved_after_key_info, ())?;
+        writer.write_bytes(self.report_data, ())?;
         writer.write_bytes(self.measurement, ())?;
         writer.write_bytes(self.host_data, ())?;
         writer.write_bytes(self.id_key_digest, ())?;
@@ -405,40 +416,39 @@ impl Encoder<()> for AttestationReport {
         match variant {
             ReportVariant::V2 => {
                 // V2 doesn't have CPUID fields
-                writer.skip_bytes::<24>()?.write_bytes(self.chip_id, ())?;
+                writer.skip_bytes::<3>()?;
             }
             _ => {
                 // Write CPUID fields for V3 and V4
                 writer.write_bytes(self.cpuid_fam_id.unwrap_or(0), ())?;
                 writer.write_bytes(self.cpuid_mod_id.unwrap_or(0), ())?;
                 writer.write_bytes(self.cpuid_step.unwrap_or(0), ())?;
-                writer.skip_bytes::<21>()?.write_bytes(self.chip_id, ())?;
             }
         }
+
+        writer.write_bytes(self._reserved_after_cpuid, ())?;
+        writer.write_bytes(self.chip_id, ())?;
 
         // Write committed TCB based on variant
         writer.write_bytes(self.committed_tcb, generation)?;
         writer.write_bytes(self.current, ())?;
-        writer.skip_bytes::<1>()?.write_bytes(self.committed, ())?;
-        writer
-            .skip_bytes::<1>()?
-            .write_bytes(self.launch_tcb, generation)?;
+        writer.write_bytes(self._reserved_after_current, ())?;
+        writer.write_bytes(self.committed, ())?;
+        writer.write_bytes(self._reserved_after_committed, ())?;
+        writer.write_bytes(self.launch_tcb, generation)?;
 
         // Write launch and current mitigation vectors based on variant
         match variant {
             ReportVariant::V2 | ReportVariant::V3 => {
-                writer
-                    .skip_bytes::<168>()?
-                    .write_bytes(self.signature, ())?;
+                writer.skip_bytes::<16>()?;
             }
             _ => {
                 writer.write_bytes(self.launch_mit_vector.unwrap_or(0), ())?;
                 writer.write_bytes(self.current_mit_vector.unwrap_or(0), ())?;
-                writer
-                    .skip_bytes::<152>()?
-                    .write_bytes(self.signature, ())?;
             }
         }
+        writer.write_bytes(self._reserved_after_mit_vectors, ())?;
+        writer.write_bytes(self.signature, ())?;
 
         Ok(())
     }
@@ -479,7 +489,8 @@ impl Decoder<()> for AttestationReport {
         let current_tcb = stepper.read_bytes_with(generation)?;
         let plat_info = stepper.read_bytes()?;
         let key_info = stepper.read_bytes()?;
-        let report_data = stepper.skip_bytes::<4>()?.read_bytes()?;
+        let _reserved_after_key_info = stepper.read_reserved_bytes()?;
+        let report_data = stepper.read_bytes()?;
         let measurement = stepper.read_bytes()?;
         let host_data = stepper.read_bytes()?;
         let id_key_digest = stepper.read_bytes()?;
@@ -489,32 +500,39 @@ impl Decoder<()> for AttestationReport {
         let reported_tcb = stepper.read_bytes_with(generation)?;
 
         // CPUID fields were added in V3 and later.
-        let (cpuid_fam_id, cpuid_mod_id, cpuid_step, chip_id) = match variant {
-            ReportVariant::V2 => (None, None, None, stepper.skip_bytes::<24>()?.read_bytes()?),
-            _ => (
-                Some(stepper.read_bytes()?),
-                Some(stepper.read_bytes()?),
-                Some(stepper.read_bytes()?),
-                stepper.skip_bytes::<21>()?.read_bytes()?,
-            ),
-        };
-
-        let committed_tcb = stepper.read_bytes_with(generation)?;
-        let current = stepper.read_bytes()?;
-        let committed = stepper.skip_bytes::<1>()?.read_bytes()?;
-        let launch_tcb = stepper.skip_bytes::<1>()?.read_bytes_with(generation)?;
-
-        // mit vecor fields were added in V5 and later.
-        let (launch_mit_vector, current_mit_vector, signature) = match variant {
-            ReportVariant::V2 | ReportVariant::V3 => {
-                (None, None, stepper.skip_bytes::<168>()?.read_bytes()?)
+        let (cpuid_fam_id, cpuid_mod_id, cpuid_step) = match variant {
+            ReportVariant::V2 => {
+                stepper.read_reserved_bytes::<3>()?;
+                (None, None, None)
             }
             _ => (
                 Some(stepper.read_bytes()?),
                 Some(stepper.read_bytes()?),
-                stepper.skip_bytes::<152>()?.read_bytes()?,
+                Some(stepper.read_bytes()?),
             ),
         };
+
+        let _reserved_after_cpuid = stepper.read_reserved_bytes()?;
+        let chip_id = stepper.read_bytes()?;
+
+        let committed_tcb = stepper.read_bytes_with(generation)?;
+        let current = stepper.read_bytes()?;
+        let _reserved_after_current = stepper.read_reserved_bytes()?;
+        let committed = stepper.read_bytes()?;
+        let _reserved_after_committed = stepper.read_reserved_bytes()?;
+        let launch_tcb = stepper.read_bytes_with(generation)?;
+
+        // mit vecor fields were added in V5 and later.
+        let (launch_mit_vector, current_mit_vector) = match variant {
+            ReportVariant::V2 | ReportVariant::V3 => {
+                stepper.read_reserved_bytes::<16>()?;
+                (None, None)
+            }
+            _ => (Some(stepper.read_bytes()?), Some(stepper.read_bytes()?)),
+        };
+
+        let _reserved_after_mit_vectors = stepper.read_reserved_bytes()?;
+        let signature = stepper.read_bytes()?;
 
         Ok(Self {
             version,
@@ -527,6 +545,7 @@ impl Decoder<()> for AttestationReport {
             current_tcb,
             plat_info,
             key_info,
+            _reserved_after_key_info,
             report_data,
             measurement,
             host_data,
@@ -538,13 +557,17 @@ impl Decoder<()> for AttestationReport {
             cpuid_fam_id,
             cpuid_mod_id,
             cpuid_step,
+            _reserved_after_cpuid,
             chip_id,
             committed_tcb,
             current,
+            _reserved_after_current,
             committed,
+            _reserved_after_committed,
             launch_tcb,
             launch_mit_vector,
             current_mit_vector,
+            _reserved_after_mit_vectors,
             signature,
         })
     }
@@ -1689,6 +1712,14 @@ Signature:
         assert_eq!(<Version as Default>::default(), Version::new(0, 0, 0));
     }
 
+    const VCEK: [u8; 64] = [
+        0xD4, 0x95, 0x54, 0xEC, 0x71, 0x7F, 0x4E, 0x5B, 0x0F, 0xE6, 0xB1, 0x43, 0xBC, 0xF0, 0x40,
+        0x5B, 0xD7, 0xAE, 0x30, 0x47, 0x27, 0xED, 0xF4, 0x66, 0x03, 0xF2, 0xA7, 0x6A, 0xEF, 0x6A,
+        0x3A, 0xBC, 0x15, 0xD7, 0xAF, 0x38, 0xDB, 0x75, 0x70, 0x39, 0x02, 0x9F, 0x0E, 0xFA, 0xCF,
+        0xD0, 0x8E, 0x24, 0x43, 0x24, 0x88, 0x47, 0x38, 0xC7, 0x2B, 0x08, 0x2E, 0x2F, 0x87, 0xA4,
+        0x4D, 0x54, 0x1E, 0xB6,
+    ];
+
     #[test]
     fn test_attestation_report_from_bytes() {
         // Create a valid attestation report bytes minus one byte.
@@ -1697,15 +1728,32 @@ Signature:
         // Push the version byte at the beginning.
         bytes.insert(0, 2);
 
-        let vcek = [
-            0xD4, 0x95, 0x54, 0xEC, 0x71, 0x7F, 0x4E, 0x5B, 0x0F, 0xE6, 0xB1, 0x43, 0xBC, 0xF0,
-            0x40, 0x5B, 0xD7, 0xAE, 0x30, 0x47, 0x27, 0xED, 0xF4, 0x66, 0x03, 0xF2, 0xA7, 0x6A,
-            0xEF, 0x6A, 0x3A, 0xBC, 0x15, 0xD7, 0xAF, 0x38, 0xDB, 0x75, 0x70, 0x39, 0x02, 0x9F,
-            0x0E, 0xFA, 0xCF, 0xD0, 0x8E, 0x24, 0x43, 0x24, 0x88, 0x47, 0x38, 0xC7, 0x2B, 0x08,
-            0x2E, 0x2F, 0x87, 0xA4, 0x4D, 0x54, 0x1E, 0xB6,
-        ];
+        bytes[0x1A8..0x1E0].copy_from_slice(&VCEK[..(0x1E0 - 0x1A8)]);
 
-        bytes[0x1A8..0x1E0].copy_from_slice(&vcek[..(0x1E0 - 0x1A8)]);
+        // Test valid input
+        let result = AttestationReport::from_bytes(bytes.as_slice());
+        assert!(result.is_ok());
+    }
+
+    #[cfg(feature = "lax-parser")]
+    #[test]
+    fn test_future_attestation_report_from_bytes() {
+        // Create a valid attestation report bytes minus one byte.
+        let mut bytes: Vec<u8> = vec![0; 1183];
+
+        // Push the version byte at the beginning.
+        bytes.insert(0, 9);
+
+        // Set CPUID_FAM_ID
+        bytes[0x188] = 0x1A;
+
+        // Set CPUID_MOD_ID
+        bytes[0x189] = 0x2;
+
+        // Write into a reserved area; the standard parser would expect 0.
+        bytes[0x19F] = 1;
+
+        bytes[0x1A8..0x1E0].copy_from_slice(&VCEK[..(0x1E0 - 0x1A8)]);
 
         // Test valid input
         let result = AttestationReport::from_bytes(bytes.as_slice());

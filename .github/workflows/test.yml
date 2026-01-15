@@ -213,3 +213,28 @@ jobs:
             flag: --release
         features:
           - crypto_nossl
+
+  sw-lax-parser:
+    name: sw lax-parser ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - run: cargo test ${{ matrix.profile.flag }} --features=lax-parser
+
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-latest
+          - macos-15-intel
+          - windows-latest
+        toolchain:
+          - 1.85.0
+          - stable
+        profile:
+          - name: debug
+          - name: release
+            flag: --release
