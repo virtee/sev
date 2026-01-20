@@ -34,6 +34,17 @@ jobs:
           toolchain: 1.85.0
       - run: cargo clippy --features=crypto_nossl,hw_tests,dangerous_hw_tests --all-targets -- -D clippy::all -D unused_imports -D warnings -D clippy::style
 
+  clippy-unsafe-parser:
+    name: cargo clippy unsafe-parser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+          toolchain: 1.85.0
+      - run: cargo clippy --features=unsafe_parser,hw_tests,dangerous_hw_tests --all-targets -- -D clippy::all -D unused_imports -D warnings -D clippy::style
+
   readme:
     name: cargo rdme
     runs-on: ubuntu-latest

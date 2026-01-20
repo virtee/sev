@@ -213,3 +213,86 @@ jobs:
             flag: --release
         features:
           - crypto_nossl
+
+  sw-unsafe-parser:
+    name: sw unsafe-parser ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - run: cargo test ${{ matrix.profile.flag }} --features=${{ matrix.features }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-latest
+          - macos-15-intel
+          - windows-latest
+        toolchain:
+          - 1.85.0
+          - stable
+        profile:
+          - name: debug
+          - name: release
+            flag: --release
+        features:
+          - unsafe_parser
+  
+  sw-unsafe-parser-openssl:
+    name: sw unsafe-parser-openssl ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - run: cargo test ${{ matrix.profile.flag }} --features=${{ matrix.features }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-latest
+          - macos-15-intel
+          - windows-latest
+        toolchain:
+          - 1.85.0
+          - stable
+        profile:
+          - name: debug
+          - name: release
+            flag: --release
+        features:
+          - unsafe_parser
+          - openssl
+          
+  sw-unsafe-parser-crypto_nossl:
+    name: sw unsafe-parser-crypto-nossl ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - run: cargo test ${{ matrix.profile.flag }} --features=${{ matrix.features }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-latest
+          - macos-15-intel
+          - windows-latest
+        toolchain:
+          - 1.85.0
+          - stable
+        profile:
+          - name: debug
+          - name: release
+            flag: --release
+        features:
+          - unsafe_parser
+          - crypto_nossl
