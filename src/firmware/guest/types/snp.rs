@@ -265,6 +265,10 @@ pub struct AttestationReport {
     /// Information related to signing keys in the report. See KeyInfo
     pub key_info: KeyInfo,
 
+    /// Reserved 1
+    #[cfg(feature = "unsafe_parser")]
+    _reserved_1: [u8; 4],
+
     /// Guest-provided 512 Bits of Data
     #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
     pub report_data: [u8; 64],
@@ -298,6 +302,10 @@ pub struct AttestationReport {
     /// CPUID Stepping
     pub cpuid_step: Option<u8>,
 
+    /// Reserved 2
+    #[cfg(feature = "unsafe_parser")]
+    _reserved_2: [u8; 21],
+
     /// If MaskChipId is set to 0, Identifier unique to the chip.
     /// Otherwise set to 0h.
     #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
@@ -306,14 +314,30 @@ pub struct AttestationReport {
     pub committed_tcb: TcbVersion,
     /// The build number of CurrentVersion
     pub current: Version,
+
+    /// Reserved 3
+    #[cfg(feature = "unsafe_parser")]
+    _reserved_3: [u8; 1],
+
     /// The build number of CommittedVersion
     pub committed: Version,
+
+    /// Reserved 4
+    #[cfg(feature = "unsafe_parser")]
+    _reserved_4: [u8; 1],
+
     /// The CurrentTcb at the time the guest was launched or imported.
     pub launch_tcb: TcbVersion,
     /// The verified mitigation vecor value at the time the guest was launched (LaunchMitVector).
     pub launch_mit_vector: Option<u64>,
     /// Value is set to the current verified mitigation vectore value (CurrentMitVector).
     pub current_mit_vector: Option<u64>,
+
+    /// Reserved 5
+    #[cfg(feature = "unsafe_parser")]
+    #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
+    _reserved_5: [u8; 152],
+
     /// Signature of bytes 0 to 0x29F inclusive of this report.
     /// The format of the signature is found within Signature.
     pub signature: Signature,
@@ -321,36 +345,79 @@ pub struct AttestationReport {
 
 impl Default for AttestationReport {
     fn default() -> Self {
-        Self {
-            version: Default::default(),
-            guest_svn: Default::default(),
-            policy: Default::default(),
-            family_id: Default::default(),
-            image_id: Default::default(),
-            vmpl: Default::default(),
-            sig_algo: Default::default(),
-            current_tcb: Default::default(),
-            plat_info: Default::default(),
-            key_info: Default::default(),
-            report_data: [0u8; 64],
-            measurement: [0u8; 48],
-            host_data: Default::default(),
-            id_key_digest: [0u8; 48],
-            author_key_digest: [0u8; 48],
-            report_id: Default::default(),
-            report_id_ma: Default::default(),
-            reported_tcb: Default::default(),
-            cpuid_fam_id: Default::default(),
-            cpuid_mod_id: Default::default(),
-            cpuid_step: Default::default(),
-            chip_id: [0u8; 64],
-            committed_tcb: Default::default(),
-            current: Default::default(),
-            committed: Default::default(),
-            launch_tcb: Default::default(),
-            launch_mit_vector: Default::default(),
-            current_mit_vector: Default::default(),
-            signature: Default::default(),
+        #[cfg(not(feature = "unsafe_parser"))]
+        {
+            Self {
+                version: Default::default(),
+                guest_svn: Default::default(),
+                policy: Default::default(),
+                family_id: Default::default(),
+                image_id: Default::default(),
+                vmpl: Default::default(),
+                sig_algo: Default::default(),
+                current_tcb: Default::default(),
+                plat_info: Default::default(),
+                key_info: Default::default(),
+                report_data: [0u8; 64],
+                measurement: [0u8; 48],
+                host_data: Default::default(),
+                id_key_digest: [0u8; 48],
+                author_key_digest: [0u8; 48],
+                report_id: Default::default(),
+                report_id_ma: Default::default(),
+                reported_tcb: Default::default(),
+                cpuid_fam_id: Default::default(),
+                cpuid_mod_id: Default::default(),
+                cpuid_step: Default::default(),
+                chip_id: [0u8; 64],
+                committed_tcb: Default::default(),
+                current: Default::default(),
+                committed: Default::default(),
+                launch_tcb: Default::default(),
+                launch_mit_vector: Default::default(),
+                current_mit_vector: Default::default(),
+                signature: Default::default(),
+            }
+        }
+
+        #[cfg(feature = "unsafe_parser")]
+        {
+            Self {
+                version: Default::default(),
+                guest_svn: Default::default(),
+                policy: Default::default(),
+                family_id: Default::default(),
+                image_id: Default::default(),
+                vmpl: Default::default(),
+                sig_algo: Default::default(),
+                current_tcb: Default::default(),
+                plat_info: Default::default(),
+                key_info: Default::default(),
+                _reserved_1: Default::default(),
+                report_data: [0u8; 64],
+                measurement: [0u8; 48],
+                host_data: Default::default(),
+                id_key_digest: [0u8; 48],
+                author_key_digest: [0u8; 48],
+                report_id: Default::default(),
+                report_id_ma: Default::default(),
+                reported_tcb: Default::default(),
+                cpuid_fam_id: Default::default(),
+                cpuid_mod_id: Default::default(),
+                cpuid_step: Default::default(),
+                _reserved_2: Default::default(),
+                chip_id: [0u8; 64],
+                committed_tcb: Default::default(),
+                current: Default::default(),
+                _reserved_3: Default::default(),
+                committed: Default::default(),
+                _reserved_4: Default::default(),
+                launch_tcb: Default::default(),
+                launch_mit_vector: Default::default(),
+                current_mit_vector: Default::default(),
+                _reserved_5: [0u8; 152],
+                signature: Default::default(),
+            }
         }
     }
 }
@@ -390,9 +457,14 @@ impl Encoder<()> for AttestationReport {
         writer.write_bytes(self.current_tcb, generation)?;
         writer.write_bytes(self.plat_info, ())?;
         writer.write_bytes(self.key_info, ())?;
-        writer
-            .skip_bytes::<4>()?
-            .write_bytes(self.report_data, ())?;
+
+        // Reserved field 1
+        #[cfg(not(feature = "unsafe_parser"))]
+        writer.skip_bytes::<4>()?;
+        #[cfg(feature = "unsafe_parser")]
+        writer.write_bytes(self._reserved_1, ())?;
+
+        writer.write_bytes(self.report_data, ())?;
         writer.write_bytes(self.measurement, ())?;
         writer.write_bytes(self.host_data, ())?;
         writer.write_bytes(self.id_key_digest, ())?;
@@ -401,29 +473,55 @@ impl Encoder<()> for AttestationReport {
         writer.write_bytes(self.report_id_ma, ())?;
         writer.write_bytes(self.reported_tcb, generation)?;
 
+        // Reserved Field 2
+        #[cfg(not(feature = "unsafe_parser"))]
         // Write CPUID fields based on variant
         match variant {
             ReportVariant::V2 => {
                 // V2 doesn't have CPUID fields
-                writer.skip_bytes::<24>()?.write_bytes(self.chip_id, ())?;
+                writer.skip_bytes::<24>()?;
             }
             _ => {
                 // Write CPUID fields for V3 and V4
                 writer.write_bytes(self.cpuid_fam_id.unwrap_or(0), ())?;
                 writer.write_bytes(self.cpuid_mod_id.unwrap_or(0), ())?;
                 writer.write_bytes(self.cpuid_step.unwrap_or(0), ())?;
-                writer.skip_bytes::<21>()?.write_bytes(self.chip_id, ())?;
+                writer.skip_bytes::<21>()?;
             }
         }
+        // Since we are writing data as is in all locations, we don't need to check version, just writing raw data.
+        #[cfg(feature = "unsafe_parser")]
+        {
+            writer.write_bytes(self.cpuid_fam_id.unwrap_or(0), ())?;
+            writer.write_bytes(self.cpuid_mod_id.unwrap_or(0), ())?;
+            writer.write_bytes(self.cpuid_step.unwrap_or(0), ())?;
+            writer.write_bytes(self._reserved_2, ())?;
+        }
+
+        writer.write_bytes(self.chip_id, ())?;
 
         // Write committed TCB based on variant
         writer.write_bytes(self.committed_tcb, generation)?;
         writer.write_bytes(self.current, ())?;
-        writer.skip_bytes::<1>()?.write_bytes(self.committed, ())?;
-        writer
-            .skip_bytes::<1>()?
-            .write_bytes(self.launch_tcb, generation)?;
 
+        // Reserved field 3
+        #[cfg(not(feature = "unsafe_parser"))]
+        writer.skip_bytes::<1>()?;
+        #[cfg(feature = "unsafe_parser")]
+        writer.write_bytes(self._reserved_3, ())?;
+
+        writer.write_bytes(self.committed, ())?;
+
+        // Reserved field 4
+        #[cfg(not(feature = "unsafe_parser"))]
+        writer.skip_bytes::<1>()?;
+        #[cfg(feature = "unsafe_parser")]
+        writer.write_bytes(self._reserved_4, ())?;
+
+        writer.write_bytes(self.launch_tcb, generation)?;
+
+        //Reserved field 5
+        #[cfg(not(feature = "unsafe_parser"))]
         // Write launch and current mitigation vectors based on variant
         match variant {
             ReportVariant::V2 | ReportVariant::V3 => {
@@ -438,6 +536,14 @@ impl Encoder<()> for AttestationReport {
                     .skip_bytes::<152>()?
                     .write_bytes(self.signature, ())?;
             }
+        }
+
+        #[cfg(feature = "unsafe_parser")]
+        {
+            writer.write_bytes(self.launch_mit_vector.unwrap_or(0), ())?;
+            writer.write_bytes(self.current_mit_vector.unwrap_or(0), ())?;
+            writer.write_bytes(self._reserved_5, ())?;
+            writer.write_bytes(self.signature, ())?;
         }
 
         Ok(())
@@ -479,7 +585,14 @@ impl Decoder<()> for AttestationReport {
         let current_tcb = stepper.read_bytes_with(generation)?;
         let plat_info = stepper.read_bytes()?;
         let key_info = stepper.read_bytes()?;
-        let report_data = stepper.skip_bytes::<4>()?.read_bytes()?;
+
+        // Reserved 1
+        #[cfg(not(feature = "unsafe_parser"))]
+        stepper.skip_bytes::<4>()?;
+        #[cfg(feature = "unsafe_parser")]
+        let _reserved_1 = stepper.read_bytes()?;
+
+        let report_data = stepper.read_bytes()?;
         let measurement = stepper.read_bytes()?;
         let host_data = stepper.read_bytes()?;
         let id_key_digest = stepper.read_bytes()?;
@@ -488,65 +601,152 @@ impl Decoder<()> for AttestationReport {
         let report_id_ma = stepper.read_bytes()?;
         let reported_tcb = stepper.read_bytes_with(generation)?;
 
+        // Reserved 2
+        #[cfg(not(feature = "unsafe_parser"))]
         // CPUID fields were added in V3 and later.
-        let (cpuid_fam_id, cpuid_mod_id, cpuid_step, chip_id) = match variant {
-            ReportVariant::V2 => (None, None, None, stepper.skip_bytes::<24>()?.read_bytes()?),
-            _ => (
+        let (cpuid_fam_id, cpuid_mod_id, cpuid_step) = match variant {
+            ReportVariant::V2 => {
+                stepper.skip_bytes::<24>()?;
+                (None, None, None)
+            }
+            _ => {
+                let fam = Some(stepper.read_bytes()?);
+                let model = Some(stepper.read_bytes()?);
+                let step = Some(stepper.read_bytes()?);
+                stepper.skip_bytes::<21>()?;
+                (fam, model, step)
+            }
+        };
+        #[cfg(feature = "unsafe_parser")]
+        let (cpuid_fam_id, cpuid_mod_id, cpuid_step, _reserved_2) = {
+            (
                 Some(stepper.read_bytes()?),
                 Some(stepper.read_bytes()?),
                 Some(stepper.read_bytes()?),
-                stepper.skip_bytes::<21>()?.read_bytes()?,
-            ),
+                stepper.read_bytes()?,
+            )
         };
 
+        let chip_id = stepper.read_bytes()?;
         let committed_tcb = stepper.read_bytes_with(generation)?;
         let current = stepper.read_bytes()?;
-        let committed = stepper.skip_bytes::<1>()?.read_bytes()?;
-        let launch_tcb = stepper.skip_bytes::<1>()?.read_bytes_with(generation)?;
 
+        // Reserved 3
+        #[cfg(not(feature = "unsafe_parser"))]
+        stepper.skip_bytes::<1>()?;
+        #[cfg(feature = "unsafe_parser")]
+        let _reserved_3 = stepper.read_bytes()?;
+
+        let committed = stepper.read_bytes()?;
+
+        //Reserved 4
+        #[cfg(not(feature = "unsafe_parser"))]
+        stepper.skip_bytes::<1>()?;
+        #[cfg(feature = "unsafe_parser")]
+        let _reserved_4 = stepper.read_bytes()?;
+
+        let launch_tcb = stepper.read_bytes_with(generation)?;
+
+        //Reserved 5
+        #[cfg(not(feature = "unsafe_parser"))]
         // mit vecor fields were added in V5 and later.
-        let (launch_mit_vector, current_mit_vector, signature) = match variant {
+        let (launch_mit_vector, current_mit_vector) = match variant {
             ReportVariant::V2 | ReportVariant::V3 => {
-                (None, None, stepper.skip_bytes::<168>()?.read_bytes()?)
+                stepper.skip_bytes::<168>()?;
+                (None, None)
             }
-            _ => (
+            _ => {
+                let launch_vector = Some(stepper.read_bytes()?);
+                let current_vector = Some(stepper.read_bytes()?);
+                stepper.skip_bytes::<152>()?;
+                (launch_vector, current_vector)
+            }
+        };
+        #[cfg(feature = "unsafe_parser")]
+        let (launch_mit_vector, current_mit_vector, _reserved_5) = {
+            (
                 Some(stepper.read_bytes()?),
                 Some(stepper.read_bytes()?),
-                stepper.skip_bytes::<152>()?.read_bytes()?,
-            ),
+                stepper.read_bytes()?,
+            )
         };
 
-        Ok(Self {
-            version,
-            guest_svn,
-            policy,
-            family_id,
-            image_id,
-            vmpl,
-            sig_algo,
-            current_tcb,
-            plat_info,
-            key_info,
-            report_data,
-            measurement,
-            host_data,
-            id_key_digest,
-            author_key_digest,
-            report_id,
-            report_id_ma,
-            reported_tcb,
-            cpuid_fam_id,
-            cpuid_mod_id,
-            cpuid_step,
-            chip_id,
-            committed_tcb,
-            current,
-            committed,
-            launch_tcb,
-            launch_mit_vector,
-            current_mit_vector,
-            signature,
-        })
+        let signature = stepper.read_bytes()?;
+
+        #[cfg(not(feature = "unsafe_parser"))]
+        {
+            Ok(Self {
+                version,
+                guest_svn,
+                policy,
+                family_id,
+                image_id,
+                vmpl,
+                sig_algo,
+                current_tcb,
+                plat_info,
+                key_info,
+                report_data,
+                measurement,
+                host_data,
+                id_key_digest,
+                author_key_digest,
+                report_id,
+                report_id_ma,
+                reported_tcb,
+                cpuid_fam_id,
+                cpuid_mod_id,
+                cpuid_step,
+                chip_id,
+                committed_tcb,
+                current,
+                committed,
+                launch_tcb,
+                launch_mit_vector,
+                current_mit_vector,
+                signature,
+            })
+        }
+
+        #[cfg(feature = "unsafe_parser")]
+        {
+            Ok(Self {
+                version,
+                guest_svn,
+                policy,
+                family_id,
+                image_id,
+                vmpl,
+                sig_algo,
+                current_tcb,
+                plat_info,
+                key_info,
+                _reserved_1,
+                report_data,
+                measurement,
+                host_data,
+                id_key_digest,
+                author_key_digest,
+                report_id,
+                report_id_ma,
+                reported_tcb,
+                cpuid_fam_id,
+                cpuid_mod_id,
+                cpuid_step,
+                _reserved_2,
+                chip_id,
+                committed_tcb,
+                current,
+                _reserved_3,
+                committed,
+                _reserved_4,
+                launch_tcb,
+                launch_mit_vector,
+                current_mit_vector,
+                _reserved_5,
+                signature,
+            })
+        }
     }
 }
 
@@ -675,7 +875,19 @@ Current Mitigation Vector:    {}
             self.current_mit_vector
                 .map_or("None".to_string(), |cmv| cmv.to_string()),
             self.signature
-        )
+        )?;
+
+        #[cfg(feature = "unsafe_parser")]
+        {
+            writeln!(f)?;
+            writeln!(f, "\n--- Reserved Fields (unsafe_parser) ---")?;
+            writeln!(f, "\nReserved 1: {}", HexLine(&self._reserved_1))?;
+            writeln!(f, "\nReserved 2: {}", HexLine(&self._reserved_2))?;
+            writeln!(f, "\nReserved 3: {}", HexLine(&self._reserved_3))?;
+            writeln!(f, "\nReserved 4: {}", HexLine(&self._reserved_4))?;
+        }
+
+        Ok(())
     }
 }
 
@@ -1161,8 +1373,9 @@ mod tests {
         assert!(!actual.get_tcb_version());
     }
 
+    #[cfg(not(feature = "unsafe_parser"))]
     #[test]
-    fn test_attestation_report_fmt() {
+    fn test_attestation_report_fmt_safe() {
         let expected: &str = r#"Attestation Report:
 
 Version:                      0
@@ -1308,6 +1521,173 @@ Signature:
 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 00 00 00 00 00 00 00 00"#;
+        assert_eq!(expected, AttestationReport::default().to_string())
+    }
+
+    #[cfg(feature = "unsafe_parser")]
+    #[test]
+    fn test_attestation_report_fmt_unsafe() {
+        let expected: &str = r#"Attestation Report:
+
+Version:                      0
+
+Guest SVN:                    0
+
+Guest Policy (0x0):
+  ABI Major:     0
+  ABI Minor:     0
+  SMT Allowed:   false
+  Migrate MA:    false
+  Debug Allowed: false
+  Single Socket: false
+  CXL Allowed:   false
+  AEX 256 XTS:   false
+  RAPL Allowed:  false
+  Ciphertext hiding: false
+  Page Swap Disable: false
+
+Family ID:
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+Image ID:
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+VMPL:                         0
+
+Signature Algorithm:          0
+
+Current TCB:
+
+TCB Version:
+  Microcode:   0
+  SNP:         0
+  TEE:         0
+  Boot Loader: 0
+  FMC:         None
+
+Platform Info (0):
+  SMT Enabled:               false
+  TSME Enabled:              false
+  ECC Enabled:               false
+  RAPL Disabled:             false
+  Ciphertext Hiding Enabled: false
+  Alias Check Complete:      false
+  SEV-TIO Enabled:           false
+
+Key Information:
+    author key enabled: false
+    mask chip key:      false
+    signing key:        vcek
+
+Report Data:
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+Measurement:
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+Host Data:
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+ID Key Digest:
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+Author Key Digest:
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+Report ID:
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+Report ID Migration Agent:
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+Reported TCB:
+
+TCB Version:
+  Microcode:   0
+  SNP:         0
+  TEE:         0
+  Boot Loader: 0
+  FMC:         None
+
+CPUID Family ID:              None
+
+CPUID Model ID:               None
+
+CPUID Stepping:               None
+
+Chip ID:
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+Committed TCB:
+
+TCB Version:
+  Microcode:   0
+  SNP:         0
+  TEE:         0
+  Boot Loader: 0
+  FMC:         None
+
+Current Version:              0.0.0
+
+Committed Version:            0.0.0
+
+Launch TCB:
+
+TCB Version:
+  Microcode:   0
+  SNP:         0
+  TEE:         0
+  Boot Loader: 0
+  FMC:         None
+
+Launch Mitigation Vector:     None
+
+Current Mitigation Vector:    None
+
+Signature:
+  R:
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+  S:
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+
+--- Reserved Fields (unsafe_parser) ---
+
+Reserved 1: 
+00 00 00 00
+
+Reserved 2: 
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00
+
+Reserved 3: 
+00
+
+Reserved 4: 
+00
+"#;
         assert_eq!(expected, AttestationReport::default().to_string())
     }
 

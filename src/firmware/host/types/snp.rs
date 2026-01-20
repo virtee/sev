@@ -785,25 +785,46 @@ pub struct WrappedVlekHashstick {
     /// IV used to wrap chip-unique key
     pub iv: [u8; 12], // 96 bits = 12 bytes
 
-    // Reserved [u8;4]
+    #[cfg(feature = "unsafe_parser")]
+    /// Reserved 1
+    _reserved_1: [u8; 4],
+
     /// VLEK hashstick wrapped with a chip-unique key using AES-256-GCM
     pub vlek_wrapped: [u8; 384],
 
     /// The TCB version associated with this VLEK hashstick
     pub tcb_version: TcbVersion,
 
-    // Reserved [u8;8]
+    #[cfg(feature = "unsafe_parser")]
+    /// Reserved 2
+    _reserved_2: [u8; 8],
+
     /// AES-256-GCM authentication tag of the wrapped VLEK hashstick and TCB_VERSION
     pub vlek_auth_tag: [u8; 16],
 }
 
 impl Default for WrappedVlekHashstick {
     fn default() -> Self {
-        Self {
-            iv: Default::default(),
-            vlek_wrapped: [0u8; 384],
-            tcb_version: Default::default(),
-            vlek_auth_tag: Default::default(),
+        #[cfg(not(feature = "unsafe_parser"))]
+        {
+            Self {
+                iv: Default::default(),
+                vlek_wrapped: [0u8; 384],
+                tcb_version: Default::default(),
+                vlek_auth_tag: Default::default(),
+            }
+        }
+
+        #[cfg(feature = "unsafe_parser")]
+        {
+            Self {
+                iv: Default::default(),
+                _reserved_1: Default::default(),
+                vlek_wrapped: [0u8; 384],
+                tcb_version: Default::default(),
+                _reserved_2: Default::default(),
+                vlek_auth_tag: Default::default(),
+            }
         }
     }
 }
@@ -815,15 +836,23 @@ impl Encoder<Generation> for WrappedVlekHashstick {
         generation: Generation,
     ) -> Result<(), std::io::Error> {
         writer.write_bytes(self.iv, ())?;
-        // Reserved [u8;4]
-        writer
-            .skip_bytes::<4>()?
-            .write_bytes(self.vlek_wrapped, ())?;
+
+        // Reserved 1
+        #[cfg(not(feature = "unsafe_parser"))]
+        writer.skip_bytes::<4>()?;
+        #[cfg(feature = "unsafe_parser")]
+        writer.write_bytes(self._reserved_1, ())?;
+
+        writer.write_bytes(self.vlek_wrapped, ())?;
         writer.write_bytes(self.tcb_version, generation)?;
-        // Reserved [u8;8]
-        writer
-            .skip_bytes::<8>()?
-            .write_bytes(self.vlek_auth_tag, ())?;
+
+        // Reserved 2
+        #[cfg(not(feature = "unsafe_parser"))]
+        writer.skip_bytes::<8>()?;
+        #[cfg(feature = "unsafe_parser")]
+        writer.write_bytes(self._reserved_2, ())?;
+
+        writer.write_bytes(self.vlek_auth_tag, ())?;
         Ok(())
     }
 }
@@ -831,15 +860,45 @@ impl Encoder<Generation> for WrappedVlekHashstick {
 impl Decoder<Generation> for WrappedVlekHashstick {
     fn decode(reader: &mut impl Read, generation: Generation) -> Result<Self, std::io::Error> {
         let iv = reader.read_bytes()?;
-        let vlek_wrapped = reader.skip_bytes::<4>()?.read_bytes()?;
+
+        // Reserved 1
+        #[cfg(not(feature = "unsafe_parser"))]
+        reader.skip_bytes::<4>()?;
+        #[cfg(feature = "unsafe_parser")]
+        let _reserved_1 = reader.read_bytes()?;
+
+        let vlek_wrapped = reader.read_bytes()?;
         let tcb_version = reader.read_bytes_with(generation)?;
-        let vlek_auth_tag = reader.skip_bytes::<8>()?.read_bytes()?;
-        Ok(Self {
-            iv,
-            vlek_wrapped,
-            tcb_version,
-            vlek_auth_tag,
-        })
+
+        // Reserved 2
+        #[cfg(not(feature = "unsafe_parser"))]
+        reader.skip_bytes::<8>()?;
+        #[cfg(feature = "unsafe_parser")]
+        let _reserved_2 = reader.read_bytes()?;
+
+        let vlek_auth_tag = reader.read_bytes()?;
+
+        #[cfg(not(feature = "unsafe_parser"))]
+        {
+            Ok(Self {
+                iv,
+                vlek_wrapped,
+                tcb_version,
+                vlek_auth_tag,
+            })
+        }
+
+        #[cfg(feature = "unsafe_parser")]
+        {
+            Ok(Self {
+                iv,
+                _reserved_1,
+                vlek_wrapped,
+                tcb_version,
+                _reserved_2,
+                vlek_auth_tag,
+            })
+        }
     }
 }
 
@@ -863,7 +922,17 @@ impl Display for WrappedVlekHashstick {
             HexLine(&self.vlek_wrapped),
             self.tcb_version,
             HexLine(&self.vlek_auth_tag)
-        )
+        )?;
+
+        #[cfg(feature = "unsafe_parser")]
+        {
+            writeln!(f)?;
+            writeln!(f, "\n--- Reserved Fields (unsafe_parser) ---")?;
+            writeln!(f, "\nReserved 1: {}", HexLine(&self._reserved_1))?;
+            writeln!(f, "\nReserved 2: {}", HexLine(&self._reserved_2))?;
+        }
+
+        Ok(())
     }
 }
 
@@ -1870,10 +1939,21 @@ mod tests {
     #[test]
     fn test_wrapped_vlek_hashstick_to_bytes() {
         // Create a test hashstick
+        #[cfg(not(feature = "unsafe_parser"))]
         let hashstick = WrappedVlekHashstick {
             iv: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
             vlek_wrapped: [42; 384],
             tcb_version: TcbVersion::new(None, 1, 2, 3, 4),
+            vlek_auth_tag: [9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0],
+        };
+
+        #[cfg(feature = "unsafe_parser")]
+        let hashstick = WrappedVlekHashstick {
+            iv: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+            _reserved_1: [0; 4],
+            vlek_wrapped: [42; 384],
+            tcb_version: TcbVersion::new(None, 1, 2, 3, 4),
+            _reserved_2: [0; 8],
             vlek_auth_tag: [9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0],
         };
 
@@ -1919,10 +1999,21 @@ mod tests {
     #[test]
     fn test_wrapped_vlek_hashstick_display() {
         // Create a test hashstick
+        #[cfg(not(feature = "unsafe_parser"))]
         let hashstick = WrappedVlekHashstick {
             iv: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
             vlek_wrapped: [42; 384],
             tcb_version: TcbVersion::new(None, 1, 2, 3, 4),
+            vlek_auth_tag: [9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0],
+        };
+
+        #[cfg(feature = "unsafe_parser")]
+        let hashstick = WrappedVlekHashstick {
+            iv: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+            _reserved_1: [0; 4],
+            vlek_wrapped: [42; 384],
+            tcb_version: TcbVersion::new(None, 1, 2, 3, 4),
+            _reserved_2: [0; 8],
             vlek_auth_tag: [9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0],
         };
 
@@ -1933,5 +2024,12 @@ mod tests {
         assert!(display_string.contains("VLEK hashstic Wrapped:"));
         assert!(display_string.contains("TCB:"));
         assert!(display_string.contains("VLEK authentication tag:"));
+
+        #[cfg(feature = "unsafe_parser")]
+        {
+            // Ensure reserved fields are displayed
+            assert!(display_string.contains("\nReserved 1:"));
+            assert!(display_string.contains("\nReserved 2:"));
+        }
     }
 }

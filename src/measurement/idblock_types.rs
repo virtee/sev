@@ -455,29 +455,58 @@ pub struct IdAuth {
     pub id_key_algo: u32,
     /// The algorithm of the Author Key. Defaults to P-384
     pub author_key_algo: u32,
+
+    #[cfg(feature = "unsafe_parser")]
+    /// Reserved 1
+    pub reserved1: [u8; Self::ID_AUTH_RESERVED1_BYTES],
+
     /// The signature of all bytes of the ID block
     pub id_block_sig: SevEcdsaSig,
     /// The public component of the ID key
     pub id_pubkey: SevEcdsaPubKey,
+
+    #[cfg(feature = "unsafe_parser")]
+    /// Reserved 2
+    pub reserved2: [u8; Self::ID_AUTH_RESERVED2_BYTES],
+
     /// The signature of the ID_KEY
     pub id_key_sig: SevEcdsaSig,
     /// The public component of the Author key
     pub author_pub_key: SevEcdsaPubKey,
+
+    #[cfg(feature = "unsafe_parser")]
+    /// Reserved 3
+    pub reserved3: [u8; Self::ID_AUTH_RESERVED3_BYTES],
 }
 
 impl Encoder<()> for IdAuth {
     fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
         writer.write_bytes(self.id_key_algo, ())?;
         writer.write_bytes(self.author_key_algo, ())?;
-        writer
-            .skip_bytes::<{ Self::ID_AUTH_RESERVED1_BYTES }>()?
-            .write_bytes(self.id_block_sig, ())?;
+
+        // Reserved 1
+        #[cfg(not(feature = "unsafe_parser"))]
+        writer.skip_bytes::<{ Self::ID_AUTH_RESERVED1_BYTES }>()?;
+        #[cfg(feature = "unsafe_parser")]
+        writer.write_bytes(self.reserved1, ())?;
+
+        writer.write_bytes(self.id_block_sig, ())?;
         writer.write_bytes(self.id_pubkey, ())?;
-        writer
-            .skip_bytes::<{ Self::ID_AUTH_RESERVED2_BYTES }>()?
-            .write_bytes(self.id_key_sig, ())?;
+
+        // Reserved 2
+        #[cfg(not(feature = "unsafe_parser"))]
+        writer.skip_bytes::<{ Self::ID_AUTH_RESERVED2_BYTES }>()?;
+        #[cfg(feature = "unsafe_parser")]
+        writer.write_bytes(self.reserved2, ())?;
+
+        writer.write_bytes(self.id_key_sig, ())?;
         writer.write_bytes(self.author_pub_key, ())?;
+
+        // Reserved 3
+        #[cfg(not(feature = "unsafe_parser"))]
         writer.skip_bytes::<{ Self::ID_AUTH_RESERVED3_BYTES }>()?;
+        #[cfg(feature = "unsafe_parser")]
+        writer.write_bytes(self.reserved3, ())?;
 
         Ok(())
     }
@@ -487,22 +516,57 @@ impl Decoder<()> for IdAuth {
     fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
         let id_key_algo = reader.read_bytes()?;
         let author_key_algo = reader.read_bytes()?;
+
+        // Reserved 1
+        #[cfg(not(feature = "unsafe_parser"))]
         reader.skip_bytes::<{ Self::ID_AUTH_RESERVED1_BYTES }>()?;
+        #[cfg(feature = "unsafe_parser")]
+        let reserved1 = reader.read_bytes()?;
+
         let id_block_sig = reader.read_bytes()?;
         let id_pubkey = reader.read_bytes()?;
+
+        // Reserved 2
+        #[cfg(not(feature = "unsafe_parser"))]
         reader.skip_bytes::<{ Self::ID_AUTH_RESERVED2_BYTES }>()?;
+        #[cfg(feature = "unsafe_parser")]
+        let reserved2 = reader.read_bytes()?;
+
         let id_key_sig = reader.read_bytes()?;
         let author_pub_key = reader.read_bytes()?;
-        reader.skip_bytes::<{ Self::ID_AUTH_RESERVED3_BYTES }>()?;
 
-        Ok(Self {
-            id_key_algo,
-            author_key_algo,
-            id_block_sig,
-            id_pubkey,
-            id_key_sig,
-            author_pub_key,
-        })
+        // Reserved 3
+        #[cfg(not(feature = "unsafe_parser"))]
+        reader.skip_bytes::<{ Self::ID_AUTH_RESERVED3_BYTES }>()?;
+        #[cfg(feature = "unsafe_parser")]
+        let reserved3 = reader.read_bytes()?;
+
+        #[cfg(not(feature = "unsafe_parser"))]
+        {
+            Ok(Self {
+                id_key_algo,
+                author_key_algo,
+                id_block_sig,
+                id_pubkey,
+                id_key_sig,
+                author_pub_key,
+            })
+        }
+
+        #[cfg(feature = "unsafe_parser")]
+        {
+            Ok(Self {
+                id_key_algo,
+                author_key_algo,
+                reserved1,
+                id_block_sig,
+                id_pubkey,
+                reserved2,
+                id_key_sig,
+                author_pub_key,
+                reserved3,
+            })
+        }
     }
 }
 
@@ -536,26 +600,62 @@ impl IdAuth {
             _ => DEFAULT_KEY_ALGO,
         };
 
-        Self {
-            id_key_algo: id_algo,
-            author_key_algo: key_algo,
-            id_block_sig,
-            id_pubkey,
-            id_key_sig,
-            author_pub_key,
+        #[cfg(not(feature = "unsafe_parser"))]
+        {
+            Self {
+                id_key_algo: id_algo,
+                author_key_algo: key_algo,
+                id_block_sig,
+                id_pubkey,
+                id_key_sig,
+                author_pub_key,
+            }
+        }
+
+        #[cfg(feature = "unsafe_parser")]
+        {
+            Self {
+                id_key_algo: id_algo,
+                author_key_algo: key_algo,
+                reserved1: [0u8; Self::ID_AUTH_RESERVED1_BYTES],
+                id_block_sig,
+                id_pubkey,
+                reserved2: [0u8; Self::ID_AUTH_RESERVED2_BYTES],
+                id_key_sig,
+                author_pub_key,
+                reserved3: [0u8; Self::ID_AUTH_RESERVED3_BYTES],
+            }
         }
     }
 }
 
 impl Default for IdAuth {
     fn default() -> Self {
-        Self {
-            id_key_algo: DEFAULT_KEY_ALGO,
-            author_key_algo: DEFAULT_KEY_ALGO,
-            id_block_sig: Default::default(),
-            id_pubkey: Default::default(),
-            id_key_sig: Default::default(),
-            author_pub_key: Default::default(),
+        #[cfg(not(feature = "unsafe_parser"))]
+        {
+            Self {
+                id_key_algo: DEFAULT_KEY_ALGO,
+                author_key_algo: DEFAULT_KEY_ALGO,
+                id_block_sig: Default::default(),
+                id_pubkey: Default::default(),
+                id_key_sig: Default::default(),
+                author_pub_key: Default::default(),
+            }
+        }
+
+        #[cfg(feature = "unsafe_parser")]
+        {
+            Self {
+                id_key_algo: DEFAULT_KEY_ALGO,
+                author_key_algo: DEFAULT_KEY_ALGO,
+                reserved1: [0u8; Self::ID_AUTH_RESERVED1_BYTES],
+                id_block_sig: Default::default(),
+                id_pubkey: Default::default(),
+                reserved2: [0u8; Self::ID_AUTH_RESERVED2_BYTES],
+                id_key_sig: Default::default(),
+                author_pub_key: Default::default(),
+                reserved3: [0u8; Self::ID_AUTH_RESERVED3_BYTES],
+            }
         }
     }
 }

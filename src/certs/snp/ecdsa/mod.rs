@@ -77,7 +77,12 @@ impl Encoder<()> for Signature {
         writer.write_bytes(self.r, ())?;
         writer.write_bytes(self.s, ())?;
         // Reserved bytes
+        #[cfg(not(feature = "unsafe_parser"))]
         writer.skip_bytes::<368>()?;
+
+        #[cfg(feature = "unsafe_parser")]
+        writer.write_bytes([0u8; 368], ())?;
+
         Ok(())
     }
 }

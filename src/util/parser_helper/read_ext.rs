@@ -23,6 +23,7 @@ pub trait ReadExt: Read {
     }
 
     /// Read SKIP bytes and verify they are zero; returns a mutable reference to the same reader.
+    #[cfg(not(feature = "unsafe_parser"))]
     fn skip_bytes<const SKIP: usize>(&mut self) -> Result<&mut Self, std::io::Error> {
         if SKIP != 0 {
             // Read in chunks to avoid huge stack allocations for large SKIP.
@@ -88,6 +89,7 @@ mod read_ext_tests {
         assert_eq!(result.unwrap(), 0x78563412);
     }
 
+    #[cfg(not(feature = "unsafe_parser"))]
     // Test case 2: Skip, Valid Data
     #[test]
     fn test_skip_valid_data() {
@@ -97,6 +99,7 @@ mod read_ext_tests {
         assert_eq!(result.unwrap(), 0x78563412);
     }
 
+    #[cfg(not(feature = "unsafe_parser"))]
     // Test case 3: Skip, Invalid Data
     #[test]
     fn test_skip_invalid_data() {

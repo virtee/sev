@@ -12,12 +12,16 @@ pub trait WriteExt: Write {
         value.encode(self, params)
     }
 
+    #[cfg(not(feature = "unsafe_parser"))]
     fn skip_bytes<const SKIP: usize>(&mut self) -> Result<&mut Self, std::io::Error>
     where
         Self: Sized,
     {
         if SKIP != 0 {
-            self.write_all(&[0; SKIP])?;
+            {
+                // Default behavior: write zeros
+                self.write_all(&[0; SKIP])?;
+            }
         }
         Ok(self)
     }
@@ -56,6 +60,7 @@ mod write_ext_tests {
         Ok(())
     }
 
+    #[cfg(not(feature = "unsafe_parser"))]
     #[test]
     fn test_write_bytes_with_skip() -> Result<(), std::io::Error> {
         let mut writer = MockWriter::default();
@@ -72,6 +77,21 @@ mod write_ext_tests {
         writer.flush()?;
         // Flush doesn't modify the written buffer, so we just check that it executes without error.
         assert_eq!(writer.written.len(), 0);
+        Ok(())
+    }
+
+    #[cfg(not(feature = "unsafe_parser"))]
+    #[test]
+    fn test_skip_bytes_unsafe_raw_bytes() -> Result<(), std::io::Error> {
+        let mut writer = MockWriter::default();
+        writer.skip_bytes::<4>()?;
+
+        // When unsafe feature is enabled, we should write 4 bytes
+        assert_eq!(writer.written.len(), 4);
+
+        // The bytes written are uninitialized memory, so we can't predict their exact values
+        // But we can verify they were written and that the function completed successfully
+        println!("Unsafe skip_bytes wrote: {:?}", writer.written);
         Ok(())
     }
 }

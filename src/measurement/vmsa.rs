@@ -246,9 +246,24 @@ struct SevEsSaveArea {
     vmpl2_ssp: u64,
     vmpl3_ssp: u64,
     u_cet: u64,
+
+    // reserved_0xc8
+    #[cfg(feature = "unsafe_parser")]
+    reserved_0xc8: [u8; 2],
+
     vmpl: u8,
     cpl: u8,
+
+    // reserved_0xcc
+    #[cfg(feature = "unsafe_parser")]
+    reserved_0xcc: [u8; 4],
+
     efer: u64,
+
+    // reserved_0xd8
+    #[cfg(feature = "unsafe_parser")]
+    reserved_0xd8: [u8; 104],
+
     xss: u64,
     cr4: u64,
     cr3: u64,
@@ -265,6 +280,11 @@ struct SevEsSaveArea {
     dr1_addr_mask: u64,
     dr2_addr_mask: u64,
     dr3_addr_mask: u64,
+
+    // reserved_0x1c0
+    #[cfg(feature = "unsafe_parser")]
+    reserved_0x1c0: [u8; 24],
+
     rsp: u64,
     s_cet: u64,
     ssp: u64,
@@ -279,17 +299,37 @@ struct SevEsSaveArea {
     sysenter_esp: u64,
     sysenter_eip: u64,
     cr2: u64,
+
+    // reserved_0x248
+    #[cfg(feature = "unsafe_parser")]
+    reserved_0x248: [u8; 32],
+
     g_pat: u64,
     dbgctrl: u64,
     br_from: u64,
     br_to: u64,
     last_excp_from: u64,
     last_excp_to: u64,
+
+    // reserved_0x298
+    #[cfg(feature = "unsafe_parser")]
+    reserved_0x298: [u8; 80],
+
     pkru: u32,
     tsc_aux: u32,
+
+    // reserved_0x2f0
+    #[cfg(feature = "unsafe_parser")]
+    reserved_0x2f0: [u8; 24],
+
     rcx: u64,
     rdx: u64,
     rbx: u64,
+
+    // reserved_0x320
+    #[cfg(feature = "unsafe_parser")]
+    reserved_0x320: [u8; 8],
+
     rbp: u64,
     rsi: u64,
     rdi: u64,
@@ -301,6 +341,11 @@ struct SevEsSaveArea {
     r13: u64,
     r14: u64,
     r15: u64,
+
+    // reserved_0x380
+    #[cfg(feature = "unsafe_parser")]
+    reserved_0x380: [u8; 16],
+
     guest_exit_info_1: u64,
     guest_exit_info_2: u64,
     guest_exit_int_info: u64,
@@ -313,6 +358,10 @@ struct SevEsSaveArea {
     pcpu_id: u64,
     event_inj: u64,
     xcr0: u64,
+
+    // reserved_0x3f0
+    #[cfg(feature = "unsafe_parser")]
+    reserved_0x3f0: [u8; 16],
 
     /* Floating Point Area */
     x87_dp: u64,
@@ -336,102 +385,215 @@ struct SevEsSaveArea {
 
 impl Default for SevEsSaveArea {
     fn default() -> Self {
-        Self {
-            es: Default::default(),
-            cs: Default::default(),
-            ss: Default::default(),
-            ds: Default::default(),
-            fs: Default::default(),
-            gs: Default::default(),
-            gdtr: Default::default(),
-            ldtr: Default::default(),
-            idtr: Default::default(),
-            tr: Default::default(),
-            vmpl0_ssp: Default::default(),
-            vmpl1_ssp: Default::default(),
-            vmpl2_ssp: Default::default(),
-            vmpl3_ssp: Default::default(),
-            u_cet: Default::default(),
-            vmpl: Default::default(),
-            cpl: Default::default(),
-            efer: Default::default(),
-            xss: Default::default(),
-            cr4: Default::default(),
-            cr3: Default::default(),
-            cr0: Default::default(),
-            dr7: Default::default(),
-            dr6: Default::default(),
-            rflags: Default::default(),
-            rip: Default::default(),
-            dr0: Default::default(),
-            dr1: Default::default(),
-            dr2: Default::default(),
-            dr3: Default::default(),
-            dr0_addr_mask: Default::default(),
-            dr1_addr_mask: Default::default(),
-            dr2_addr_mask: Default::default(),
-            dr3_addr_mask: Default::default(),
-            rsp: Default::default(),
-            s_cet: Default::default(),
-            ssp: Default::default(),
-            isst_addr: Default::default(),
-            rax: Default::default(),
-            star: Default::default(),
-            lstar: Default::default(),
-            cstar: Default::default(),
-            sfmask: Default::default(),
-            kernel_gs_base: Default::default(),
-            sysenter_cs: Default::default(),
-            sysenter_esp: Default::default(),
-            sysenter_eip: Default::default(),
-            cr2: Default::default(),
-            g_pat: Default::default(),
-            dbgctrl: Default::default(),
-            br_from: Default::default(),
-            br_to: Default::default(),
-            last_excp_from: Default::default(),
-            last_excp_to: Default::default(),
-            pkru: Default::default(),
-            tsc_aux: Default::default(),
-            rcx: Default::default(),
-            rdx: Default::default(),
-            rbx: Default::default(),
-            rbp: Default::default(),
-            rsi: Default::default(),
-            rdi: Default::default(),
-            r8: Default::default(),
-            r9: Default::default(),
-            r10: Default::default(),
-            r11: Default::default(),
-            r12: Default::default(),
-            r13: Default::default(),
-            r14: Default::default(),
-            r15: Default::default(),
-            guest_exit_info_1: Default::default(),
-            guest_exit_info_2: Default::default(),
-            guest_exit_int_info: Default::default(),
-            guest_nrip: Default::default(),
-            sev_features: Default::default(),
-            vintr_ctrl: Default::default(),
-            guest_exit_code: Default::default(),
-            virtual_tom: Default::default(),
-            tlb_id: Default::default(),
-            pcpu_id: Default::default(),
-            event_inj: Default::default(),
-            xcr0: Default::default(),
-            x87_dp: Default::default(),
-            mxcsr: Default::default(),
-            x87_ftw: Default::default(),
-            x87_fsw: Default::default(),
-            x87_fcw: Default::default(),
-            x87_fop: Default::default(),
-            x87_ds: Default::default(),
-            x87_cs: Default::default(),
-            x87_rip: Default::default(),
-            fpreg_x87: [0u8; 80],
-            fpreg_xmm: [0u8; 256],
-            fpreg_ymm: [0u8; 256],
-            manual_padding: [0u8; 2448],
+        #[cfg(not(feature = "unsafe_parser"))]
+        {
+            Self {
+                es: Default::default(),
+                cs: Default::default(),
+                ss: Default::default(),
+                ds: Default::default(),
+                fs: Default::default(),
+                gs: Default::default(),
+                gdtr: Default::default(),
+                ldtr: Default::default(),
+                idtr: Default::default(),
+                tr: Default::default(),
+                vmpl0_ssp: Default::default(),
+                vmpl1_ssp: Default::default(),
+                vmpl2_ssp: Default::default(),
+                vmpl3_ssp: Default::default(),
+                u_cet: Default::default(),
+                vmpl: Default::default(),
+                cpl: Default::default(),
+                efer: Default::default(),
+                xss: Default::default(),
+                cr4: Default::default(),
+                cr3: Default::default(),
+                cr0: Default::default(),
+                dr7: Default::default(),
+                dr6: Default::default(),
+                rflags: Default::default(),
+                rip: Default::default(),
+                dr0: Default::default(),
+                dr1: Default::default(),
+                dr2: Default::default(),
+                dr3: Default::default(),
+                dr0_addr_mask: Default::default(),
+                dr1_addr_mask: Default::default(),
+                dr2_addr_mask: Default::default(),
+                dr3_addr_mask: Default::default(),
+                rsp: Default::default(),
+                s_cet: Default::default(),
+                ssp: Default::default(),
+                isst_addr: Default::default(),
+                rax: Default::default(),
+                star: Default::default(),
+                lstar: Default::default(),
+                cstar: Default::default(),
+                sfmask: Default::default(),
+                kernel_gs_base: Default::default(),
+                sysenter_cs: Default::default(),
+                sysenter_esp: Default::default(),
+                sysenter_eip: Default::default(),
+                cr2: Default::default(),
+                g_pat: Default::default(),
+                dbgctrl: Default::default(),
+                br_from: Default::default(),
+                br_to: Default::default(),
+                last_excp_from: Default::default(),
+                last_excp_to: Default::default(),
+                pkru: Default::default(),
+                tsc_aux: Default::default(),
+                rcx: Default::default(),
+                rdx: Default::default(),
+                rbx: Default::default(),
+                rbp: Default::default(),
+                rsi: Default::default(),
+                rdi: Default::default(),
+                r8: Default::default(),
+                r9: Default::default(),
+                r10: Default::default(),
+                r11: Default::default(),
+                r12: Default::default(),
+                r13: Default::default(),
+                r14: Default::default(),
+                r15: Default::default(),
+                guest_exit_info_1: Default::default(),
+                guest_exit_info_2: Default::default(),
+                guest_exit_int_info: Default::default(),
+                guest_nrip: Default::default(),
+                sev_features: Default::default(),
+                vintr_ctrl: Default::default(),
+                guest_exit_code: Default::default(),
+                virtual_tom: Default::default(),
+                tlb_id: Default::default(),
+                pcpu_id: Default::default(),
+                event_inj: Default::default(),
+                xcr0: Default::default(),
+                x87_dp: Default::default(),
+                mxcsr: Default::default(),
+                x87_ftw: Default::default(),
+                x87_fsw: Default::default(),
+                x87_fcw: Default::default(),
+                x87_fop: Default::default(),
+                x87_ds: Default::default(),
+                x87_cs: Default::default(),
+                x87_rip: Default::default(),
+                fpreg_x87: [0u8; 80],
+                fpreg_xmm: [0u8; 256],
+                fpreg_ymm: [0u8; 256],
+                manual_padding: [0u8; 2448],
+            }
+        }
+        #[cfg(feature = "unsafe_parser")]
+        {
+            Self {
+                es: Default::default(),
+                cs: Default::default(),
+                ss: Default::default(),
+                ds: Default::default(),
+                fs: Default::default(),
+                gs: Default::default(),
+                gdtr: Default::default(),
+                ldtr: Default::default(),
+                idtr: Default::default(),
+                tr: Default::default(),
+                vmpl0_ssp: Default::default(),
+                vmpl1_ssp: Default::default(),
+                vmpl2_ssp: Default::default(),
+                vmpl3_ssp: Default::default(),
+                u_cet: Default::default(),
+                reserved_0xc8: [0u8; 2],
+                vmpl: Default::default(),
+                cpl: Default::default(),
+                reserved_0xcc: [0u8; 4],
+                efer: Default::default(),
+                reserved_0xd8: [0u8; 104],
+                xss: Default::default(),
+                cr4: Default::default(),
+                cr3: Default::default(),
+                cr0: Default::default(),
+                dr7: Default::default(),
+                dr6: Default::default(),
+                rflags: Default::default(),
+                rip: Default::default(),
+                dr0: Default::default(),
+                dr1: Default::default(),
+                dr2: Default::default(),
+                dr3: Default::default(),
+                dr0_addr_mask: Default::default(),
+                dr1_addr_mask: Default::default(),
+                dr2_addr_mask: Default::default(),
+                dr3_addr_mask: Default::default(),
+                reserved_0x1c0: [0u8; 24],
+                rsp: Default::default(),
+                s_cet: Default::default(),
+                ssp: Default::default(),
+                isst_addr: Default::default(),
+                rax: Default::default(),
+                star: Default::default(),
+                lstar: Default::default(),
+                cstar: Default::default(),
+                sfmask: Default::default(),
+                kernel_gs_base: Default::default(),
+                sysenter_cs: Default::default(),
+                sysenter_esp: Default::default(),
+                sysenter_eip: Default::default(),
+                cr2: Default::default(),
+                reserved_0x248: [0u8; 32],
+                g_pat: Default::default(),
+                dbgctrl: Default::default(),
+                br_from: Default::default(),
+                br_to: Default::default(),
+                last_excp_from: Default::default(),
+                last_excp_to: Default::default(),
+                reserved_0x298: [0u8; 80],
+                pkru: Default::default(),
+                tsc_aux: Default::default(),
+                reserved_0x2f0: [0u8; 24],
+                rcx: Default::default(),
+                rdx: Default::default(),
+                rbx: Default::default(),
+                reserved_0x320: [0u8; 8],
+                rbp: Default::default(),
+                rsi: Default::default(),
+                rdi: Default::default(),
+                r8: Default::default(),
+                r9: Default::default(),
+                r10: Default::default(),
+                r11: Default::default(),
+                r12: Default::default(),
+                r13: Default::default(),
+                r14: Default::default(),
+                r15: Default::default(),
+                reserved_0x380: [0u8; 16],
+                guest_exit_info_1: Default::default(),
+                guest_exit_info_2: Default::default(),
+                guest_exit_int_info: Default::default(),
+                guest_nrip: Default::default(),
+                sev_features: Default::default(),
+                vintr_ctrl: Default::default(),
+                guest_exit_code: Default::default(),
+                virtual_tom: Default::default(),
+                tlb_id: Default::default(),
+                pcpu_id: Default::default(),
+                event_inj: Default::default(),
+                xcr0: Default::default(),
+                reserved_0x3f0: [0u8; 16],
+                x87_dp: Default::default(),
+                mxcsr: Default::default(),
+                x87_ftw: Default::default(),
+                x87_fsw: Default::default(),
+                x87_fcw: Default::default(),
+                x87_fop: Default::default(),
+                x87_ds: Default::default(),
+                x87_cs: Default::default(),
+                x87_rip: Default::default(),
+                fpreg_x87: [0u8; 80],
+                fpreg_xmm: [0u8; 256],
+                fpreg_ymm: [0u8; 256],
+                manual_padding: [0u8; 2448],
+            }
         }
     }
 }
@@ -453,13 +615,30 @@ impl Encoder<()> for SevEsSaveArea {
         writer.write_bytes(self.vmpl2_ssp, ())?;
         writer.write_bytes(self.vmpl3_ssp, ())?;
         writer.write_bytes(self.u_cet, ())?;
-        // reserved_0xc8 [u8;2]
-        writer.skip_bytes::<2>()?.write_bytes(self.vmpl, ())?;
+
+        // reserved_0xc8
+        #[cfg(not(feature = "unsafe_parser"))]
+        writer.skip_bytes::<2>()?;
+        #[cfg(feature = "unsafe_parser")]
+        writer.write_bytes(self.reserved_0xc8, ())?;
+
+        writer.write_bytes(self.vmpl, ())?;
         writer.write_bytes(self.cpl, ())?;
-        // reserved_0xcc [u8;4]
-        writer.skip_bytes::<4>()?.write_bytes(self.efer, ())?;
-        // reserved_0xd8 [u8;104]
-        writer.skip_bytes::<104>()?.write_bytes(self.xss, ())?;
+        // reserved_0xcc
+        #[cfg(not(feature = "unsafe_parser"))]
+        writer.skip_bytes::<4>()?;
+        #[cfg(feature = "unsafe_parser")]
+        writer.write_bytes(self.reserved_0xcc, ())?;
+
+        writer.write_bytes(self.efer, ())?;
+
+        // reserved_0xd8
+        #[cfg(not(feature = "unsafe_parser"))]
+        writer.skip_bytes::<104>()?;
+        #[cfg(feature = "unsafe_parser")]
+        writer.write_bytes(self.reserved_0xd8, ())?;
+
+        writer.write_bytes(self.xss, ())?;
         writer.write_bytes(self.cr4, ())?;
         writer.write_bytes(self.cr3, ())?;
         writer.write_bytes(self.cr0, ())?;
@@ -475,8 +654,14 @@ impl Encoder<()> for SevEsSaveArea {
         writer.write_bytes(self.dr1_addr_mask, ())?;
         writer.write_bytes(self.dr2_addr_mask, ())?;
         writer.write_bytes(self.dr3_addr_mask, ())?;
-        // reserved_0x1c0 [u8;24]
-        writer.skip_bytes::<24>()?.write_bytes(self.rsp, ())?;
+
+        // reserved_0x1c0
+        #[cfg(not(feature = "unsafe_parser"))]
+        writer.skip_bytes::<24>()?;
+        #[cfg(feature = "unsafe_parser")]
+        writer.write_bytes(self.reserved_0x1c0, ())?;
+
+        writer.write_bytes(self.rsp, ())?;
         writer.write_bytes(self.s_cet, ())?;
         writer.write_bytes(self.ssp, ())?;
         writer.write_bytes(self.isst_addr, ())?;
@@ -490,22 +675,46 @@ impl Encoder<()> for SevEsSaveArea {
         writer.write_bytes(self.sysenter_esp, ())?;
         writer.write_bytes(self.sysenter_eip, ())?;
         writer.write_bytes(self.cr2, ())?;
-        // reserved_0x248[u8;32]
-        writer.skip_bytes::<32>()?.write_bytes(self.g_pat, ())?;
+
+        // reserved_0x248
+        #[cfg(not(feature = "unsafe_parser"))]
+        writer.skip_bytes::<32>()?;
+        #[cfg(feature = "unsafe_parser")]
+        writer.write_bytes(self.reserved_0x248, ())?;
+
+        writer.write_bytes(self.g_pat, ())?;
         writer.write_bytes(self.dbgctrl, ())?;
         writer.write_bytes(self.br_from, ())?;
         writer.write_bytes(self.br_to, ())?;
         writer.write_bytes(self.last_excp_from, ())?;
         writer.write_bytes(self.last_excp_to, ())?;
-        // reserved_0x298 [u8;80]
-        writer.skip_bytes::<80>()?.write_bytes(self.pkru, ())?;
+
+        // reserved_0x298
+        #[cfg(not(feature = "unsafe_parser"))]
+        writer.skip_bytes::<80>()?;
+        #[cfg(feature = "unsafe_parser")]
+        writer.write_bytes(self.reserved_0x298, ())?;
+
+        writer.write_bytes(self.pkru, ())?;
         writer.write_bytes(self.tsc_aux, ())?;
-        // reserved_0x2f0 [u8;24]
-        writer.skip_bytes::<24>()?.write_bytes(self.rcx, ())?;
+
+        // reserved_0x2f0
+        #[cfg(not(feature = "unsafe_parser"))]
+        writer.skip_bytes::<24>()?;
+        #[cfg(feature = "unsafe_parser")]
+        writer.write_bytes(self.reserved_0x2f0, ())?;
+
+        writer.write_bytes(self.rcx, ())?;
         writer.write_bytes(self.rdx, ())?;
         writer.write_bytes(self.rbx, ())?;
-        // reserved_0x320 u64
-        writer.skip_bytes::<8>()?.write_bytes(self.rbp, ())?;
+
+        // reserved_0x320
+        #[cfg(not(feature = "unsafe_parser"))]
+        writer.skip_bytes::<8>()?;
+        #[cfg(feature = "unsafe_parser")]
+        writer.write_bytes(self.reserved_0x320, ())?;
+
+        writer.write_bytes(self.rbp, ())?;
         writer.write_bytes(self.rsi, ())?;
         writer.write_bytes(self.rdi, ())?;
         writer.write_bytes(self.r8, ())?;
@@ -516,10 +725,14 @@ impl Encoder<()> for SevEsSaveArea {
         writer.write_bytes(self.r13, ())?;
         writer.write_bytes(self.r14, ())?;
         writer.write_bytes(self.r15, ())?;
-        // reserved_0x380 [u8;16]
-        writer
-            .skip_bytes::<16>()?
-            .write_bytes(self.guest_exit_info_1, ())?;
+
+        // reserved_0x380
+        #[cfg(not(feature = "unsafe_parser"))]
+        writer.skip_bytes::<16>()?;
+        #[cfg(feature = "unsafe_parser")]
+        writer.write_bytes(self.reserved_0x380, ())?;
+
+        writer.write_bytes(self.guest_exit_info_1, ())?;
         writer.write_bytes(self.guest_exit_info_2, ())?;
         writer.write_bytes(self.guest_exit_int_info, ())?;
         writer.write_bytes(self.guest_nrip, ())?;
@@ -531,8 +744,14 @@ impl Encoder<()> for SevEsSaveArea {
         writer.write_bytes(self.pcpu_id, ())?;
         writer.write_bytes(self.event_inj, ())?;
         writer.write_bytes(self.xcr0, ())?;
-        // reserved_0x3f0 [u8;16]
-        writer.skip_bytes::<16>()?.write_bytes(self.x87_dp, ())?;
+
+        // reserved_0x3f0
+        #[cfg(not(feature = "unsafe_parser"))]
+        writer.skip_bytes::<16>()?;
+        #[cfg(feature = "unsafe_parser")]
+        writer.write_bytes(self.reserved_0x3f0, ())?;
+
+        writer.write_bytes(self.x87_dp, ())?;
         writer.write_bytes(self.mxcsr, ())?;
         writer.write_bytes(self.x87_ftw, ())?;
         writer.write_bytes(self.x87_fsw, ())?;
@@ -567,13 +786,31 @@ impl Decoder<()> for SevEsSaveArea {
         let vmpl2_ssp = reader.read_bytes()?;
         let vmpl3_ssp = reader.read_bytes()?;
         let u_cet = reader.read_bytes()?;
-        // reserved_0xc8: [u8;2]
-        let vmpl = reader.skip_bytes::<2>()?.read_bytes()?;
+
+        // reserved_0xc8
+        #[cfg(not(feature = "unsafe_parser"))]
+        reader.skip_bytes::<2>()?;
+        #[cfg(feature = "unsafe_parser")]
+        let reserved_0xc8 = reader.read_bytes()?;
+
+        let vmpl = reader.read_bytes()?;
         let cpl = reader.read_bytes()?;
-        // reserved_0xcc: [u8;4]
-        let efer = reader.skip_bytes::<4>()?.read_bytes()?;
-        // reserved 0xd8: [u8;104]
-        let xss = reader.skip_bytes::<104>()?.read_bytes()?;
+
+        // reserved_0xcc
+        #[cfg(not(feature = "unsafe_parser"))]
+        reader.skip_bytes::<4>()?;
+        #[cfg(feature = "unsafe_parser")]
+        let reserved_0xcc = reader.read_bytes()?;
+
+        let efer = reader.read_bytes()?;
+
+        // reserved 0xd8
+        #[cfg(not(feature = "unsafe_parser"))]
+        reader.skip_bytes::<104>()?;
+        #[cfg(feature = "unsafe_parser")]
+        let reserved_0xd8 = reader.read_bytes()?;
+
+        let xss = reader.read_bytes()?;
         let cr4 = reader.read_bytes()?;
         let cr3 = reader.read_bytes()?;
         let cr0 = reader.read_bytes()?;
@@ -589,8 +826,14 @@ impl Decoder<()> for SevEsSaveArea {
         let dr1_addr_mask = reader.read_bytes()?;
         let dr2_addr_mask = reader.read_bytes()?;
         let dr3_addr_mask = reader.read_bytes()?;
-        // reserved_0x1c0: [u8;24]
-        let rsp = reader.skip_bytes::<24>()?.read_bytes()?;
+
+        // reserved_0x1c0
+        #[cfg(not(feature = "unsafe_parser"))]
+        reader.skip_bytes::<24>()?;
+        #[cfg(feature = "unsafe_parser")]
+        let reserved_0x1c0 = reader.read_bytes()?;
+
+        let rsp = reader.read_bytes()?;
         let s_cet = reader.read_bytes()?;
         let ssp = reader.read_bytes()?;
         let isst_addr = reader.read_bytes()?;
@@ -604,22 +847,46 @@ impl Decoder<()> for SevEsSaveArea {
         let sysenter_esp = reader.read_bytes()?;
         let sysenter_eip = reader.read_bytes()?;
         let cr2 = reader.read_bytes()?;
-        // reserved_0x248: [u8;32]
-        let g_pat = reader.skip_bytes::<32>()?.read_bytes()?;
+
+        // reserved_0x248
+        #[cfg(not(feature = "unsafe_parser"))]
+        reader.skip_bytes::<32>()?;
+        #[cfg(feature = "unsafe_parser")]
+        let reserved_0x248 = reader.read_bytes()?;
+
+        let g_pat = reader.read_bytes()?;
         let dbgctrl = reader.read_bytes()?;
         let br_from = reader.read_bytes()?;
         let br_to = reader.read_bytes()?;
         let last_excp_from = reader.read_bytes()?;
         let last_excp_to = reader.read_bytes()?;
-        // reserved_0x298: [u8;80]
-        let pkru = reader.skip_bytes::<80>()?.read_bytes()?;
+
+        // reserved_0x298
+        #[cfg(not(feature = "unsafe_parser"))]
+        reader.skip_bytes::<80>()?;
+        #[cfg(feature = "unsafe_parser")]
+        let reserved_0x298 = reader.read_bytes()?;
+
+        let pkru = reader.read_bytes()?;
         let tsc_aux = reader.read_bytes()?;
-        // reserved_0x2f0: [u8;24]
-        let rcx = reader.skip_bytes::<24>()?.read_bytes()?;
+
+        // reserved_0x2f0
+        #[cfg(not(feature = "unsafe_parser"))]
+        reader.skip_bytes::<24>()?;
+        #[cfg(feature = "unsafe_parser")]
+        let reserved_0x2f0 = reader.read_bytes()?;
+
+        let rcx = reader.read_bytes()?;
         let rdx = reader.read_bytes()?;
         let rbx = reader.read_bytes()?;
-        // reserved_0x320 u64
-        let rbp = reader.skip_bytes::<8>()?.read_bytes()?;
+
+        // reserved_0x320
+        #[cfg(not(feature = "unsafe_parser"))]
+        reader.skip_bytes::<8>()?;
+        #[cfg(feature = "unsafe_parser")]
+        let reserved_0x320 = reader.read_bytes()?;
+
+        let rbp = reader.read_bytes()?;
         let rsi = reader.read_bytes()?;
         let rdi = reader.read_bytes()?;
         let r8 = reader.read_bytes()?;
@@ -630,8 +897,14 @@ impl Decoder<()> for SevEsSaveArea {
         let r13 = reader.read_bytes()?;
         let r14 = reader.read_bytes()?;
         let r15 = reader.read_bytes()?;
-        // reserved_0x380 [u8;16]
-        let guest_exit_info_1 = reader.skip_bytes::<16>()?.read_bytes()?;
+
+        // reserved_0x380
+        #[cfg(not(feature = "unsafe_parser"))]
+        reader.skip_bytes::<16>()?;
+        #[cfg(feature = "unsafe_parser")]
+        let reserved_0x380 = reader.read_bytes()?;
+
+        let guest_exit_info_1 = reader.read_bytes()?;
         let guest_exit_info_2 = reader.read_bytes()?;
         let guest_exit_int_info = reader.read_bytes()?;
         let guest_nrip = reader.read_bytes()?;
@@ -643,9 +916,14 @@ impl Decoder<()> for SevEsSaveArea {
         let pcpu_id = reader.read_bytes()?;
         let event_inj = reader.read_bytes()?;
         let xcr0 = reader.read_bytes()?;
-        // reserved_0x3f0: [u8;16]
 
-        let x87_dp = reader.skip_bytes::<16>()?.read_bytes()?;
+        // reserved_0x3f0
+        #[cfg(not(feature = "unsafe_parser"))]
+        reader.skip_bytes::<16>()?;
+        #[cfg(feature = "unsafe_parser")]
+        let reserved_0x3f0 = reader.read_bytes()?;
+
+        let x87_dp = reader.read_bytes()?;
         let mxcsr = reader.read_bytes()?;
         let x87_ftw = reader.read_bytes()?;
         let x87_fsw = reader.read_bytes()?;
@@ -658,103 +936,217 @@ impl Decoder<()> for SevEsSaveArea {
         let fpreg_xmm = reader.read_bytes()?;
         let fpreg_ymm = reader.read_bytes()?;
         let manual_padding = reader.read_bytes()?;
-        Ok(Self {
-            es,
-            cs,
-            ss,
-            ds,
-            fs,
-            gs,
-            gdtr,
-            ldtr,
-            idtr,
-            tr,
-            vmpl0_ssp,
-            vmpl1_ssp,
-            vmpl2_ssp,
-            vmpl3_ssp,
-            u_cet,
-            vmpl,
-            cpl,
-            efer,
-            xss,
-            cr4,
-            cr3,
-            cr0,
-            dr7,
-            dr6,
-            rflags,
-            rip,
-            dr0,
-            dr1,
-            dr2,
-            dr3,
-            dr0_addr_mask,
-            dr1_addr_mask,
-            dr2_addr_mask,
-            dr3_addr_mask,
-            rsp,
-            s_cet,
-            ssp,
-            isst_addr,
-            rax,
-            star,
-            lstar,
-            cstar,
-            sfmask,
-            kernel_gs_base,
-            sysenter_cs,
-            sysenter_esp,
-            sysenter_eip,
-            cr2,
-            g_pat,
-            dbgctrl,
-            br_from,
-            br_to,
-            last_excp_from,
-            last_excp_to,
-            pkru,
-            tsc_aux,
-            rcx,
-            rdx,
-            rbx,
-            rbp,
-            rsi,
-            rdi,
-            r8,
-            r9,
-            r10,
-            r11,
-            r12,
-            r13,
-            r14,
-            r15,
-            guest_exit_info_1,
-            guest_exit_info_2,
-            guest_exit_int_info,
-            guest_nrip,
-            sev_features,
-            vintr_ctrl,
-            guest_exit_code,
-            virtual_tom,
-            tlb_id,
-            pcpu_id,
-            event_inj,
-            xcr0,
-            x87_dp,
-            mxcsr,
-            x87_ftw,
-            x87_fsw,
-            x87_fcw,
-            x87_fop,
-            x87_ds,
-            x87_cs,
-            x87_rip,
-            fpreg_x87,
-            fpreg_xmm,
-            fpreg_ymm,
-            manual_padding,
-        })
+
+        #[cfg(not(feature = "unsafe_parser"))]
+        {
+            Ok(Self {
+                es,
+                cs,
+                ss,
+                ds,
+                fs,
+                gs,
+                gdtr,
+                ldtr,
+                idtr,
+                tr,
+                vmpl0_ssp,
+                vmpl1_ssp,
+                vmpl2_ssp,
+                vmpl3_ssp,
+                u_cet,
+                vmpl,
+                cpl,
+                efer,
+                xss,
+                cr4,
+                cr3,
+                cr0,
+                dr7,
+                dr6,
+                rflags,
+                rip,
+                dr0,
+                dr1,
+                dr2,
+                dr3,
+                dr0_addr_mask,
+                dr1_addr_mask,
+                dr2_addr_mask,
+                dr3_addr_mask,
+                rsp,
+                s_cet,
+                ssp,
+                isst_addr,
+                rax,
+                star,
+                lstar,
+                cstar,
+                sfmask,
+                kernel_gs_base,
+                sysenter_cs,
+                sysenter_esp,
+                sysenter_eip,
+                cr2,
+                g_pat,
+                dbgctrl,
+                br_from,
+                br_to,
+                last_excp_from,
+                last_excp_to,
+                pkru,
+                tsc_aux,
+                rcx,
+                rdx,
+                rbx,
+                rbp,
+                rsi,
+                rdi,
+                r8,
+                r9,
+                r10,
+                r11,
+                r12,
+                r13,
+                r14,
+                r15,
+                guest_exit_info_1,
+                guest_exit_info_2,
+                guest_exit_int_info,
+                guest_nrip,
+                sev_features,
+                vintr_ctrl,
+                guest_exit_code,
+                virtual_tom,
+                tlb_id,
+                pcpu_id,
+                event_inj,
+                xcr0,
+                x87_dp,
+                mxcsr,
+                x87_ftw,
+                x87_fsw,
+                x87_fcw,
+                x87_fop,
+                x87_ds,
+                x87_cs,
+                x87_rip,
+                fpreg_x87,
+                fpreg_xmm,
+                fpreg_ymm,
+                manual_padding,
+            })
+        }
+        #[cfg(feature = "unsafe_parser")]
+        {
+            Ok(Self {
+                es,
+                cs,
+                ss,
+                ds,
+                fs,
+                gs,
+                gdtr,
+                ldtr,
+                idtr,
+                tr,
+                vmpl0_ssp,
+                vmpl1_ssp,
+                vmpl2_ssp,
+                vmpl3_ssp,
+                u_cet,
+                reserved_0xc8,
+                vmpl,
+                cpl,
+                reserved_0xcc,
+                efer,
+                reserved_0xd8,
+                xss,
+                cr4,
+                cr3,
+                cr0,
+                dr7,
+                dr6,
+                rflags,
+                rip,
+                dr0,
+                dr1,
+                dr2,
+                dr3,
+                dr0_addr_mask,
+                dr1_addr_mask,
+                dr2_addr_mask,
+                dr3_addr_mask,
+                reserved_0x1c0,
+                rsp,
+                s_cet,
+                ssp,
+                isst_addr,
+                rax,
+                star,
+                lstar,
+                cstar,
+                sfmask,
+                kernel_gs_base,
+                sysenter_cs,
+                sysenter_esp,
+                sysenter_eip,
+                cr2,
+                reserved_0x248,
+                g_pat,
+                dbgctrl,
+                br_from,
+                br_to,
+                last_excp_from,
+                last_excp_to,
+                reserved_0x298,
+                pkru,
+                tsc_aux,
+                reserved_0x2f0,
+                rcx,
+                rdx,
+                rbx,
+                reserved_0x320,
+                rbp,
+                rsi,
+                rdi,
+                r8,
+                r9,
+                r10,
+                r11,
+                r12,
+                r13,
+                r14,
+                r15,
+                reserved_0x380,
+                guest_exit_info_1,
+                guest_exit_info_2,
+                guest_exit_int_info,
+                guest_nrip,
+                sev_features,
+                vintr_ctrl,
+                guest_exit_code,
+                virtual_tom,
+                tlb_id,
+                pcpu_id,
+                event_inj,
+                xcr0,
+                reserved_0x3f0,
+                x87_dp,
+                mxcsr,
+                x87_ftw,
+                x87_fsw,
+                x87_fcw,
+                x87_fop,
+                x87_ds,
+                x87_cs,
+                x87_rip,
+                fpreg_x87,
+                fpreg_xmm,
+                fpreg_ymm,
+                manual_padding,
+            })
+        }
     }
 }
 
