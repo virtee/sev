@@ -531,7 +531,7 @@ impl Encoder<Generation> for TcbVersion {
     ) -> Result<(), std::io::Error> {
         let buffer = match generation {
             Generation::Milan | Generation::Genoa => self.to_legacy_bytes(),
-            Generation::Turin => self.to_turin_bytes(),
+            Generation::Turin | Generation::Venice => self.to_turin_bytes(),
             _ => {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::Unsupported,
@@ -550,7 +550,9 @@ impl Decoder<Generation> for TcbVersion {
             Generation::Milan | Generation::Genoa => {
                 Ok(TcbVersion::from_legacy_bytes(&reader.read_bytes()?))
             }
-            Generation::Turin => Ok(TcbVersion::from_turin_bytes(&reader.read_bytes()?)),
+            Generation::Turin | Generation::Venice => {
+                Ok(TcbVersion::from_turin_bytes(&reader.read_bytes()?))
+            }
             _ => Err(std::io::Error::new(
                 std::io::ErrorKind::Unsupported,
                 "Unsupported Processor Generation for TCB parsing",
@@ -1287,7 +1289,12 @@ mod tests {
         let config = Config::new(tcb, mask_id);
 
         // Test all generations
-        let generations = [Generation::Milan, Generation::Genoa, Generation::Turin];
+        let generations = [
+            Generation::Milan,
+            Generation::Genoa,
+            Generation::Turin,
+            Generation::Venice,
+        ];
 
         for generation in generations {
             // Convert to SnpSetConfig
@@ -1302,7 +1309,7 @@ mod tests {
 
             // For non-Turin generations, FMC will be lost in the conversion
             match generation {
-                Generation::Turin => assert_eq!(round_trip.reported_tcb, tcb),
+                Generation::Turin | Generation::Venice => assert_eq!(round_trip.reported_tcb, tcb),
                 _ => {
                     // FMC field is not preserved for legacy generations
                     assert_eq!(round_trip.reported_tcb.bootloader, tcb.bootloader);

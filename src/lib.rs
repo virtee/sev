@@ -202,6 +202,10 @@ pub enum Generation {
     /// Fifth generation EPYC (SEV, SEV-ES, SEV-SNP).
     #[cfg(any(feature = "sev", feature = "snp"))]
     Turin,
+
+    /// Sixth generation EPYC (SEV, SEV-ES, SEV-SNP).
+    #[cfg(any(feature = "sev", feature = "snp"))]
+    Venice,
 }
 
 #[cfg(feature = "snp")]
@@ -267,6 +271,7 @@ impl Generation {
             },
             0x1A => match model {
                 0x0..=0x11 => Ok(Self::Turin),
+                0x50..=0x57 | 0x90..=0x9F | 0xA0..=0xAF | 0xC0..=0xC7 => Ok(Self::Venice),
                 _ => Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
                     "processor is not of know SEV-SNP model.",
@@ -312,6 +317,8 @@ impl From<Generation> for CertSevCaChain {
             Generation::Genoa => (SevBuiltin::genoa::ARK, SevBuiltin::genoa::ASK),
             #[cfg(any(feature = "sev", feature = "snp"))]
             Generation::Turin => (SevBuiltin::turin::ARK, SevBuiltin::turin::ASK),
+            #[cfg(any(feature = "sev", feature = "snp"))]
+            Generation::Venice => panic!("Venice SEV CA chain is not yet implemented"),
         };
 
         CertSevCaChain {
@@ -341,6 +348,8 @@ impl From<Generation> for CertSnpCaChain {
                 SnpBuiltin::turin::ark().unwrap(),
                 SnpBuiltin::turin::ask().unwrap(),
             ),
+
+            Generation::Venice => panic!("Venice SNP CA chain is not yet implemented"),
         };
 
         CertSnpCaChain { ark, ask }
@@ -403,6 +412,9 @@ impl TryFrom<String> for Generation {
             #[cfg(any(feature = "sev", feature = "snp"))]
             "turin" => Ok(Self::Turin),
 
+            #[cfg(any(feature = "sev", feature = "snp"))]
+            "venice" => Ok(Self::Venice),
+
             _ => Err(()),
         }
     }
@@ -427,6 +439,9 @@ impl Generation {
 
             #[cfg(any(feature = "sev", feature = "snp"))]
             Self::Turin => "Turin".to_string(),
+
+            #[cfg(any(feature = "sev", feature = "snp"))]
+            Self::Venice => "Venice".to_string(),
         }
     }
 }
