@@ -1,0 +1,123 @@
+name: Setup the given SNP latest upstream kernel on the self-hosted runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      snp-kernel-host-guest-tag:
+        description: 'Specify SNP kernel tag version(e.g: v6.10)'
+
+jobs:
+  snp_setup_host:
+    runs-on: self-hosted
+    timeout-minutes: 60
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Pre-cleanup tasks for the SNP host kernel setup
+        run: |
+            [ ! -f "${HOME}/snp.sh" ] || rm -rf ${HOME}/snp.sh
+            [ ! -d "${HOME}/previous_snp" ] || rm -rf ${HOME}/previous_snp
+            [ ! -d "${HOME}/snp" ] || mv ${HOME}/snp ${HOME}/previous_snp
+
+      - name: Install the given SNP host Kernel version on the self-hosted runner
+        id: install-snp-host-kernel
+        run: |
+            # Downloads sev utility script to setup host SNP kernel
+            wget https://raw.githubusercontent.com/LakshmiSaiHarika/sev-utils/Fedora-Latest-SNP-kernel-Upstream/tools/snp.sh
+            chmod +x snp.sh
+
+            # Sets up the user given latest upstream SNP host kernel/master branch
+            kernel_host_guest_branch_tag="${{ github.event.inputs.snp-kernel-host-guest-tag }}"
+            if [[ ! -z "${kernel_host_guest_branch_tag}" ]]; then
+              ./snp.sh --kernel-tag "${kernel_host_guest_branch_tag}" setup-host
+            else
+              # Uses kernel upstream default master branch for kernel installation
+              ./snp.sh setup-host
+            fi
+
+      - name: Revert snp folder to back to its previous SNP folder if the previous task fail
+        if: failure() && steps.install-snp-host-kernel.outcome != 'success'
+        run: |
+            mv ${HOME}/snp ${HOME}/latest_snp
+            mv ${HOME}/previous_snp ${HOME}/snp
+
+  reboot_self_hosted_runner:
+    runs-on: self-hosted
+    needs: snp_setup_host
+    steps:
+      - name: Reboot
+        timeout-minutes: 8
+        run: sudo reboot
+        shell: bash
+
+  wait_time_after_reboot:
+    runs-on: ubuntu-latest
+    needs:  reboot_self_hosted_runner
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Sleep for 5 minutes
+        timeout-minutes: 15
+        run: sleep 300s
+        shell: bash
+
+  test_launch_snp_guest:
+    runs-on: self-hosted
+    needs:  wait_time_after_reboot
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set the next available guest network port number
+        run: |
+             export DOTENV_PATH="${HOME}/.env"
+             echo "guest_port_in_use=$(python ./.github/workflows/handle_guest_network_ports.py get-next-available-port-number)" >> $GITHUB_ENV
+
+      - name: Test the launch of sample SNP guest on the self-hosted runner
+        run: |
+            # Uses sev utility script to test the launch of latest SNP guest
+            wget https://raw.githubusercontent.com/LakshmiSaiHarika/sev-utils/Fedora-Latest-SNP-kernel-Upstream/tools/snp.sh
+            chmod +x snp.sh
+
+            export GUEST_NAME="sample-snp-guest"
+            export HOST_SSH_PORT=${{ env.guest_port_in_use }}
+
+            ./snp.sh launch-guest
+
+      - name: Stop the active running SNP guest for this PR
+        if: success() || failure()
+        continue-on-error: true
+        run: |
+           export GUEST_NAME="sample-snp-guest"
+           export HOST_SSH_PORT=${{ env.guest_port_in_use }}
+
+           ./snp.sh stop-guests
+
+      - name: Remove current active guest network port from GHAW network port file
+        if: success() || failure()
+        run: |
+          export DOTENV_PATH="${HOME}/.env"
+          python ./.github/workflows/handle_guest_network_ports.py remove-ghaw-used-port-number ${{ env.guest_port_in_use }}
+
+      - name: Cleanup SNP guest folder
+        if: success() || failure()
+        run: |
+           rm -rf ${HOME}/snp/launch/sample-snp-guest
+           ssh-keygen -R [localhost]:${{ env.guest_port_in_use }}
+
+  trigger_pr_tests:
+    runs-on: self-hosted
+    needs:  test_launch_snp_guest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Trigger all open Virtee CI PR tests(sev, snphost, snpguest)
+        run: |
+              export DOTENV_PATH="${HOME}/.env"
+              python ./.github/workflows/trigger_pr_tests.py
