@@ -62,11 +62,6 @@ impl Verifiable for (&Certificate, &Certificate) {
 }
 
 impl Certificate {
-    /// Gets a reference to the X509 certificate inside
-    pub fn cert(&self) -> &x509_cert::Certificate {
-        &self.0
-    }
-
     /// Create a Certificate from a PEM-encoded X509 structure.
     pub fn from_pem(pem: &[u8]) -> Result<Self> {
         let cert = x509_cert::Certificate::from_pem(pem)
