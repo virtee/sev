@@ -44,6 +44,25 @@ pub trait ReadExt: Read {
         }
         Ok(self)
     }
+
+    #[cfg(not(feature = "lax-parser"))]
+    /// Read N bytes and verify they are zero.
+    fn read_reserved_bytes<const N: usize>(&mut self) -> Result<[u8; N], std::io::Error>
+    where
+        Self: Sized,
+    {
+        self.skip_bytes::<N>()?;
+        Ok([0; N])
+    }
+
+    #[cfg(feature = "lax-parser")]
+    /// Read N bytes.
+    fn read_reserved_bytes<const N: usize>(&mut self) -> Result<[u8; N], std::io::Error>
+    where
+        Self: Sized,
+    {
+        <[u8; N]>::decode(self, ())
+    }
 }
 
 impl<R> ReadExt for R where R: Read {}
