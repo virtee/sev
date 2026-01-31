@@ -888,7 +888,7 @@ impl Display for GuestPolicy {
   Debug Allowed: {}
   Single Socket: {}
   CXL Allowed:   {}
-  AEX 256 XTS:   {}
+  AES 256 XTS:   {}
   RAPL Allowed:  {}
   Ciphertext hiding: {}
   Page Swap Disable: {}"#,
@@ -1181,7 +1181,7 @@ Guest Policy (0x0):
   Debug Allowed: false
   Single Socket: false
   CXL Allowed:   false
-  AEX 256 XTS:   false
+  AES 256 XTS:   false
   RAPL Allowed:  false
   Ciphertext hiding: false
   Page Swap Disable: false
