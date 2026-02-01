@@ -194,10 +194,10 @@ pub enum ReportVariant {
     /// Version 2 of the Attestation Report.
     V2,
 
-    /// Version 3 of the Attestation Report for PreTurin CPUs.
+    /// Version 3 and 4 of the Attestation Report.
     V3,
 
-    /// Version 5 of the Attestation Report
+    /// Version 5 of the Attestation Report.
     V5,
 }
 
@@ -357,13 +357,14 @@ impl Default for AttestationReport {
 
 impl Encoder<()> for AttestationReport {
     fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
-        // Determine the variant based on version and CPUID step
+        // Determine the variant based on version
         let variant = match self.version {
             2 => ReportVariant::V2,
             3 | 4 => ReportVariant::V3,
             _ => ReportVariant::V5,
         };
 
+        // Determine the CPU generation
         let generation = match variant {
             ReportVariant::V2 => {
                 if Self::chip_id_is_turin_like(&self.chip_id)? {
@@ -404,11 +405,11 @@ impl Encoder<()> for AttestationReport {
         // Write CPUID fields based on variant
         match variant {
             ReportVariant::V2 => {
-                // V2 doesn't have CPUID fields
+                // V2 doesn't have CPUID_FAM_ID, CPUID_MOD_ID, or CPUID_STEP
                 writer.skip_bytes::<24>()?.write_bytes(self.chip_id, ())?;
             }
             _ => {
-                // Write CPUID fields for V3 and V4
+                // Write CPUID fields for V3 and later variants
                 writer.write_bytes(self.cpuid_fam_id.unwrap_or(0), ())?;
                 writer.write_bytes(self.cpuid_mod_id.unwrap_or(0), ())?;
                 writer.write_bytes(self.cpuid_step.unwrap_or(0), ())?;
@@ -416,7 +417,7 @@ impl Encoder<()> for AttestationReport {
             }
         }
 
-        // Write committed TCB based on variant
+        // Write TCB version fields based on CPU generation
         writer.write_bytes(self.committed_tcb, generation)?;
         writer.write_bytes(self.current, ())?;
         writer.skip_bytes::<1>()?.write_bytes(self.committed, ())?;
@@ -425,12 +426,15 @@ impl Encoder<()> for AttestationReport {
             .write_bytes(self.launch_tcb, generation)?;
 
         // Write launch and current mitigation vectors based on variant
+        // Write signature field
         match variant {
+            // Pre-V5 does not have mitigation vector fields
             ReportVariant::V2 | ReportVariant::V3 => {
                 writer
                     .skip_bytes::<168>()?
                     .write_bytes(self.signature, ())?;
             }
+            // Write mitigation vector fields for V5 (or later)
             _ => {
                 writer.write_bytes(self.launch_mit_vector.unwrap_or(0), ())?;
                 writer.write_bytes(self.current_mit_vector.unwrap_or(0), ())?;
@@ -504,7 +508,7 @@ impl Decoder<()> for AttestationReport {
         let committed = stepper.skip_bytes::<1>()?.read_bytes()?;
         let launch_tcb = stepper.skip_bytes::<1>()?.read_bytes_with(generation)?;
 
-        // mit vecor fields were added in V5 and later.
+        // mit vector fields were added in V5 and later.
         let (launch_mit_vector, current_mit_vector, signature) = match variant {
             ReportVariant::V2 | ReportVariant::V3 => {
                 (None, None, stepper.skip_bytes::<168>()?.read_bytes()?)
@@ -817,7 +821,7 @@ bitfield! {
     /// | 22     | MEM_AES_256_XTS   | 0: Allow either AES 128 XEX or AES 256 XTS for memory encryption.<br>1: Require AES 256 XTS for memory encryption. >
     /// | 23     | RAPL_DIS          | 0: Allow Running Average Power Limit (RAPL).<br>1: RAPL must be disabled.                                          >
     /// | 24     | CIPHERTEXT_HIDING | 0: Ciphertext hiding may be enabled or disabled.<br>1: Ciphertext hiding must be enabled.                          >
-    /// | 25     | PAGE_SWAP_DISABLE | 0: Disable Guest access to SNP_PAGE_MOVE, SNP_SWAP_OUT and SNP_SWAP_IN commands.                                   >
+    /// | 25     | PAGE_SWAP_DISABLE | 0: Enable Guest access to SNP_PAGE_MOVE, SNP_SWAP_OUT and SNP_SWAP_IN commands.<br>1: Disable those commands.      >
     /// | 63:25  | -                 | Reserved. MBZ.                                                                                                     >
     ///
     #[repr(C)]
@@ -884,7 +888,7 @@ impl Display for GuestPolicy {
   Debug Allowed: {}
   Single Socket: {}
   CXL Allowed:   {}
-  AEX 256 XTS:   {}
+  AES 256 XTS:   {}
   RAPL Allowed:  {}
   Ciphertext hiding: {}
   Page Swap Disable: {}"#,
@@ -1177,7 +1181,7 @@ Guest Policy (0x0):
   Debug Allowed: false
   Single Socket: false
   CXL Allowed:   false
-  AEX 256 XTS:   false
+  AES 256 XTS:   false
   RAPL Allowed:  false
   Ciphertext hiding: false
   Page Swap Disable: false
