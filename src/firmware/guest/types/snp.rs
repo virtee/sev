@@ -21,6 +21,7 @@ use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 
 use std::{
+    convert::TryInto,
     fmt::Display,
     io::{Cursor, Read, Write},
     ops::Range,
@@ -216,11 +217,10 @@ impl Decoder<()> for ReportVariant {
     fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
         let version: u32 = reader.read_bytes()?;
         Ok(match version {
-            0 | 1 => return Err(std::io::ErrorKind::Unsupported.into()),
             2 => Self::V2,
             3 | 4 => Self::V3,
             5 => Self::V5,
-            _ => Self::V5,
+            _ => return Err(std::io::ErrorKind::Unsupported.into()),
         })
     }
 }
@@ -230,93 +230,773 @@ impl ByteParser<()> for ReportVariant {
     const EXPECTED_LEN: Option<usize> = Some(4);
 }
 
-/// Attestation Report for SEV-SNP guests.
-/// These are all the possible fields in the attestation report.
-/// Optional fields are set to none or a value depending on the version the system has.
-/// Added in version 3:
-/// The CPUID Family, Model and Stepping fields
-/// The Alias_Check_Complete field in the PlatformInfo field
-/// Added in version 5:
-/// The launch_mit_vector and current_mit_vector fields
-/// The page_swap_disabled field in the GuestPolicy field
-/// The SEV-TIO field in the PlatformInfo field
+/// A zero-copy view of a raw SEV-SNP attestation report.
+///
+/// This type splits the report into two byte slices:
+/// - `body`: the bytes covered by the report signature
+/// - `signature`: the signature bytes (DER-encoded ECDSA, as produced by firmware)
+///
+/// `Report` does **not** imply authenticity or integrity. It is just a view over
+/// untrusted bytes. Consumers should verify the signature (using [`Verifiable`])
+/// before interpreting any fields from the body.
+///
+/// This design supports a two-phase workflow:
+/// 1) Parse the outer framing to locate the signed body and signature.
+/// 2) Verify the signature over `body`, then parse the verified body into
+///    [`ReportBody`] for typed access.
+///
+/// # Notes
+/// - `Report` borrows from the input buffer (`'a`), so the input bytes must
+///   outlive the `Report`.
+/// - The offsets used by [`Report::from_bytes`] assume the current fixed
+///   firmware report layout and size.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Copy)]
+pub struct Report<'a> {
+    /// The bytes covered by the report signature (bytes 0x00 to 0x2A0).
+    pub body: &'a [u8],
+    /// The signature bytes (bytes 0x2A0 to 0x49F).
+    pub signature: &'a [u8],
+}
+
+impl<'a> Report<'a> {
+    /// Parse a raw attestation report into body and signature slices.
+    ///
+    /// Returns an error if the input length does not match the expected firmware report size.
+    pub fn from_bytes(report: &'a [u8]) -> std::io::Result<Self> {
+        if report.len() != ATT_REP_FW_LEN {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "bad report length",
+            ));
+        };
+
+        Ok(Self {
+            body: &report[..0x2a0],
+            signature: &report[0x2a0..0x49f],
+        })
+    }
+}
+
+#[cfg(feature = "openssl")]
+impl<'a> Verifiable for (&Certificate, &Report<'a>) {
+    type Output = ();
+
+    fn verify(self) -> std::io::Result<Self::Output> {
+        let (vek, report) = self;
+
+        let sig = EcdsaSig::from_der(report.signature)?;
+
+        let mut hasher = Sha384::new();
+        hasher.update(report.body);
+        let base_digest = hasher.finish();
+
+        let ec = vek.public_key()?.ec_key()?;
+        let signed = sig.verify(&base_digest, &ec)?;
+        match signed {
+            true => Ok(()),
+            false => Err(Error::other("VEK does not sign the attestation report")),
+        }
+    }
+}
+
+#[cfg(feature = "crypto_nossl")]
+impl<'a> Verifiable for (&Certificate, &Report<'a>) {
+    type Output = ();
+
+    fn verify(self) -> std::io::Result<Self::Output> {
+        // According to Chapter 3 of the Versioned Chip Endorsement Key (VCEK) Certificate and the Versioned Loaded Endorsement Key (VLEK)
+        // Certificate specifications, both Versioned Endorsement Key certificates certify an ECDSA public key on curve P-384,
+        // with the signature hash algorithm being SHA-384.
+
+        let (vek, report) = self;
+
+        let sig = p384::ecdsa::Signature::from_slice(report.signature).map_err(|e| {
+            std::io::Error::other(format!(
+                "failed to generate signature from raw bytes: {e:?}"
+            ))
+        })?;
+
+        use sha2::Digest;
+        let base_digest = sha2::Sha384::new_with_prefix(report.body);
+        let verifying_key = p384::ecdsa::VerifyingKey::from_sec1_bytes(vek.public_key_sec1())
+            .map_err(|e| {
+                std::io::Error::other(format!(
+                    "failed to deserialize public key from sec1 bytes: {e:?}"
+                ))
+            })?;
+        use p384::ecdsa::signature::DigestVerifier;
+        verifying_key.verify_digest(base_digest, &sig).map_err(|e| {
+            std::io::Error::other(format!("VEK does not sign the attestation report: {e:?}"))
+        })
+    }
+}
+
+#[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
+impl<'a> Verifiable for (&Chain, &Report<'a>) {
+    type Output = ();
+
+    fn verify(self) -> std::io::Result<()> {
+        let (chain, report) = self;
+        let vek = chain.verify()?;
+        (vek, report).verify()
+    }
+}
+
+#[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
+impl<'a> TryFrom<(&Report<'a>, &Certificate)> for ReportBody {
+    type Error = std::io::Error;
+
+    fn try_from((report, vek): (&Report<'a>, &Certificate)) -> Result<Self, Self::Error> {
+        (vek, report).verify()?;
+        ReportBody::from_bytes(report.body)
+    }
+}
+
+#[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
+impl<'a> TryFrom<(&Report<'a>, &Chain)> for ReportBody {
+    type Error = std::io::Error;
+
+    fn try_from((report, chain): (&Report<'a>, &Chain)) -> Result<Self, Self::Error> {
+        (chain, report).verify()?;
+        ReportBody::from_bytes(report.body)
+    }
+}
+
+/// A zero-copy view of the attestation report body.
+///
+/// This struct provides direct byte slice access to each field in the report body.
+/// Unlike [`AttestationReport`], this does not parse the bytes into typed values.
+///
+/// Use [`ReportBody::parse`] to create an instance from raw bytes.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ReportBody<'a> {
+    /// Version number of this attestation report (4 bytes, little-endian u32).
+    pub version: &'a [u8],
+    /// The guest SVN (4 bytes, little-endian u32).
+    pub guest_svn: &'a [u8],
+    /// The guest policy (8 bytes).
+    pub policy: &'a [u8],
+    /// The family ID provided at launch (16 bytes).
+    pub family_id: &'a [u8],
+    /// The image ID provided at launch (16 bytes).
+    pub image_id: &'a [u8],
+    /// The request VMPL for the attestation report (4 bytes).
+    pub vmpl: &'a [u8],
+    /// The signature algorithm used to sign this report (4 bytes).
+    pub sig_algo: &'a [u8],
+    /// Current TCB version (8 bytes).
+    pub current_tcb: &'a [u8],
+    /// Platform information (8 bytes).
+    pub plat_info: &'a [u8],
+    /// Key information - signing key, mask chip key, author key enabled (4 bytes).
+    pub key_info: &'a [u8],
+    /// Guest-provided 512-bit data (64 bytes).
+    pub report_data: &'a [u8],
+    /// The measurement calculated at launch (48 bytes, SHA-384).
+    pub measurement: &'a [u8],
+    /// Data provided by the hypervisor at launch (32 bytes).
+    pub host_data: &'a [u8],
+    /// SHA-384 digest of the ID public key (48 bytes).
+    pub id_key_digest: &'a [u8],
+    /// SHA-384 digest of the Author public key (48 bytes).
+    pub author_key_digest: &'a [u8],
+    /// Report ID of this guest (32 bytes).
+    pub report_id: &'a [u8],
+    /// Report ID of this guest's migration agent (32 bytes).
+    pub report_id_ma: &'a [u8],
+    /// Reported TCB version used to derive the VCEK (8 bytes).
+    pub reported_tcb: &'a [u8],
+    /// CPUID Family ID - present in report version 3+ (1 byte).
+    pub cpuid_fam_id: Option<&'a [u8]>,
+    /// CPUID Model ID - present in report version 3+ (1 byte).
+    pub cpuid_mod_id: Option<&'a [u8]>,
+    /// CPUID Stepping - present in report version 3+ (1 byte).
+    pub cpuid_step: Option<&'a [u8]>,
+    /// Chip ID, unique to the chip (64 bytes). Zero if MaskChipId is set.
+    pub chip_id: &'a [u8],
+    /// Committed TCB version (8 bytes).
+    pub committed_tcb: &'a [u8],
+    /// Current firmware version - build, minor, major (3 bytes).
+    pub current: &'a [u8],
+    /// Committed firmware version - build, minor, major (3 bytes).
+    pub committed: &'a [u8],
+    /// Launch TCB version (8 bytes).
+    pub launch_tcb: &'a [u8],
+    /// Launch mitigation vector - present in report version 5+ (8 bytes).
+    pub launch_mit_vector: Option<&'a [u8]>,
+    /// Current mitigation vector - present in report version 5+ (8 bytes).
+    pub current_mit_vector: Option<&'a [u8]>,
+}
+
+impl<'a> ReportBody<'a> {
+    /// The expected length of the report body (bytes 0x00 to 0x2A0).
+    pub const BODY_LEN: usize = 0x2A0;
+
+    /// Parse a report body from raw bytes.
+    ///
+    /// The input `body` should be the bytes from offset 0x00 to 0x2A0 of the
+    /// attestation report (the portion covered by the signature).
+    pub fn from_bytes(body: &'a [u8]) -> Result<Self, std::io::Error> {
+        if body.len() < Self::BODY_LEN {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "body too short: expected {} bytes, got {}",
+                    Self::BODY_LEN,
+                    body.len()
+                ),
+            ));
+        }
+
+        // Parse version to determine which optional fields are present
+        let version = &body[0x00..0x04];
+        let version_num = u32::from_le_bytes([version[0], version[1], version[2], version[3]]);
+
+        let guest_svn = &body[0x04..0x08];
+        let policy = &body[0x08..0x10];
+        let family_id = &body[0x10..0x20];
+        let image_id = &body[0x20..0x30];
+        let vmpl = &body[0x30..0x34];
+        let sig_algo = &body[0x34..0x38];
+        let current_tcb = &body[0x38..0x40];
+        let plat_info = &body[0x40..0x48];
+        let key_info = &body[0x48..0x4C];
+        // 0x4C-0x50 is reserved
+        let report_data = &body[0x50..0x90];
+        let measurement = &body[0x90..0xC0];
+        let host_data = &body[0xC0..0xE0];
+        let id_key_digest = &body[0xE0..0x110];
+        let author_key_digest = &body[0x110..0x140];
+        let report_id = &body[0x140..0x160];
+        let report_id_ma = &body[0x160..0x180];
+        let reported_tcb = &body[0x180..0x188];
+
+        // CPUID fields are present in version 3+ reports
+        let (cpuid_fam_id, cpuid_mod_id, cpuid_step) = if version_num >= 3 {
+            (
+                Some(&body[0x188..0x189]),
+                Some(&body[0x189..0x18A]),
+                Some(&body[0x18A..0x18B]),
+            )
+        } else {
+            (None, None, None)
+        };
+
+        // 0x18B-0x1A0 is reserved
+        let chip_id = &body[0x1A0..0x1E0];
+        let committed_tcb = &body[0x1E0..0x1E8];
+        let current = &body[0x1E8..0x1EB]; // build, minor, major
+                                           // 0x1EB is reserved
+        let committed = &body[0x1EC..0x1EF]; // build, minor, major
+                                             // 0x1EF is reserved
+        let launch_tcb = &body[0x1F0..0x1F8];
+
+        // Mitigation vector fields are present in version 5+ reports
+        let (launch_mit_vector, current_mit_vector) = if version_num >= 5 {
+            (Some(&body[0x1F8..0x200]), Some(&body[0x200..0x208]))
+        } else {
+            (None, None)
+        };
+
+        Ok(Self {
+            version,
+            guest_svn,
+            policy,
+            family_id,
+            image_id,
+            vmpl,
+            sig_algo,
+            current_tcb,
+            plat_info,
+            key_info,
+            report_data,
+            measurement,
+            host_data,
+            id_key_digest,
+            author_key_digest,
+            report_id,
+            report_id_ma,
+            reported_tcb,
+            cpuid_fam_id,
+            cpuid_mod_id,
+            cpuid_step,
+            chip_id,
+            committed_tcb,
+            current,
+            committed,
+            launch_tcb,
+            launch_mit_vector,
+            current_mit_vector,
+        })
+    }
+
+    /// Get the version number as a u32.
+    #[inline]
+    pub fn version(&self) -> u32 {
+        u32::from_le_bytes([
+            self.version[0],
+            self.version[1],
+            self.version[2],
+            self.version[3],
+        ])
+    }
+
+    /// Get the guest SVN as a u32.
+    #[inline]
+    pub fn guest_svn(&self) -> u32 {
+        u32::from_le_bytes([
+            self.guest_svn[0],
+            self.guest_svn[1],
+            self.guest_svn[2],
+            self.guest_svn[3],
+        ])
+    }
+
+    /// Get the guest policy as a typed `GuestPolicy`.
+    #[inline]
+    pub fn policy(&self) -> GuestPolicy {
+        GuestPolicy(u64::from_le_bytes([
+            self.policy[0],
+            self.policy[1],
+            self.policy[2],
+            self.policy[3],
+            self.policy[4],
+            self.policy[5],
+            self.policy[6],
+            self.policy[7],
+        ]))
+    }
+
+    /// Get the family ID as a fixed-size array.
+    #[inline]
+    pub fn family_id(&self) -> [u8; 16] {
+        self.family_id.try_into().unwrap()
+    }
+
+    /// Get the image ID as a fixed-size array.
+    #[inline]
+    pub fn image_id(&self) -> [u8; 16] {
+        self.image_id.try_into().unwrap()
+    }
+
+    /// Get the VMPL as a u32.
+    #[inline]
+    pub fn vmpl(&self) -> u32 {
+        u32::from_le_bytes([self.vmpl[0], self.vmpl[1], self.vmpl[2], self.vmpl[3]])
+    }
+
+    /// Get the signature algorithm as a u32.
+    #[inline]
+    pub fn sig_algo(&self) -> u32 {
+        u32::from_le_bytes([
+            self.sig_algo[0],
+            self.sig_algo[1],
+            self.sig_algo[2],
+            self.sig_algo[3],
+        ])
+    }
+
+    /// Get the current TCB version, parsed according to the given CPU generation.
+    #[inline]
+    pub fn current_tcb(&self, generation: Generation) -> TcbVersion {
+        let bytes: [u8; 8] = self.current_tcb.try_into().unwrap();
+        match generation {
+            Generation::Milan | Generation::Genoa => TcbVersion::from_legacy_bytes(&bytes),
+            _ => TcbVersion::from_turin_bytes(&bytes),
+        }
+    }
+
+    /// Get the platform info as a typed `PlatformInfo`.
+    #[inline]
+    pub fn plat_info(&self) -> PlatformInfo {
+        PlatformInfo(u64::from_le_bytes([
+            self.plat_info[0],
+            self.plat_info[1],
+            self.plat_info[2],
+            self.plat_info[3],
+            self.plat_info[4],
+            self.plat_info[5],
+            self.plat_info[6],
+            self.plat_info[7],
+        ]))
+    }
+
+    /// Get the key info as a typed `KeyInfo`.
+    #[inline]
+    pub fn key_info(&self) -> KeyInfo {
+        KeyInfo(u32::from_le_bytes([
+            self.key_info[0],
+            self.key_info[1],
+            self.key_info[2],
+            self.key_info[3],
+        ]))
+    }
+
+    /// Get the report data as a fixed-size array.
+    #[inline]
+    pub fn report_data(&self) -> [u8; 64] {
+        self.report_data.try_into().unwrap()
+    }
+
+    /// Get the measurement as a fixed-size array.
+    #[inline]
+    pub fn measurement(&self) -> [u8; 48] {
+        self.measurement.try_into().unwrap()
+    }
+
+    /// Get the host data as a fixed-size array.
+    #[inline]
+    pub fn host_data(&self) -> [u8; 32] {
+        self.host_data.try_into().unwrap()
+    }
+
+    /// Get the ID key digest as a fixed-size array.
+    #[inline]
+    pub fn id_key_digest(&self) -> [u8; 48] {
+        self.id_key_digest.try_into().unwrap()
+    }
+
+    /// Get the author key digest as a fixed-size array.
+    #[inline]
+    pub fn author_key_digest(&self) -> [u8; 48] {
+        self.author_key_digest.try_into().unwrap()
+    }
+
+    /// Get the report ID as a fixed-size array.
+    #[inline]
+    pub fn report_id(&self) -> [u8; 32] {
+        self.report_id.try_into().unwrap()
+    }
+
+    /// Get the report ID of the migration agent as a fixed-size array.
+    #[inline]
+    pub fn report_id_ma(&self) -> [u8; 32] {
+        self.report_id_ma.try_into().unwrap()
+    }
+
+    /// Get the reported TCB version, parsed according to the given CPU generation.
+    #[inline]
+    pub fn reported_tcb(&self, generation: Generation) -> TcbVersion {
+        let bytes: [u8; 8] = self.reported_tcb.try_into().unwrap();
+        match generation {
+            Generation::Milan | Generation::Genoa => TcbVersion::from_legacy_bytes(&bytes),
+            _ => TcbVersion::from_turin_bytes(&bytes),
+        }
+    }
+
+    /// Get the CPUID family ID (present in report version 3+).
+    #[inline]
+    pub fn cpuid_fam_id(&self) -> Option<u8> {
+        self.cpuid_fam_id.map(|b| b[0])
+    }
+
+    /// Get the CPUID model ID (present in report version 3+).
+    #[inline]
+    pub fn cpuid_mod_id(&self) -> Option<u8> {
+        self.cpuid_mod_id.map(|b| b[0])
+    }
+
+    /// Get the CPUID stepping (present in report version 3+).
+    #[inline]
+    pub fn cpuid_step(&self) -> Option<u8> {
+        self.cpuid_step.map(|b| b[0])
+    }
+
+    /// Get the chip ID as a fixed-size array.
+    #[inline]
+    pub fn chip_id(&self) -> [u8; 64] {
+        self.chip_id.try_into().unwrap()
+    }
+
+    /// Get the committed TCB version, parsed according to the given CPU generation.
+    #[inline]
+    pub fn committed_tcb(&self, generation: Generation) -> TcbVersion {
+        let bytes: [u8; 8] = self.committed_tcb.try_into().unwrap();
+        match generation {
+            Generation::Milan | Generation::Genoa => TcbVersion::from_legacy_bytes(&bytes),
+            _ => TcbVersion::from_turin_bytes(&bytes),
+        }
+    }
+
+    /// Get the current firmware version.
+    #[inline]
+    pub fn current_version(&self) -> Version {
+        Version {
+            build: self.current[0],
+            minor: self.current[1],
+            major: self.current[2],
+        }
+    }
+
+    /// Get the committed firmware version.
+    #[inline]
+    pub fn committed_version(&self) -> Version {
+        Version {
+            build: self.committed[0],
+            minor: self.committed[1],
+            major: self.committed[2],
+        }
+    }
+
+    /// Get the launch TCB version, parsed according to the given CPU generation.
+    #[inline]
+    pub fn launch_tcb(&self, generation: Generation) -> TcbVersion {
+        let bytes: [u8; 8] = self.launch_tcb.try_into().unwrap();
+        match generation {
+            Generation::Milan | Generation::Genoa => TcbVersion::from_legacy_bytes(&bytes),
+            _ => TcbVersion::from_turin_bytes(&bytes),
+        }
+    }
+
+    /// Get the launch mitigation vector (present in report version 5+).
+    #[inline]
+    pub fn launch_mit_vector(&self) -> Option<u64> {
+        self.launch_mit_vector
+            .map(|b| u64::from_le_bytes([b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]]))
+    }
+
+    /// Get the current mitigation vector (present in report version 5+).
+    #[inline]
+    pub fn current_mit_vector(&self) -> Option<u64> {
+        self.current_mit_vector
+            .map(|b| u64::from_le_bytes([b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]]))
+    }
+
+    /// Infer the CPU generation from CPUID fields or chip ID.
+    ///
+    /// For version 3+ reports, uses the CPUID family and model IDs.
+    /// For version 2 reports, uses the chip ID heuristic (Turin has zeros in bytes 8-63).
+    ///
+    /// Returns an error if the generation cannot be determined.
+    pub fn infer_generation(&self) -> Result<Generation, std::io::Error> {
+        let version = self.version();
+
+        if version >= 3 {
+            // Use CPUID fields for v3+ reports
+            let family = self.cpuid_fam_id().unwrap_or(0);
+            let model = self.cpuid_mod_id().unwrap_or(0);
+            Generation::identify_cpu(family, model)
+        } else {
+            // Use chip ID heuristic for v2 reports
+            let chip_id = self.chip_id();
+            if chip_id == [0; 64] {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Cannot infer generation: chip ID is masked",
+                ))
+            } else if chip_id[8..] == [0; 56] {
+                // Turin-like: first 8 bytes non-zero, rest zero
+                Ok(Generation::Turin)
+            } else {
+                // Genoa-like: full 64 bytes used
+                Ok(Generation::Genoa)
+            }
+        }
+    }
+
+    /// Convert this zero-copy report body to an owned `AttestationReport`.
+    ///
+    /// This method infers the CPU generation from CPUID fields or chip ID
+    /// to properly parse TCB version fields.
+    pub fn to_attestation_report(&self) -> Result<AttestationReport, std::io::Error> {
+        let generation = self.infer_generation()?;
+        self.to_attestation_report_with_generation(generation)
+    }
+
+    /// Convert this zero-copy report body to an owned `AttestationReport`
+    /// using the specified CPU generation.
+    pub fn to_attestation_report_with_generation(
+        &self,
+        generation: Generation,
+    ) -> Result<AttestationReport, std::io::Error> {
+        Ok(AttestationReport {
+            version: self.version(),
+            guest_svn: self.guest_svn(),
+            policy: self.policy(),
+            family_id: self.family_id(),
+            image_id: self.image_id(),
+            vmpl: self.vmpl(),
+            sig_algo: self.sig_algo(),
+            current_tcb: self.current_tcb(generation),
+            plat_info: self.plat_info(),
+            key_info: self.key_info(),
+            report_data: self.report_data(),
+            measurement: self.measurement(),
+            host_data: self.host_data(),
+            id_key_digest: self.id_key_digest(),
+            author_key_digest: self.author_key_digest(),
+            report_id: self.report_id(),
+            report_id_ma: self.report_id_ma(),
+            reported_tcb: self.reported_tcb(generation),
+            cpuid_fam_id: self.cpuid_fam_id(),
+            cpuid_mod_id: self.cpuid_mod_id(),
+            cpuid_step: self.cpuid_step(),
+            chip_id: self.chip_id(),
+            committed_tcb: self.committed_tcb(generation),
+            current: self.current_version(),
+            committed: self.committed_version(),
+            launch_tcb: self.launch_tcb(generation),
+            launch_mit_vector: self.launch_mit_vector(),
+            current_mit_vector: self.current_mit_vector(),
+        })
+    }
+}
+
+/// Owned, typed representation of a SNP attestation report body.
+///
+/// This struct contains all fields from the attestation report body (bytes 0x00-0x2A0),
+/// parsed into their typed representations. It does **not** include the signature.
+///
+/// # Creating an AttestationReport
+///
+/// There are several ways to obtain an `AttestationReport`:
+///
+/// 1. **From raw bytes** (no verification):
+///    ```ignore
+///    let report = AttestationReport::from_bytes(&raw_bytes)?;
+///    ```
+///
+/// 2. **From a zero-copy ReportBody**:
+///    ```ignore
+///    let body = ReportBody::from_bytes(&raw_bytes)?;
+///    let report = body.to_attestation_report()?;
+///    ```
+///
+/// # Version differences
+///
+/// The attestation report format varies by version:
+/// - **V2**: Base format (Milan, Genoa without CPUID fields)
+/// - **V3/V4**: Adds CPUID family, model, and stepping fields
+/// - **V5**: Adds launch and current mitigation vector fields
+///
+/// Optional fields (`cpuid_*`, `*_mit_vector`) are `None` when not present
+/// in the report version.
+///
+/// # TCB Version parsing
+///
+/// The `TcbVersion` fields are parsed differently based on CPU generation:
+/// - **Milan/Genoa**: Legacy 8-byte layout
+/// - **Turin/Venice**: New layout with FMC field
+///
+/// The generation is inferred from CPUID fields (v3+) or chip ID heuristics (v2).
 #[repr(C)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AttestationReport {
-    /// Version number of this attestation report. Set to 2h for this specification.
+    /// Version number of this attestation report.
     pub version: u32,
-    /// The guest SVN.
+
+    /// Guest Security Version Number (SVN).
     pub guest_svn: u32,
-    /// The guest policy.
+
+    /// Guest policy governing hypervisor restrictions.
+    /// See [`GuestPolicy`].
     pub policy: GuestPolicy,
-    /// The family ID provided at launch.
+
+    /// Family ID provided at launch (128 bits).
     pub family_id: [u8; 16],
-    /// The image ID provided at launch.
+
+    /// Image ID provided at launch (128 bits).
     pub image_id: [u8; 16],
-    /// The request VMPL for the attestation report.
+
+    /// Virtual Machine Privilege Level (VMPL) of the attestation request.
     pub vmpl: u32,
-    /// The signature algorithm used to sign this report.
+
+    /// Signature algorithm used to sign this report.
     pub sig_algo: u32,
-    /// Current TCB. See SNPTcbVersion
+
+    /// Current TCB (Trusted Computing Base) version.
+    /// See [`TcbVersion`], parsed according to CPU generation.
     pub current_tcb: TcbVersion,
-    /// Information about the platform. See PlatformInfo
+
+    /// Platform information flags.
+    /// See [`PlatformInfo`].
     pub plat_info: PlatformInfo,
-    /// Information related to signing keys in the report. See KeyInfo
+
+    /// Key and signing information.
+    /// See [`KeyInfo`].
     pub key_info: KeyInfo,
 
-    /// Guest-provided 512 Bits of Data
+    /// Guest-provided data (512 bits).
     #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
     pub report_data: [u8; 64],
 
-    /// The measurement calculated at launch.
+    /// Launch measurement (SHA-384).
     #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
     pub measurement: [u8; 48],
 
-    /// Data provided by the hypervisor at launch.
+    /// Host-provided data (256 bits).
     pub host_data: [u8; 32],
 
-    /// SHA-384 digest of the ID public key that signed the ID block provided
-    /// in SNP_LANUNCH_FINISH.
+    /// SHA-384 digest of the ID public key.
     #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
     pub id_key_digest: [u8; 48],
 
-    /// SHA-384 digest of the Author public key that certified the ID key,
-    /// if provided in SNP_LAUNCH_FINSIH. Zeroes if AUTHOR_KEY_EN is 1.
+    /// SHA-384 digest of the Author public key.
     #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
     pub author_key_digest: [u8; 48],
-    /// Report ID of this guest.
+
+    /// Report ID of this guest (256 bits).
     pub report_id: [u8; 32],
-    /// Report ID of this guest's migration agent (if applicable).
+
+    /// Report ID of this guest's migration agent if applicable (256 bits).
     pub report_id_ma: [u8; 32],
-    /// Reported TCB version used to derive the VCEK that signed this report.
+
+    /// Reported TCB version.
+    /// See [`TcbVersion`], parsed according to CPU generation.
     pub reported_tcb: TcbVersion,
-    /// CPUID Familiy ID (Combined Extended Family ID and Family ID)
+
+    /// CPUID Family ID.
+    ///
+    /// Combined Extended Family ID and Family ID from CPUID.
+    /// Present in report version 3 and later.
     pub cpuid_fam_id: Option<u8>,
-    /// CPUID Model (Combined Extended Model and Model fields)
+
+    /// CPUID Model ID.
+    ///
+    /// Combined Extended Model and Model from CPUID.
+    /// Present in report version 3 and later.
     pub cpuid_mod_id: Option<u8>,
-    /// CPUID Stepping
+
+    /// CPUID Stepping.
+    ///
+    /// Processor stepping from CPUID.
+    /// Present in report version 3 and later.
     pub cpuid_step: Option<u8>,
 
-    /// If MaskChipId is set to 0, Identifier unique to the chip.
-    /// Otherwise set to 0h.
+    /// Chip identifier (512 bits).
+    ///
+    /// Zero if MaskChipId was set during launch.
     #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
     pub chip_id: [u8; 64],
-    /// CommittedTCB
+
+    /// Committed TCB version.
+    /// /// See [`TcbVersion`], parsed according to CPU generation.
     pub committed_tcb: TcbVersion,
-    /// The build number of CurrentVersion
+
+    /// Current firmware version (major.minor.build).
     pub current: Version,
-    /// The build number of CommittedVersion
+
+    /// Committed firmware version (major.minor.build).
     pub committed: Version,
-    /// The CurrentTcb at the time the guest was launched or imported.
+
+    /// Launch TCB version.
+    /// See [`TcbVersion`], parsed according to CPU generation.
     pub launch_tcb: TcbVersion,
-    /// The verified mitigation vecor value at the time the guest was launched (LaunchMitVector).
+
+    /// Launch mitigation vector.
+    ///
+    /// Verified mitigation vector value at guest launch time.
+    /// Present in report version 5 and later.
     pub launch_mit_vector: Option<u64>,
-    /// Value is set to the current verified mitigation vectore value (CurrentMitVector).
+
+    /// Current mitigation vector.
+    ///
+    /// Current verified mitigation vector value.
+    /// Present in report version 5 and later.
     pub current_mit_vector: Option<u64>,
-    /// Signature of bytes 0 to 0x29F inclusive of this report.
-    /// The format of the signature is found within Signature.
-    pub signature: Signature,
 }
 
 impl Default for AttestationReport {
@@ -350,7 +1030,6 @@ impl Default for AttestationReport {
             launch_tcb: Default::default(),
             launch_mit_vector: Default::default(),
             current_mit_vector: Default::default(),
-            signature: Default::default(),
         }
     }
 }
@@ -361,7 +1040,8 @@ impl Encoder<()> for AttestationReport {
         let variant = match self.version {
             2 => ReportVariant::V2,
             3 | 4 => ReportVariant::V3,
-            _ => ReportVariant::V5,
+            5 => ReportVariant::V5,
+            _ => return Err(std::io::ErrorKind::Unsupported.into()),
         };
 
         let generation = match variant {
@@ -427,16 +1107,12 @@ impl Encoder<()> for AttestationReport {
         // Write launch and current mitigation vectors based on variant
         match variant {
             ReportVariant::V2 | ReportVariant::V3 => {
-                writer
-                    .skip_bytes::<168>()?
-                    .write_bytes(self.signature, ())?;
+                writer.skip_bytes::<168>()?;
             }
             _ => {
                 writer.write_bytes(self.launch_mit_vector.unwrap_or(0), ())?;
                 writer.write_bytes(self.current_mit_vector.unwrap_or(0), ())?;
-                writer
-                    .skip_bytes::<152>()?
-                    .write_bytes(self.signature, ())?;
+                writer.skip_bytes::<152>()?;
             }
         }
 
@@ -505,14 +1181,12 @@ impl Decoder<()> for AttestationReport {
         let launch_tcb = stepper.skip_bytes::<1>()?.read_bytes_with(generation)?;
 
         // mit vecor fields were added in V5 and later.
-        let (launch_mit_vector, current_mit_vector, signature) = match variant {
-            ReportVariant::V2 | ReportVariant::V3 => {
-                (None, None, stepper.skip_bytes::<168>()?.read_bytes()?)
-            }
+        let (launch_mit_vector, current_mit_vector, _) = match variant {
+            ReportVariant::V2 | ReportVariant::V3 => (None, None, stepper.skip_bytes::<168>()?),
             _ => (
                 Some(stepper.read_bytes()?),
                 Some(stepper.read_bytes()?),
-                stepper.skip_bytes::<152>()?.read_bytes()?,
+                stepper.skip_bytes::<152>()?,
             ),
         };
 
@@ -545,7 +1219,6 @@ impl Decoder<()> for AttestationReport {
             launch_tcb,
             launch_mit_vector,
             current_mit_vector,
-            signature,
         })
     }
 }
@@ -639,8 +1312,7 @@ Launch TCB:
 Launch Mitigation Vector:     {}
 
 Current Mitigation Vector:    {}
-
-{}"#,
+"#,
             self.version,
             self.guest_svn,
             self.policy,
@@ -674,124 +1346,7 @@ Current Mitigation Vector:    {}
                 .map_or("None".to_string(), |lmv| lmv.to_string()),
             self.current_mit_vector
                 .map_or("None".to_string(), |cmv| cmv.to_string()),
-            self.signature
         )
-    }
-}
-
-#[cfg(feature = "openssl")]
-impl Verifiable for (&Chain, &AttestationReport) {
-    type Output = ();
-
-    fn verify(self) -> std::io::Result<Self::Output> {
-        let vek = self.0.verify()?;
-
-        let sig = EcdsaSig::try_from(&self.1.signature)?;
-
-        let raw_report_bytes = self.1.to_bytes()?;
-
-        let measurable_bytes: &[u8] = &raw_report_bytes[..0x2a0];
-
-        let mut hasher = Sha384::new();
-        hasher.update(measurable_bytes);
-        let base_digest = hasher.finish();
-
-        let ec = vek.public_key()?.ec_key()?;
-        let signed = sig.verify(&base_digest, &ec)?;
-        match signed {
-            true => Ok(()),
-            false => Err(Error::other("VEK does not sign the attestation report")),
-        }
-    }
-}
-
-#[cfg(feature = "openssl")]
-impl Verifiable for (&Certificate, &AttestationReport) {
-    type Output = ();
-
-    fn verify(self) -> std::io::Result<Self::Output> {
-        let vek = self.0;
-
-        let sig = EcdsaSig::try_from(&self.1.signature)?;
-        let raw_report_bytes = self.1.to_bytes()?;
-
-        let measurable_bytes: &[u8] = &raw_report_bytes[..0x2a0];
-
-        let mut hasher = Sha384::new();
-        hasher.update(measurable_bytes);
-        let base_digest = hasher.finish();
-
-        let ec = vek.public_key()?.ec_key()?;
-        let signed = sig.verify(&base_digest, &ec)?;
-        match signed {
-            true => Ok(()),
-            false => Err(Error::other("VEK does not sign the attestation report")),
-        }
-    }
-}
-
-#[cfg(feature = "crypto_nossl")]
-impl Verifiable for (&Chain, &AttestationReport) {
-    type Output = ();
-
-    fn verify(self) -> std::io::Result<Self::Output> {
-        // According to Chapter 3 of the Versioned Chip Endorsement Key (VCEK) Certificate and the Versioned Loaded Endorsement Key (VLEK)
-        // Certificate specifications, both Versioned Endorsement Key certificates certify an ECDSA public key on curve P-384,
-        // with the signature hash algorithm being SHA-384.
-
-        let vek = self.0.verify()?;
-
-        let sig = p384::ecdsa::Signature::try_from(&self.1.signature)?;
-
-        let raw_report_bytes = self.1.to_bytes()?;
-
-        let measurable_bytes: &[u8] = &raw_report_bytes[..0x2a0];
-
-        use sha2::Digest;
-        let base_digest = sha2::Sha384::new_with_prefix(measurable_bytes);
-        let verifying_key = p384::ecdsa::VerifyingKey::from_sec1_bytes(vek.public_key_sec1())
-            .map_err(|e| {
-                std::io::Error::other(format!(
-                    "failed to deserialize public key from sec1 bytes: {e:?}"
-                ))
-            })?;
-        use p384::ecdsa::signature::DigestVerifier;
-        verifying_key.verify_digest(base_digest, &sig).map_err(|e| {
-            std::io::Error::other(format!("VEK does not sign the attestation report: {e:?}"))
-        })
-    }
-}
-
-#[cfg(feature = "crypto_nossl")]
-impl Verifiable for (&Certificate, &AttestationReport) {
-    type Output = ();
-
-    fn verify(self) -> std::io::Result<Self::Output> {
-        // According to Chapter 3 of the [Versioned Chip Endorsement Key (VCEK) Certificate and
-        // KDS Interface Specification][spec], the VCEK certificate certifies an ECDSA public key on curve P-384,
-        // and the signature hash algorithm is sha384.
-        // [spec]: https://www.amd.com/content/dam/amd/en/documents/epyc-technical-docs/specifications/57230.pdf
-
-        let vek = self.0;
-
-        let sig = p384::ecdsa::Signature::try_from(&self.1.signature)?;
-
-        let raw_report_bytes = self.1.to_bytes()?;
-
-        let measurable_bytes: &[u8] = &raw_report_bytes[..0x2a0];
-
-        use sha2::Digest;
-        let base_digest = sha2::Sha384::new_with_prefix(measurable_bytes);
-        let verifying_key = p384::ecdsa::VerifyingKey::from_sec1_bytes(vek.public_key_sec1())
-            .map_err(|e| {
-                std::io::Error::other(format!(
-                    "failed to deserialize public key from sec1 bytes: {e:?}"
-                ))
-            })?;
-        use p384::ecdsa::signature::DigestVerifier;
-        verifying_key.verify_digest(base_digest, &sig).map_err(|e| {
-            std::io::Error::other(format!("VEK does not sign the attestation report: {e:?}"))
-        })
     }
 }
 
@@ -850,6 +1405,8 @@ bitfield! {
     /// option is selected to disable these Page Move commands, then these commands will return POLICY_FAILURE.
     /// 0: Do not disable Guest support for the commands.
     /// 1: Disable Guest support for the commands.
+    ///
+    /// **Since:** Report v5+
     pub page_swap_disabled, set_page_swap_disabled: 25;
 }
 
@@ -1294,20 +1851,7 @@ TCB Version:
 Launch Mitigation Vector:     None
 
 Current Mitigation Vector:    None
-
-Signature:
-  R:
-00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-00 00 00 00 00 00 00 00
-  S:
-00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-00 00 00 00 00 00 00 00"#;
+"#;
         assert_eq!(expected, AttestationReport::default().to_string())
     }
 
