@@ -615,7 +615,7 @@ impl std::convert::From<std::io::Error> for UserApiError {
 
 impl From<UserApiError> for io::Error {
     fn from(value: UserApiError) -> Self {
-        io::Error::new(io::ErrorKind::Other, value)
+        io::Error::other(value)
     }
 }
 
@@ -742,7 +742,7 @@ impl std::fmt::Display for AttestationReportError {
 
 impl From<AttestationReportError> for std::io::Error {
     fn from(value: AttestationReportError) -> Self {
-        std::io::Error::new(std::io::ErrorKind::Other, value)
+        std::io::Error::other(value)
     }
 }
 

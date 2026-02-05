@@ -48,11 +48,12 @@ impl BitOrAssign for SnpPlatformStatusFlags {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[repr(C)]
 /// Certificates which are accepted for [CertTableEntry](self::CertTableEntry)
 pub enum CertType {
     /// Empty or closing entry for the CertTable
+    #[default]
     Empty,
 
     /// AMD Root Signing Key (ARK) certificate
@@ -72,12 +73,6 @@ pub enum CertType {
 
     /// Other (Specify GUID)
     OTHER(uuid::Uuid),
-}
-
-impl Default for CertType {
-    fn default() -> Self {
-        Self::Empty
-    }
 }
 
 impl Display for CertType {
@@ -273,7 +268,7 @@ impl Ord for CertTableEntry {
 
 impl PartialOrd for CertTableEntry {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cert_type.cmp(&other.cert_type))
+        Some(self.cmp(other))
     }
 }
 
