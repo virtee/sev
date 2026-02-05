@@ -51,25 +51,25 @@ iocuddle = "^0.1"
 [dependencies]
 openssl = { version = "0.10", optional = true }
 serde = { version = "1.0", features = ["derive"] , optional = true}
-bitflags = "2.10.0"
+bitflags = "2.10"
 dirs = "^6.0"
-serde-big-array = {version = "0.5.1", optional = true}
-static_assertions = "^1.1.0"
+serde-big-array = {version = "0.5", optional = true}
+static_assertions = "^1.1"
 bitfield = "^0.19"
 uuid = { version = "^1.18", features = ["serde"] }
-hex = "0.4.3"
-libc = "0.2.177"
-lazy_static = "1.4.0"
-p384 = { version = "0.13.0", optional = true }
-rsa = { version = "0.9.10", optional = true }
-sha2 = { version = "0.10.9", optional = true }
-x509-cert = { version = "0.2.5", optional = true }
-byteorder = "1.4.3"
-base64 = "0.22.1"
+hex = "0.4"
+libc = "0.2"
+lazy_static = "1.4"
+p384 = { version = "0.13", optional = true }
+rsa = { version = "0.9", optional = true }
+sha2 = { version = "0.10", optional = true }
+x509-cert = { version = "0.2", optional = true }
+byteorder = "1.4"
+base64 = "0.22"
 rdrand = { version = "^0.8", optional = true }
 reqwest = { version = "^0.12", features = ["blocking"], optional = true }
-tokio = { version = "1.48.0", features = ["rt-multi-thread"], optional = true }
-serde_bytes = { version = "0.11.19", optional = true }
+tokio = { version = "1.48", features = ["rt-multi-thread"], optional = true }
+serde_bytes = { version = "0.11", optional = true }
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 kvm-ioctls = ">=0.16"
