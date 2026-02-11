@@ -805,6 +805,7 @@ impl Default for WrappedVlekHashstick {
     }
 }
 
+#[cfg(not(feature = "lax-parser"))]
 impl Encoder<Generation> for WrappedVlekHashstick {
     fn encode(
         &self,
@@ -1869,6 +1870,7 @@ mod tests {
         );
     }
 
+    #[cfg(not(feature = "lax-parser"))]
     #[test]
     fn test_wrapped_vlek_hashstick_to_bytes() {
         // Create a test hashstick

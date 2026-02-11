@@ -90,6 +90,14 @@ compile_error!(
     "feature \"openssl\" and feature \"crypto_nossl\" cannot be enabled at the same time"
 );
 
+#[cfg(all(
+    any(feature = "openssl", feature = "crypto_nossl"),
+    feature = "lax-parser"
+))]
+compile_error!(
+    r#"feature "openssl" and feature "crypto_nossl" cannot be used together with "lax-parser""#
+);
+
 /// SEV and SEV-SNP certificates interface.
 pub mod certs;
 

@@ -355,6 +355,7 @@ impl Default for AttestationReport {
     }
 }
 
+#[cfg(not(feature = "lax-parser"))]
 impl Encoder<()> for AttestationReport {
     fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
         // Determine the variant based on version and CPUID step
@@ -1689,6 +1690,14 @@ Signature:
         assert_eq!(<Version as Default>::default(), Version::new(0, 0, 0));
     }
 
+    const VCEK: [u8; 64] = [
+        0xD4, 0x95, 0x54, 0xEC, 0x71, 0x7F, 0x4E, 0x5B, 0x0F, 0xE6, 0xB1, 0x43, 0xBC, 0xF0, 0x40,
+        0x5B, 0xD7, 0xAE, 0x30, 0x47, 0x27, 0xED, 0xF4, 0x66, 0x03, 0xF2, 0xA7, 0x6A, 0xEF, 0x6A,
+        0x3A, 0xBC, 0x15, 0xD7, 0xAF, 0x38, 0xDB, 0x75, 0x70, 0x39, 0x02, 0x9F, 0x0E, 0xFA, 0xCF,
+        0xD0, 0x8E, 0x24, 0x43, 0x24, 0x88, 0x47, 0x38, 0xC7, 0x2B, 0x08, 0x2E, 0x2F, 0x87, 0xA4,
+        0x4D, 0x54, 0x1E, 0xB6,
+    ];
+
     #[test]
     fn test_attestation_report_from_bytes() {
         // Create a valid attestation report bytes minus one byte.
@@ -1697,15 +1706,32 @@ Signature:
         // Push the version byte at the beginning.
         bytes.insert(0, 2);
 
-        let vcek = [
-            0xD4, 0x95, 0x54, 0xEC, 0x71, 0x7F, 0x4E, 0x5B, 0x0F, 0xE6, 0xB1, 0x43, 0xBC, 0xF0,
-            0x40, 0x5B, 0xD7, 0xAE, 0x30, 0x47, 0x27, 0xED, 0xF4, 0x66, 0x03, 0xF2, 0xA7, 0x6A,
-            0xEF, 0x6A, 0x3A, 0xBC, 0x15, 0xD7, 0xAF, 0x38, 0xDB, 0x75, 0x70, 0x39, 0x02, 0x9F,
-            0x0E, 0xFA, 0xCF, 0xD0, 0x8E, 0x24, 0x43, 0x24, 0x88, 0x47, 0x38, 0xC7, 0x2B, 0x08,
-            0x2E, 0x2F, 0x87, 0xA4, 0x4D, 0x54, 0x1E, 0xB6,
-        ];
+        bytes[0x1A8..0x1E0].copy_from_slice(&VCEK[..(0x1E0 - 0x1A8)]);
 
-        bytes[0x1A8..0x1E0].copy_from_slice(&vcek[..(0x1E0 - 0x1A8)]);
+        // Test valid input
+        let result = AttestationReport::from_bytes(bytes.as_slice());
+        assert!(result.is_ok());
+    }
+
+    #[cfg(feature = "lax-parser")]
+    #[test]
+    fn test_future_attestation_report_from_bytes() {
+        // Create a valid attestation report bytes minus one byte.
+        let mut bytes: Vec<u8> = vec![0; 1183];
+
+        // Push the version byte at the beginning.
+        bytes.insert(0, 9);
+
+        // Set CPUID_FAM_ID
+        bytes[0x188] = 0x1A;
+
+        // Set CPUID_MOD_ID
+        bytes[0x189] = 0x2;
+
+        // Write into a reserved area; the standard parser would expect 0.
+        bytes[0x19F] = 1;
+
+        bytes[0x1A8..0x1E0].copy_from_slice(&VCEK[..(0x1E0 - 0x1A8)]);
 
         // Test valid input
         let result = AttestationReport::from_bytes(bytes.as_slice());
@@ -1725,6 +1751,7 @@ Signature:
         AttestationReport::from_bytes(bytes[..100].try_into().unwrap()).unwrap();
     }
 
+    #[cfg(not(feature = "lax-parser"))]
     #[test]
     fn test_attestation_report_parse_and_write_bytes() {
         let report = AttestationReport {
@@ -1802,6 +1829,7 @@ Signature:
         assert_eq!(original.to_bytes().unwrap(), cloned.to_bytes().unwrap());
     }
 
+    #[cfg(not(feature = "lax-parser"))]
     #[test]
     fn test_attestation_report_complex_write() {
         let report = AttestationReport {
@@ -1831,6 +1859,7 @@ Signature:
         assert_eq!(read_back.image_id, [0xBB; 16]);
     }
 
+    #[cfg(not(feature = "lax-parser"))]
     #[test]
     fn test_write_with_limited_writer() {
         let report = AttestationReport {
