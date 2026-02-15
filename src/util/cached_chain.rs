@@ -54,7 +54,11 @@ pub fn env_var() -> Option<PathBuf> {
 /// Returns the "user-level" search path for the SEV
 /// certificate chain (`$HOME/.cache/amd-sev/chain`).
 pub fn home() -> Option<PathBuf> {
-    dirs::cache_dir().map(append_rest)
+    if cfg!(feature = "dirs") {
+        dirs::cache_dir().map(append_rest)
+    } else {
+        None
+    }
 }
 
 /// Returns the "system-level" search path for the SEV
