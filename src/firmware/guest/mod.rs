@@ -221,13 +221,15 @@ impl Firmware {
 
         // Check if the launch mitigation vector is provided for message version >= 2
         if let Some(version) = message_version {
-            if version >= 2 && derived_key_request.launch_mit_vector.is_none() {
-                use std::io;
+            if version >= 2 {
+                if derived_key_request.launch_mit_vector.is_none() {
+                    use std::io;
 
-                return Err(UserApiError::IOError(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Launch Mitigation Vector must be provided for message version >= 2",
-                )));
+                    return Err(UserApiError::IOError(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "Launch Mitigation Vector must be provided for message version >= 2",
+                    )));
+                }
             } else {
                 // Set launch_vector to None for message requests version 1.
                 derived_key_request.launch_mit_vector = None;
