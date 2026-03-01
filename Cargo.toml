@@ -44,6 +44,7 @@ sev = ["dep:rdrand"]
 snp = []
 crypto_nossl = ["dep:p384", "dep:rsa", "dep:sha2", "dep:x509-cert"]
 serde = ["dep:serde", "dep:serde-big-array", "dep:serde_bytes"]
+lax-parser = []
 
 [target.'cfg(target_os = "linux")'.dependencies]
 iocuddle = "^0.1"
