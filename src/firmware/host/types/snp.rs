@@ -10,7 +10,7 @@ use crate::{
     parser::{ByteParser, Decoder, Encoder},
     util::{
         hexline::HexLine,
-        parser_helper::{ReadExt, WriteExt},
+        parser_helper::{validate_reserved, ReadExt, WriteExt},
     },
     Generation,
 };
@@ -543,10 +543,10 @@ impl Decoder<Generation> for TcbVersion {
     fn decode(reader: &mut impl Read, generation: Generation) -> Result<Self, std::io::Error> {
         match generation {
             Generation::Milan | Generation::Genoa => {
-                Ok(TcbVersion::from_legacy_bytes(&reader.read_bytes()?))
+                TcbVersion::from_legacy_bytes(&reader.read_bytes()?)
             }
             Generation::Turin | Generation::Venice => {
-                Ok(TcbVersion::from_turin_bytes(&reader.read_bytes()?))
+                TcbVersion::from_turin_bytes(&reader.read_bytes()?)
             }
             _ => Err(std::io::Error::new(
                 std::io::ErrorKind::Unsupported,
@@ -562,14 +562,15 @@ impl ByteParser<Generation> for TcbVersion {
 }
 
 impl TcbVersion {
-    pub(crate) fn from_legacy_bytes(bytes: &[u8; 8]) -> Self {
-        Self {
+    pub(crate) fn from_legacy_bytes(bytes: &[u8; 8]) -> Result<Self, std::io::Error> {
+        validate_reserved(&bytes[3..4])?;
+        Ok(Self {
             fmc: None,
             bootloader: bytes[0],
             tee: bytes[1],
             snp: bytes[6],
             microcode: bytes[7],
-        }
+        })
     }
 
     pub(crate) fn to_legacy_bytes(self) -> [u8; 8] {
@@ -585,14 +586,15 @@ impl TcbVersion {
         ]
     }
 
-    pub(crate) fn from_turin_bytes(bytes: &[u8; 8]) -> Self {
-        Self {
+    pub(crate) fn from_turin_bytes(bytes: &[u8; 8]) -> Result<Self, std::io::Error> {
+        validate_reserved(&bytes[4..5])?;
+        Ok(Self {
             fmc: Some(bytes[0]),
             bootloader: bytes[1],
             tee: bytes[2],
             snp: bytes[3],
             microcode: bytes[7],
-        }
+        })
     }
 
     pub(crate) fn to_turin_bytes(self) -> [u8; 8] {
@@ -1488,7 +1490,7 @@ mod tests {
         let tcb = TcbVersion::new(None, 1, 2, 3, 4);
 
         let serialized = tcb.to_legacy_bytes();
-        let deserialized = TcbVersion::from_legacy_bytes(&serialized);
+        let deserialized = TcbVersion::from_legacy_bytes(&serialized).unwrap();
 
         assert_eq!(tcb, deserialized);
     }

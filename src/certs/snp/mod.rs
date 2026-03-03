@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// ECDSA signatures.
-pub mod ecdsa;
+/// /// Attestation report signature parsing and verification helpers.
+pub mod signature;
 
 #[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
 /// Certificate Authority (CA) certificates.
