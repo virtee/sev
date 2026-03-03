@@ -33,6 +33,7 @@ pub trait ReadExt: Read {
             while remaining > 0 {
                 let n = remaining.min(CHUNK);
                 self.read_exact(&mut buf[..n])?;
+                #[cfg(not(feature = "unsafe_parser"))]
                 if buf[..n].iter().any(|&b| b != 0) {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::InvalidData,
