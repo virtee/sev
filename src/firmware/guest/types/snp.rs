@@ -648,7 +648,7 @@ impl<'a> ReportBody<'a> {
 
         let guest_svn = u32::decode(&mut &body[0x04..0x08], ())?;
 
-        let policy = GuestPolicy(u64::decode(&mut &body[0x08..0x10], ())?);
+        let policy = GuestPolicy::decode(&mut &body[0x08..0x10], version)?;
 
         let family_id: &'a [u8; 16] = <&[u8; 16]>::try_from(&body[0x10..0x20])
             .map_err(|e| std::io::Error::other(format!("Failed TryFrom Operation: {e}")))?;
@@ -947,6 +947,44 @@ bitfield! {
     pub page_swap_disabled, set_page_swap_disabled: 25;
 }
 
+impl GuestPolicy {
+    const RMB1_BIT_17: u64 = 1u64 << 17;
+    const RESERVED_MBZ_MASK_26_63: u64 = (!0u64) << 26; // bits 26..63
+    const PAGE_SWAP_DISABLE_BIT_25: u64 = 1u64 << 25;
+
+    fn validate_reserved_bits(self, variant: ReportVariant) -> std::io::Result<()> {
+        let raw = self.0;
+
+        // bit 17 must be 1 (RMB1)
+        if (raw & Self::RMB1_BIT_17) == 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("GuestPolicy bit 17 must be 1 (raw=0x{raw:016x})"),
+            ));
+        }
+
+        // bits 26..63 must be zero (MBZ)
+        if (raw & Self::RESERVED_MBZ_MASK_26_63) != 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("GuestPolicy reserved bits 26..63 must be zero (raw=0x{raw:016x})"),
+            ));
+        }
+
+        // bit 25 is only defined for report v5+
+        if variant < ReportVariant::V5 && (raw & Self::PAGE_SWAP_DISABLE_BIT_25) != 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "GuestPolicy bit 25 (PAGE_SWAP_DISABLE) is only valid for report v5+ (raw=0x{raw:016x})"
+                ),
+            ));
+        }
+
+        Ok(())
+    }
+}
+
 impl Encoder<()> for GuestPolicy {
     fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
         writer.write_bytes(self.0, ())?;
@@ -954,6 +992,7 @@ impl Encoder<()> for GuestPolicy {
     }
 }
 
+// No checking in case policy is being parsed outside attestation report (e.g. id-block)
 impl Decoder<()> for GuestPolicy {
     fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
         let policy = reader.read_bytes()?;
@@ -961,7 +1000,17 @@ impl Decoder<()> for GuestPolicy {
     }
 }
 
-impl ByteParser<()> for GuestPolicy {
+// Checking reserved bytes according to known reserved bytes in attestation report
+impl Decoder<ReportVariant> for GuestPolicy {
+    fn decode(reader: &mut impl Read, variant: ReportVariant) -> Result<Self, std::io::Error> {
+        let raw: u64 = reader.read_bytes()?;
+        let policy = GuestPolicy(raw);
+        policy.validate_reserved_bits(variant)?;
+        Ok(policy)
+    }
+}
+
+impl ByteParser<ReportVariant> for GuestPolicy {
     type Bytes = [u8; 8];
     const EXPECTED_LEN: Option<usize> = Some(8);
 }
@@ -1050,6 +1099,33 @@ bitfield! {
 
 }
 
+impl PlatformInfo {
+    // Allowed bits: 0..5 and 7. (bit 6 is reserved, 8..63 reserved)
+    const ALLOWED_MASK: u64 = (1u64 << 0)
+        | (1u64 << 1)
+        | (1u64 << 2)
+        | (1u64 << 3)
+        | (1u64 << 4)
+        | (1u64 << 5)
+        | (1u64 << 7);
+
+    // Reserved bits are everything not in ALLOWED_MASK.
+    const RESERVED_MASK: u64 = !Self::ALLOWED_MASK;
+
+    fn validate_reserved_bits(self) -> std::io::Result<()> {
+        let raw = self.0;
+
+        if (raw & Self::RESERVED_MASK) != 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("PlatformInfo reserved bits must be zero (raw=0x{raw:016x})"),
+            ));
+        }
+
+        Ok(())
+    }
+}
+
 impl Display for PlatformInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -1095,8 +1171,10 @@ impl Encoder<()> for PlatformInfo {
 
 impl Decoder<()> for PlatformInfo {
     fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
-        let info = reader.read_bytes()?;
-        Ok(Self(info))
+        let raw: u64 = reader.read_bytes()?;
+        let info = PlatformInfo(raw);
+        info.validate_reserved_bits()?;
+        Ok(info)
     }
 }
 
@@ -1135,6 +1213,22 @@ bitfield! {
 
 }
 
+impl KeyInfo {
+    // Bits 0..4 are defined, bits 5..31 must be zero.
+    const RESERVED_MASK: u32 = !0x1F; // 0xFFFF_FFE0
+
+    fn validate_reserved_bits(self) -> std::io::Result<()> {
+        let raw: u32 = self.0;
+        if (raw & Self::RESERVED_MASK) != 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("KeyInfo reserved bits set: 0x{raw:08x}"),
+            ));
+        }
+        Ok(())
+    }
+}
+
 impl Encoder<()> for KeyInfo {
     fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
         writer.write_bytes(self.0.to_le_bytes(), ())?;
@@ -1144,8 +1238,10 @@ impl Encoder<()> for KeyInfo {
 
 impl Decoder<()> for KeyInfo {
     fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
-        let info = reader.read_bytes()?;
-        Ok(Self(info))
+        let raw: u32 = reader.read_bytes()?; // assuming ReadExt::read_bytes::<u32>()
+        let info = KeyInfo(raw);
+        info.validate_reserved_bits()?;
+        Ok(info)
     }
 }
 
@@ -1268,6 +1364,10 @@ mod tests {
         // sig algo
         bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
 
+        // policy u64 LE at 0x08..0x10
+        let policy_raw = 1u64 << 17; // RMB1 bit
+        bytes[0x08..0x10].copy_from_slice(&policy_raw.to_le_bytes());
+
         // Make chip_id non-zero so v2 parsing doesn't error out
         bytes[CHIP_ID_RANGE.start] = 1;
 
@@ -1280,7 +1380,7 @@ Version:                      V2
 
 Guest SVN:                    0
 
-Guest Policy (0x0):
+Guest Policy (0x20000):
   ABI Major:     0
   ABI Minor:     0
   SMT Allowed:   false
@@ -1640,14 +1740,14 @@ Current Mitigation Vector:    None
 
     #[test]
     fn test_guest_policy_serialization() {
-        let mut original: GuestPolicy = Default::default();
+        let mut original: GuestPolicy = GuestPolicy::from(0u64);
         original.set_abi_major(2);
         original.set_abi_minor(1);
         original.set_smt_allowed(true);
         original.set_debug_allowed(true);
 
         let buffer = original.to_bytes().unwrap();
-        let decoded = GuestPolicy::from_bytes(&buffer).unwrap();
+        let decoded = GuestPolicy::from_bytes_with(&buffer, ReportVariant::V2).unwrap();
         assert_eq!(original, decoded);
     }
 
@@ -1660,28 +1760,6 @@ Current Mitigation Vector:    None
         let raw_v3 = [3, 0, 0, 0]; // Version 3
         let version = u32::from_le_bytes([raw_v3[0], raw_v3[1], raw_v3[2], raw_v3[3]]);
         assert_eq!(version, 3);
-    }
-
-    #[test]
-    fn test_boundary_value_serialization() {
-        // Test max values
-        let platform_info = PlatformInfo(u64::MAX);
-        let key_info = KeyInfo(u32::MAX);
-        let guest_policy = GuestPolicy(u64::MAX);
-
-        // Verify serialization/deserialization preserves max values
-        assert_eq!(
-            platform_info,
-            PlatformInfo::from_bytes(&platform_info.to_bytes().unwrap()).unwrap()
-        );
-        assert_eq!(
-            key_info,
-            KeyInfo::from_bytes(&key_info.to_bytes().unwrap()).unwrap()
-        );
-        assert_eq!(
-            guest_policy,
-            GuestPolicy::from_bytes(&guest_policy.to_bytes().unwrap()).unwrap()
-        );
     }
 
     #[test]
@@ -1745,6 +1823,10 @@ Current Mitigation Vector:    None
 
         // signature alorithm
         bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
+
+        // policy u64 LE at 0x08..0x10
+        let policy_raw = 1u64 << 17; // RMB1 bit
+        bytes[0x08..0x10].copy_from_slice(&policy_raw.to_le_bytes());
 
         let report = Report::from_bytes(&bytes).unwrap();
 
@@ -1819,6 +1901,10 @@ Current Mitigation Vector:    None
         // signature alorithm
         bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
 
+        // policy u64 LE at 0x08..0x10
+        let policy_raw = 1u64 << 17; // RMB1 bit
+        bytes[0x08..0x10].copy_from_slice(&policy_raw.to_le_bytes());
+
         let report = Report::from_bytes(bytes.as_slice());
         assert!(report.is_ok());
 
@@ -1847,7 +1933,12 @@ Current Mitigation Vector:    None
         // guest_svn
         bytes[0x04..0x08].copy_from_slice(&1u32.to_le_bytes());
 
+        // signature algorithm
         bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
+
+        // policy u64 LE at 0x08..0x10
+        let policy_raw = 1u64 << 17; // RMB1 bit
+        bytes[0x08..0x10].copy_from_slice(&policy_raw.to_le_bytes());
 
         let report = Report::from_bytes(&bytes).unwrap();
         let body = ReportBody::from_bytes(report.body).unwrap();
@@ -1970,6 +2061,10 @@ Current Mitigation Vector:    None
 
         bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
 
+        // policy u64 LE at 0x08..0x10
+        let policy_raw = 1u64 << 17; // RMB1 bit
+        bytes[0x08..0x10].copy_from_slice(&policy_raw.to_le_bytes());
+
         bytes[CHIP_ID_RANGE.clone()].copy_from_slice(&vcek_bytes);
 
         let report = Report::from_bytes(&bytes).unwrap();
@@ -1995,6 +2090,10 @@ Current Mitigation Vector:    None
         bytes[CHIP_ID_RANGE.clone()].copy_from_slice(&chip);
 
         bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
+
+        // policy u64 LE at 0x08..0x10
+        let policy_raw = 1u64 << 17; // RMB1 bit
+        bytes[0x08..0x10].copy_from_slice(&policy_raw.to_le_bytes());
 
         let report = Report::from_bytes(&bytes).unwrap();
         let body = ReportBody::from_bytes(report.body).unwrap();
