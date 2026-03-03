@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
-use crate::certs::snp::{ecdsa::Signature, Certificate, Chain, Verifiable};
+use crate::certs::snp::{Certificate, Chain, Verifiable};
 
 use crate::{
+    certs::snp::signature::SignatureAlgorithm,
     firmware::host::TcbVersion,
     parser::{ByteParser, Decoder, Encoder},
     util::{
@@ -24,13 +25,7 @@ use std::{
     io::{Read, Write},
 };
 
-#[cfg(feature = "openssl")]
-use std::io::Error;
-
 use bitfield::bitfield;
-
-#[cfg(feature = "openssl")]
-use openssl::{ecdsa::EcdsaSig, sha::Sha384};
 
 /// Structure of required data for fetching the derived key.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -345,6 +340,8 @@ impl Display for ReportVariant {
 ///   firmware report layout and size (1184 bytes).
 #[derive(Debug, Clone, Copy)]
 pub struct Report<'a> {
+    /// The signature algorithm used to sign the attestation report
+    pub algorithm: SignatureAlgorithm,
     /// The bytes covered by the report signature (bytes 0x00 to 0x2A0).
     pub body: &'a [u8],
     /// The signature bytes (0x2A0..0x4A0).
@@ -356,6 +353,8 @@ impl<'a> Report<'a> {
     const BODY_LEN: usize = 0x2A0; // bytes 0x000..=0x29F
     const SIG_OFF: usize = 0x2A0;
     const SIG_LEN: usize = 0x200; // bytes 0x2A0..=0x49F
+    const SIG_ALGO_OFF: usize = 0x34;
+    const SIG_ALGO_LEN: usize = 0x4;
     /// Parse a raw attestation report into body and signature slices.
     ///
     /// This function performs **framing only**:
@@ -373,68 +372,29 @@ impl<'a> Report<'a> {
             ));
         };
 
+        let algorithm = SignatureAlgorithm::decode(
+            &mut &report[Self::SIG_ALGO_OFF..Self::SIG_ALGO_OFF + Self::SIG_ALGO_LEN],
+            (),
+        )?;
+
         Ok(Self {
+            algorithm,
             body: &report[..Self::BODY_LEN],
             signature: &report[Self::SIG_OFF..Self::SIG_OFF + Self::SIG_LEN],
         })
     }
 }
 
-#[cfg(feature = "openssl")]
+#[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
 impl Verifiable for (&Certificate, &Report<'_>) {
     type Output = ();
 
-    fn verify(self) -> std::io::Result<Self::Output> {
+    fn verify(self) -> Result<Self::Output, std::io::Error> {
         let (vek, report) = self;
 
-        let sev_sig = Signature::from_bytes(report.signature)?;
+        let algo = report.algorithm;
 
-        let sig: EcdsaSig = EcdsaSig::try_from(&sev_sig)?;
-
-        let mut hasher = Sha384::new();
-        hasher.update(report.body);
-        let base_digest = hasher.finish();
-
-        let ec = vek.public_key()?.ec_key()?;
-        let signed = sig.verify(&base_digest, &ec)?;
-        match signed {
-            true => Ok(()),
-            false => Err(Error::other("VEK does not sign the attestation report")),
-        }
-    }
-}
-
-#[cfg(feature = "crypto_nossl")]
-impl Verifiable for (&Certificate, &Report<'_>) {
-    type Output = ();
-
-    fn verify(self) -> std::io::Result<Self::Output> {
-        // According to Chapter 3 of the Versioned Chip Endorsement Key (VCEK) Certificate and the Versioned Loaded Endorsement Key (VLEK)
-        // Certificate specifications, both Versioned Endorsement Key certificates certify an ECDSA public key on curve P-384,
-        // with the signature hash algorithm being SHA-384.
-
-        let (vek, report) = self;
-
-        let sev_sig = Signature::from_bytes(report.signature)?;
-
-        let sig = p384::ecdsa::Signature::try_from(&sev_sig).map_err(|e| {
-            std::io::Error::other(format!(
-                "failed to generate signature from raw bytes: {e:?}"
-            ))
-        })?;
-
-        use sha2::Digest;
-        let base_digest = sha2::Sha384::new_with_prefix(report.body);
-        let verifying_key = p384::ecdsa::VerifyingKey::from_sec1_bytes(vek.public_key_sec1())
-            .map_err(|e| {
-                std::io::Error::other(format!(
-                    "failed to deserialize public key from sec1 bytes: {e:?}"
-                ))
-            })?;
-        use p384::ecdsa::signature::DigestVerifier;
-        verifying_key.verify_digest(base_digest, &sig).map_err(|e| {
-            std::io::Error::other(format!("VEK does not sign the attestation report: {e:?}"))
-        })
+        algo.verify(report.body, report.signature, vek)
     }
 }
 
@@ -442,7 +402,7 @@ impl Verifiable for (&Certificate, &Report<'_>) {
 impl Verifiable for (&Chain, &Report<'_>) {
     type Output = ();
 
-    fn verify(self) -> std::io::Result<()> {
+    fn verify(self) -> Result<(), std::io::Error> {
         let (chain, report) = self;
         let vek = chain.verify()?;
         (vek, report).verify()
@@ -511,7 +471,7 @@ pub struct ReportBody<'a> {
     pub vmpl: u32,
 
     /// Signature algorithm used to sign this report.
-    pub sig_algo: u32,
+    pub sig_algo: SignatureAlgorithm,
 
     /// Current TCB (Trusted Computing Base) version, parsed for the inferred generation.
     pub current_tcb: TcbVersion,
@@ -699,7 +659,7 @@ impl<'a> ReportBody<'a> {
 
         let vmpl = u32::decode(&mut &body[0x30..0x34], ())?;
 
-        let sig_algo = u32::decode(&mut &body[0x34..0x38], ())?;
+        let sig_algo = SignatureAlgorithm::decode(&mut &body[0x34..0x38], ())?;
 
         let current_tcb = TcbVersion::decode(&mut &body[0x38..0x40], generation)?;
 
@@ -1301,6 +1261,9 @@ mod tests {
         // version: u32 LE at 0x00..0x04
         bytes[0x00..0x04].copy_from_slice(&2u32.to_le_bytes());
 
+        // sig algo
+        bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
+
         // Make chip_id non-zero so v2 parsing doesn't error out
         bytes[CHIP_ID_RANGE.start] = 1;
 
@@ -1334,7 +1297,7 @@ Image ID:
 
 VMPL:                         0
 
-Signature Algorithm:          0
+Signature Algorithm:          ECDSA with SECP384R1
 
 Current TCB:
 
@@ -1445,7 +1408,11 @@ Current Mitigation Vector:    None
 
     #[test]
     fn test_report_copy() {
-        let bytes = vec![0u8; Report::REPORT_LEN];
+        let mut bytes = vec![0u8; Report::REPORT_LEN];
+
+        // Setting sig algo
+        bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
+
         let report = Report::from_bytes(&bytes).unwrap();
         let copy = report;
 
@@ -1676,7 +1643,6 @@ Current Mitigation Vector:    None
         original.set_smt_allowed(true);
         original.set_debug_allowed(true);
 
-        // Test bincode
         let buffer = original.to_bytes().unwrap();
         let decoded = GuestPolicy::from_bytes(&buffer).unwrap();
         assert_eq!(original, decoded);
@@ -1774,6 +1740,9 @@ Current Mitigation Vector:    None
         // vmpl at 0x30..0x34
         bytes[0x30..0x34].copy_from_slice(&3u32.to_le_bytes());
 
+        // signature alorithm
+        bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
+
         let report = Report::from_bytes(&bytes).unwrap();
 
         // NOTE: parsing-only test: do NOT use TryFrom/verify path here
@@ -1783,6 +1752,7 @@ Current Mitigation Vector:    None
         assert_eq!(body.guest_svn, 1);
         assert_eq!(body.vmpl, 3);
         assert_eq!(body.measurement, &[0u8; 48]);
+        assert_eq!(body.sig_algo, SignatureAlgorithm::EcdsaSecp384r1)
     }
 
     #[test]
@@ -1843,6 +1813,9 @@ Current Mitigation Vector:    None
         bytes[0x00..0x04].copy_from_slice(&2u32.to_le_bytes()); // v2
         bytes[CHIP_ID_RANGE.start] = 1; // unmask chip id
 
+        // signature alorithm
+        bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
+
         let report = Report::from_bytes(bytes.as_slice());
         assert!(report.is_ok());
 
@@ -1870,6 +1843,8 @@ Current Mitigation Vector:    None
 
         // guest_svn
         bytes[0x04..0x08].copy_from_slice(&1u32.to_le_bytes());
+
+        bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
 
         let report = Report::from_bytes(&bytes).unwrap();
         let body = ReportBody::from_bytes(report.body).unwrap();
@@ -1989,6 +1964,9 @@ Current Mitigation Vector:    None
             0x0E, 0xFA, 0xCF, 0xD0, 0x8E, 0x24, 0x43, 0x24, 0x88, 0x47, 0x38, 0xC7, 0x2B, 0x08,
             0x2E, 0x2F, 0x87, 0xA4, 0x4D, 0x54, 0x1E, 0xB6,
         ];
+
+        bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
+
         bytes[CHIP_ID_RANGE.clone()].copy_from_slice(&vcek_bytes);
 
         let report = Report::from_bytes(&bytes).unwrap();
@@ -2013,6 +1991,8 @@ Current Mitigation Vector:    None
         // rest remains zero
         bytes[CHIP_ID_RANGE.clone()].copy_from_slice(&chip);
 
+        bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
+
         let report = Report::from_bytes(&bytes).unwrap();
         let body = ReportBody::from_bytes(report.body).unwrap();
 
@@ -2025,6 +2005,9 @@ Current Mitigation Vector:    None
         bytes[0x00..0x04].copy_from_slice(&2u32.to_le_bytes()); // v2
                                                                 // chip_id left as all zeros
 
+        // Setting sig algo
+        bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
+
         let report = Report::from_bytes(&bytes).unwrap();
         let err = ReportBody::from_bytes(report.body).unwrap_err();
         assert!(err.to_string().contains("Chip ID is masked"));
@@ -2032,11 +2015,15 @@ Current Mitigation Vector:    None
 
     #[test]
     fn test_report_from_bytes_splits_body_and_signature() {
-        let bytes = vec![0u8; Report::REPORT_LEN];
+        let mut bytes = vec![0u8; Report::REPORT_LEN];
+
+        // signature alorithm
+        bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
+
         let r = Report::from_bytes(&bytes).unwrap();
 
         assert_eq!(r.body.len(), 0x2a0);
-        assert_eq!(r.signature.len(), 0x49f - 0x2a0);
+        assert_eq!(r.signature.len(), 0x49f + 1 - 0x2a0);
         assert_eq!(r.body.as_ptr(), bytes.as_ptr());
         assert_eq!(
             r.signature.as_ptr() as usize - bytes.as_ptr() as usize,
@@ -2058,6 +2045,9 @@ Current Mitigation Vector:    None
         let mut bytes = vec![0u8; Report::REPORT_LEN];
         bytes[0x00..0x04].copy_from_slice(&2u32.to_le_bytes());
         bytes[CHIP_ID_RANGE.start] = 1;
+
+        // Setting sig algo
+        bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
 
         bytes[0x4C] = 1; // reserved byte non-zero
 
