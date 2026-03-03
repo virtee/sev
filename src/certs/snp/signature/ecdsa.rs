@@ -61,6 +61,8 @@ impl Decoder<()> for Signature {
     fn decode(reader: &mut impl Read, _: ()) -> Result<Self> {
         let r = reader.read_bytes()?;
         let s = reader.read_bytes()?;
+        // Firmware signature field is 0x200 bytes; after r and s, the remaining bytes are reserved/padding.
+        reader.skip_bytes::<368>()?;
         Ok(Self { r, s })
     }
 }

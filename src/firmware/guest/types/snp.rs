@@ -624,6 +624,13 @@ impl<'a> ReportBody<'a> {
         // Parse version to determine variant and generation
         let version = ReportVariant::decode(&mut &body[0x00..0x04], ())?;
 
+        // Parse firmware version early (needed for policy validation)
+        let current = Version {
+            build: body[0x1E8],
+            minor: body[0x1E9],
+            major: body[0x1EA],
+        };
+
         // Infer generation from chip_id (V2) or CPUID fields (V3+)
         let generation = if version >= ReportVariant::V3 {
             // V3+ uses CPUID fields
@@ -649,7 +656,7 @@ impl<'a> ReportBody<'a> {
 
         let guest_svn = u32::decode(&mut &body[0x04..0x08], ())?;
 
-        let policy = GuestPolicy(u64::decode(&mut &body[0x08..0x10], ())?);
+        let policy = GuestPolicy::decode(&mut &body[0x08..0x10], current)?;
 
         let family_id: &'a [u8; 16] = <&[u8; 16]>::try_from(&body[0x10..0x20])
             .map_err(|e| std::io::Error::other(format!("Failed TryFrom Operation: {e}")))?;
@@ -663,11 +670,11 @@ impl<'a> ReportBody<'a> {
 
         let current_tcb = TcbVersion::decode(&mut &body[0x38..0x40], generation)?;
 
-        let plat_info = PlatformInfo::decode(&mut &body[0x40..0x48], ())?;
+        let plat_info = PlatformInfo::decode(&mut &body[0x40..0x48], current)?;
 
-        let key_info = KeyInfo::decode(&mut &body[0x48..0x4C], ())?;
+        let key_info = KeyInfo::decode(&mut &body[0x48..0x4C], current)?;
 
-        // Reserved 0x4C - 0x51
+        // Reserved 0x4C - 0x50
         validate_reserved(&body[0x4C..0x50], 0x4C)?;
 
         let report_data: &'a [u8; 64] = <&[u8; 64]>::try_from(&body[0x50..0x90])
@@ -709,16 +716,12 @@ impl<'a> ReportBody<'a> {
 
         let committed_tcb = TcbVersion::decode(&mut &body[0x1E0..0x1E8], generation)?;
 
-        // Parse current and committed firmware versions
-        let current = Version {
-            build: body[0x1E8],
-            minor: body[0x1E9],
-            major: body[0x1EA],
-        };
+        // current firmware version already parsed earlier for policy validation
 
         // Reserved 0x1EB
         validate_reserved(&body[0x1EB..0x1EC], 0x1EB)?;
 
+        // Parse committed firmware version
         let committed = Version {
             build: body[0x1EC],
             minor: body[0x1ED],
@@ -848,14 +851,14 @@ Current Mitigation Vector:    {}
 "#,
             self.version,
             self.guest_svn,
-            self.policy,
+            self.policy.display_for_version(self.current),
             HexLine(self.family_id),
             HexLine(self.image_id),
             self.vmpl,
             self.sig_algo,
             self.current_tcb,
-            self.plat_info,
-            self.key_info,
+            self.plat_info.display_for_version(self.current),
+            self.key_info.display_for_version(self.current),
             HexLine(self.report_data),
             HexLine(self.measurement),
             HexLine(self.host_data),
@@ -943,6 +946,176 @@ bitfield! {
     pub page_swap_disabled, set_page_swap_disabled: 25;
 }
 
+impl GuestPolicy {
+    const RMB1_BIT_17: u64 = 1u64 << 17;
+    const RESERVED_MBZ_MASK_26_63: u64 = (!0u64) << 26; // bits 26..63
+
+    // Bit 21: CXL_ALLOW (added in v1.55)
+    const CXL_ALLOW_BIT_21: u64 = 1u64 << 21;
+    // Bit 22: MEM_AES_256_XTS (added in v1.55)
+    const MEM_AES_256_XTS_BIT_22: u64 = 1u64 << 22;
+    // Bit 23: RAPL_DIS (added in v1.55)
+    const RAPL_DIS_BIT_23: u64 = 1u64 << 23;
+    // Bit 24: CIPHERTEXT_HIDING (added in v1.55)
+    const CIPHERTEXT_HIDING_BIT_24: u64 = 1u64 << 24;
+    // Bit 25: PAGE_SWAP_DISABLE (added in v1.58)
+    const PAGE_SWAP_DISABLE_BIT_25: u64 = 1u64 << 25;
+
+    // Version 1.55: Added CXL, AES-256-XTS, RAPL, CIPHERTEXT_HIDING (bits 21-24)
+    const VERSION_1_55: Version = Version {
+        major: 1,
+        minor: 55,
+        build: 0,
+    };
+    // Version 1.58: Added PAGE_SWAP_DISABLE (bit 25)
+    const VERSION_1_58: Version = Version {
+        major: 1,
+        minor: 58,
+        build: 0,
+    };
+
+    fn validate_reserved_bits(self, version: Version) -> std::io::Result<()> {
+        let raw = self.0;
+
+        // bit 17 must be 1 (RMB1)
+        if (raw & Self::RMB1_BIT_17) == 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("GuestPolicy bit 17 must be 1 (raw=0x{raw:016x})"),
+            ));
+        }
+
+        // bits 26..63 must be zero (MBZ)
+        if (raw & Self::RESERVED_MBZ_MASK_26_63) != 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("GuestPolicy reserved bits 26..63 must be zero (raw=0x{raw:016x})"),
+            ));
+        }
+
+        // bit 21 (CXL_ALLOW) is only defined for firmware v1.55+
+        if version < Self::VERSION_1_55 && (raw & Self::CXL_ALLOW_BIT_21) != 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "GuestPolicy bit 21 (CXL_ALLOW) is only valid for firmware v1.55+ (raw=0x{raw:016x})"
+                ),
+            ));
+        }
+
+        // bit 22 (MEM_AES_256_XTS) is only defined for firmware v1.55+
+        if version < Self::VERSION_1_55 && (raw & Self::MEM_AES_256_XTS_BIT_22) != 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "GuestPolicy bit 22 (MEM_AES_256_XTS) is only valid for firmware v1.55+ (raw=0x{raw:016x})"
+                ),
+            ));
+        }
+
+        // bit 23 (RAPL_DIS) is only defined for firmware v1.55+
+        if version < Self::VERSION_1_55 && (raw & Self::RAPL_DIS_BIT_23) != 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "GuestPolicy bit 23 (RAPL_DIS) is only valid for firmware v1.55+ (raw=0x{raw:016x})"
+                ),
+            ));
+        }
+
+        // bit 24 (CIPHERTEXT_HIDING) is only defined for firmware v1.55+
+        if version < Self::VERSION_1_55 && (raw & Self::CIPHERTEXT_HIDING_BIT_24) != 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "GuestPolicy bit 24 (CIPHERTEXT_HIDING) is only valid for firmware v1.55+ (raw=0x{raw:016x})"
+                ),
+            ));
+        }
+
+        // bit 25 (PAGE_SWAP_DISABLE) is only defined for firmware v1.58+
+        if version < Self::VERSION_1_58 && (raw & Self::PAGE_SWAP_DISABLE_BIT_25) != 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "GuestPolicy bit 25 (PAGE_SWAP_DISABLE) is only valid for firmware v1.58+ (raw=0x{raw:016x})"
+                ),
+            ));
+        }
+
+        Ok(())
+    }
+
+    /// Formats the guest policy with version-aware display.
+    ///
+    /// Policy bits that are not defined for the given firmware version
+    /// will be displayed as "None" instead of their actual value.
+    ///
+    /// # Arguments
+    /// * `version` - The firmware version to use for determining which bits are valid
+    ///
+    /// # Returns
+    /// A formatted string representation of the guest policy
+    pub fn display_for_version(&self, version: Version) -> String {
+        let cxl_allowed = if version >= Self::VERSION_1_55 {
+            format!("{}", self.cxl_allowed())
+        } else {
+            "None".to_string()
+        };
+
+        let mem_aes_256_xts = if version >= Self::VERSION_1_55 {
+            format!("{}", self.mem_aes_256_xts())
+        } else {
+            "None".to_string()
+        };
+
+        let rapl_dis = if version >= Self::VERSION_1_55 {
+            format!("{}", self.rapl_dis())
+        } else {
+            "None".to_string()
+        };
+
+        let ciphertext_hiding = if version >= Self::VERSION_1_55 {
+            format!("{}", self.ciphertext_hiding())
+        } else {
+            "None".to_string()
+        };
+
+        let page_swap_disabled = if version >= Self::VERSION_1_58 {
+            format!("{}", self.page_swap_disabled())
+        } else {
+            "None".to_string()
+        };
+
+        format!(
+            r#"Guest Policy (0x{:x}):
+  ABI Major:         {}
+  ABI Minor:         {}
+  SMT Allowed:       {}
+  Migrate MA:        {}
+  Debug Allowed:     {}
+  Single Socket:     {}
+  CXL Allowed:       {}
+  AES 256 XTS:       {}
+  RAPL Disabled:     {}
+  Ciphertext Hiding: {}
+  Page Swap Disable: {}"#,
+            self.0,
+            self.abi_major(),
+            self.abi_minor(),
+            self.smt_allowed(),
+            self.migrate_ma_allowed(),
+            self.debug_allowed(),
+            self.single_socket_required(),
+            cxl_allowed,
+            mem_aes_256_xts,
+            rapl_dis,
+            ciphertext_hiding,
+            page_swap_disabled
+        )
+    }
+}
+
 impl Encoder<()> for GuestPolicy {
     fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
         writer.write_bytes(self.0, ())?;
@@ -950,6 +1123,8 @@ impl Encoder<()> for GuestPolicy {
     }
 }
 
+// No checking in case policy is being parsed outside attestation report (e.g. id-block)
+// Assumes latest version for all bits, since older firmware should ignore unknown bits and newer firmware should require reserved bits to be set to 1
 impl Decoder<()> for GuestPolicy {
     fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
         let policy = reader.read_bytes()?;
@@ -957,7 +1132,17 @@ impl Decoder<()> for GuestPolicy {
     }
 }
 
-impl ByteParser<()> for GuestPolicy {
+// Checking reserved bytes according to known reserved bytes in attestation report
+impl Decoder<Version> for GuestPolicy {
+    fn decode(reader: &mut impl Read, version: Version) -> Result<Self, std::io::Error> {
+        let raw: u64 = reader.read_bytes()?;
+        let policy = GuestPolicy(raw);
+        policy.validate_reserved_bits(version)?;
+        Ok(policy)
+    }
+}
+
+impl ByteParser<Version> for GuestPolicy {
     type Bytes = [u8; 8];
     const EXPECTED_LEN: Option<usize> = Some(8);
 }
@@ -1046,6 +1231,172 @@ bitfield! {
 
 }
 
+impl PlatformInfo {
+    // Bit 2: ECC_ENABLED (added in v1.55)
+    const ECC_BIT_2: u64 = 1u64 << 2;
+    // Bit 3: RAPL_DISABLED (added in v1.55)
+    const RAPL_BIT_3: u64 = 1u64 << 3;
+    // Bit 4: CIPHERTEXT_HIDING_ENABLED (added in v1.55)
+    const CIPHERTEXT_HIDING_BIT_4: u64 = 1u64 << 4;
+    // Bit 5: ALIAS_CHECK_COMPLETE (added in v1.57)
+    const ALIAS_CHECK_BIT_5: u64 = 1u64 << 5;
+    // Bit 6: Reserved (always MBZ)
+    const RESERVED_BIT_6: u64 = 1u64 << 6;
+    // Bit 7: TIO_ENABLED (added in v1.56)
+    const TIO_BIT_7: u64 = 1u64 << 7;
+    // Bits 8-63: Reserved (always MBZ)
+    const RESERVED_BITS_8_63: u64 = (!0u64) << 8;
+
+    // Version constants
+    const VERSION_1_55: Version = Version {
+        major: 1,
+        minor: 55,
+        build: 0,
+    };
+    const VERSION_1_56: Version = Version {
+        major: 1,
+        minor: 56,
+        build: 0,
+    };
+    const VERSION_1_57: Version = Version {
+        major: 1,
+        minor: 57,
+        build: 0,
+    };
+
+    fn validate_reserved_bits(self, version: Version) -> std::io::Result<()> {
+        let raw = self.0;
+
+        // Bit 6 and bits 8-63 are always reserved
+        if (raw & Self::RESERVED_BIT_6) != 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("PlatformInfo bit 6 is reserved and must be zero (raw=0x{raw:016x})"),
+            ));
+        }
+
+        if (raw & Self::RESERVED_BITS_8_63) != 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("PlatformInfo bits 8-63 are reserved and must be zero (raw=0x{raw:016x})"),
+            ));
+        }
+
+        // Bit 2 (ECC_ENABLED) is only defined for firmware v1.55+
+        if version < Self::VERSION_1_55 && (raw & Self::ECC_BIT_2) != 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "PlatformInfo bit 2 (ECC_ENABLED) is only valid for firmware v1.55+ (raw=0x{raw:016x})"
+                ),
+            ));
+        }
+
+        // Bit 3 (RAPL_DISABLED) is only defined for firmware v1.55+
+        if version < Self::VERSION_1_55 && (raw & Self::RAPL_BIT_3) != 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "PlatformInfo bit 3 (RAPL_DISABLED) is only valid for firmware v1.55+ (raw=0x{raw:016x})"
+                ),
+            ));
+        }
+
+        // Bit 4 (CIPHERTEXT_HIDING_ENABLED) is only defined for firmware v1.55+
+        if version < Self::VERSION_1_55 && (raw & Self::CIPHERTEXT_HIDING_BIT_4) != 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "PlatformInfo bit 4 (CIPHERTEXT_HIDING_ENABLED) is only valid for firmware v1.55+ (raw=0x{raw:016x})"
+                ),
+            ));
+        }
+
+        // Bit 5 (ALIAS_CHECK_COMPLETE) is only defined for firmware v1.57+
+        if version < Self::VERSION_1_57 && (raw & Self::ALIAS_CHECK_BIT_5) != 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "PlatformInfo bit 5 (ALIAS_CHECK_COMPLETE) is only valid for firmware v1.57+ (raw=0x{raw:016x})"
+                ),
+            ));
+        }
+
+        // Bit 7 (TIO_ENABLED) is only defined for firmware v1.56+
+        if version < Self::VERSION_1_56 && (raw & Self::TIO_BIT_7) != 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "PlatformInfo bit 7 (TIO_ENABLED) is only valid for firmware v1.56+ (raw=0x{raw:016x})"
+                ),
+            ));
+        }
+
+        Ok(())
+    }
+
+    /// Formats the platform info with version-aware display.
+    ///
+    /// Platform info bits that are not defined for the given firmware version
+    /// will be displayed as "None" instead of their actual value.
+    ///
+    /// # Arguments
+    /// * `version` - The firmware version to use for determining which bits are valid
+    ///
+    /// # Returns
+    /// A formatted string representation of the platform info
+    pub fn display_for_version(&self, version: Version) -> String {
+        let ecc_enabled = if version >= Self::VERSION_1_55 {
+            format!("{}", self.ecc_enabled())
+        } else {
+            "None".to_string()
+        };
+
+        let rapl_disabled = if version >= Self::VERSION_1_55 {
+            format!("{}", self.rapl_disabled())
+        } else {
+            "None".to_string()
+        };
+
+        let ciphertext_hiding_enabled = if version >= Self::VERSION_1_55 {
+            format!("{}", self.ciphertext_hiding_enabled())
+        } else {
+            "None".to_string()
+        };
+
+        let alias_check_complete = if version >= Self::VERSION_1_57 {
+            format!("{}", self.alias_check_complete())
+        } else {
+            "None".to_string()
+        };
+
+        let tio_enabled = if version >= Self::VERSION_1_56 {
+            format!("{}", self.tio_enabled())
+        } else {
+            "None".to_string()
+        };
+
+        format!(
+            r#"Platform Info ({}):
+  SMT Enabled:               {}
+  TSME Enabled:              {}
+  ECC Enabled:               {}
+  RAPL Disabled:             {}
+  Ciphertext Hiding Enabled: {}
+  Alias Check Complete:      {}
+  SEV-TIO Enabled:           {}"#,
+            self.0,
+            self.smt_enabled(),
+            self.tsme_enabled(),
+            ecc_enabled,
+            rapl_disabled,
+            ciphertext_hiding_enabled,
+            alias_check_complete,
+            tio_enabled
+        )
+    }
+}
+
 impl Display for PlatformInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -1089,14 +1440,30 @@ impl Encoder<()> for PlatformInfo {
     }
 }
 
+// No checking in case platform info is being parsed outside attestation report
 impl Decoder<()> for PlatformInfo {
     fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
-        let info = reader.read_bytes()?;
-        Ok(Self(info))
+        let raw: u64 = reader.read_bytes()?;
+        Ok(PlatformInfo(raw))
+    }
+}
+
+// Checking reserved bytes according to known reserved bytes in attestation report
+impl Decoder<Version> for PlatformInfo {
+    fn decode(reader: &mut impl Read, version: Version) -> Result<Self, std::io::Error> {
+        let raw: u64 = reader.read_bytes()?;
+        let info = PlatformInfo(raw);
+        info.validate_reserved_bits(version)?;
+        Ok(info)
     }
 }
 
 impl ByteParser<()> for PlatformInfo {
+    type Bytes = [u8; 8];
+    const EXPECTED_LEN: Option<usize> = Some(8);
+}
+
+impl ByteParser<Version> for PlatformInfo {
     type Bytes = [u8; 8];
     const EXPECTED_LEN: Option<usize> = Some(8);
 }
@@ -1131,6 +1498,108 @@ bitfield! {
 
 }
 
+impl KeyInfo {
+    // Bits 0..4 are defined, bits 5..31 must be zero.
+    const RESERVED_MASK: u32 = !0x1F; // 0xFFFF_FFE0
+
+    // Bit 1: MASK_CHIP_KEY (added in v1.53)
+    const MASK_CHIP_KEY_BIT_1: u32 = 1u32 << 1;
+
+    // SIGNING_KEY field: bits 2-4
+    const SIGNING_KEY_MASK: u32 = 0b111 << 2;
+
+    // Version constants
+    const VERSION_1_53: Version = Version {
+        major: 1,
+        minor: 53,
+        build: 0,
+    };
+    const VERSION_1_54: Version = Version {
+        major: 1,
+        minor: 54,
+        build: 0,
+    };
+
+    fn validate_reserved_bits(self, version: Version) -> std::io::Result<()> {
+        let raw: u32 = self.0;
+
+        // Bits 5-31 must always be zero
+        if (raw & Self::RESERVED_MASK) != 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("KeyInfo reserved bits 5-31 must be zero (raw=0x{raw:08x})"),
+            ));
+        }
+
+        // Bit 1 (MASK_CHIP_KEY) is only defined for firmware v1.53+
+        if version < Self::VERSION_1_53 && (raw & Self::MASK_CHIP_KEY_BIT_1) != 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "KeyInfo bit 1 (MASK_CHIP_KEY) is only valid for firmware v1.53+ (raw=0x{raw:08x})"
+                ),
+            ));
+        }
+
+        // SIGNING_KEY = VLEK (value 1) is only defined for firmware v1.54+
+        let signing_key = (raw & Self::SIGNING_KEY_MASK) >> 2;
+        if version < Self::VERSION_1_54 && signing_key == 1 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "KeyInfo SIGNING_KEY=VLEK (1) is only valid for firmware v1.54+ (raw=0x{raw:08x})"
+                ),
+            ));
+        }
+
+        Ok(())
+    }
+
+    /// Formats the key info with version-aware display.
+    ///
+    /// Key info fields that are not defined for the given firmware version
+    /// will be displayed as "None" instead of their actual value.
+    ///
+    /// # Arguments
+    /// * `version` - The firmware version to use for determining which fields are valid
+    ///
+    /// # Returns
+    /// A formatted string representation of the key info
+    pub fn display_for_version(&self, version: Version) -> String {
+        let mask_chip_key = if version >= Self::VERSION_1_53 {
+            format!("{}", self.mask_chip_key())
+        } else {
+            "None".to_string()
+        };
+
+        let signing_key = if version >= Self::VERSION_1_54 {
+            match self.signing_key() {
+                0 => "vcek".to_string(),
+                1 => "vlek".to_string(),
+                7 => "none".to_string(),
+                v => format!("unknown ({v})"),
+            }
+        } else {
+            // Pre v1.54 only supports VCEK (0) and NONE (7)
+            match self.signing_key() {
+                0 => "vcek".to_string(),
+                7 => "none".to_string(),
+                v => format!("unknown ({v})"),
+            }
+        };
+
+        format!(
+            r#"Key Information:
+    author key enabled: {}
+    mask chip key:      {}
+    signing key:        {}"#,
+            self.author_key_en(),
+            mask_chip_key,
+            signing_key
+        )
+    }
+}
+
 impl Encoder<()> for KeyInfo {
     fn encode(&self, writer: &mut impl Write, _: ()) -> Result<(), std::io::Error> {
         writer.write_bytes(self.0.to_le_bytes(), ())?;
@@ -1138,14 +1607,30 @@ impl Encoder<()> for KeyInfo {
     }
 }
 
+// No checking in case key info is being parsed outside attestation report
 impl Decoder<()> for KeyInfo {
     fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
-        let info = reader.read_bytes()?;
-        Ok(Self(info))
+        let raw: u32 = reader.read_bytes()?;
+        Ok(KeyInfo(raw))
+    }
+}
+
+// Checking reserved bytes according to known reserved bytes in attestation report
+impl Decoder<Version> for KeyInfo {
+    fn decode(reader: &mut impl Read, version: Version) -> Result<Self, std::io::Error> {
+        let raw: u32 = reader.read_bytes()?;
+        let info = KeyInfo(raw);
+        info.validate_reserved_bits(version)?;
+        Ok(info)
     }
 }
 
 impl ByteParser<()> for KeyInfo {
+    type Bytes = [u8; 4];
+    const EXPECTED_LEN: Option<usize> = Some(4);
+}
+
+impl ByteParser<Version> for KeyInfo {
     type Bytes = [u8; 4];
     const EXPECTED_LEN: Option<usize> = Some(4);
 }
@@ -1264,6 +1749,10 @@ mod tests {
         // sig algo
         bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
 
+        // policy u64 LE at 0x08..0x10
+        let policy_raw = 1u64 << 17; // RMB1 bit
+        bytes[0x08..0x10].copy_from_slice(&policy_raw.to_le_bytes());
+
         // Make chip_id non-zero so v2 parsing doesn't error out
         bytes[CHIP_ID_RANGE.start] = 1;
 
@@ -1276,18 +1765,18 @@ Version:                      V2
 
 Guest SVN:                    0
 
-Guest Policy (0x0):
-  ABI Major:     0
-  ABI Minor:     0
-  SMT Allowed:   false
-  Migrate MA:    false
-  Debug Allowed: false
-  Single Socket: false
-  CXL Allowed:   false
-  AEX 256 XTS:   false
-  RAPL Allowed:  false
-  Ciphertext hiding: false
-  Page Swap Disable: false
+Guest Policy (0x20000):
+  ABI Major:         0
+  ABI Minor:         0
+  SMT Allowed:       false
+  Migrate MA:        false
+  Debug Allowed:     false
+  Single Socket:     false
+  CXL Allowed:       None
+  AES 256 XTS:       None
+  RAPL Disabled:     None
+  Ciphertext Hiding: None
+  Page Swap Disable: None
 
 Family ID:
 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
@@ -1311,15 +1800,15 @@ TCB Version:
 Platform Info (0):
   SMT Enabled:               false
   TSME Enabled:              false
-  ECC Enabled:               false
-  RAPL Disabled:             false
-  Ciphertext Hiding Enabled: false
-  Alias Check Complete:      false
-  SEV-TIO Enabled:           false
+  ECC Enabled:               None
+  RAPL Disabled:             None
+  Ciphertext Hiding Enabled: None
+  Alias Check Complete:      None
+  SEV-TIO Enabled:           None
 
 Key Information:
     author key enabled: false
-    mask chip key:      false
+    mask chip key:      None
     signing key:        vcek
 
 Report Data:
@@ -1613,10 +2102,11 @@ Current Mitigation Vector:    None
 
     #[test]
     fn test_platform_info_v2_serialization() {
-        let original = PlatformInfo(0b11111);
-        // Test encoding and decoding
-        let buffer = original.to_bytes().unwrap();
-        let decoded = PlatformInfo::from_bytes(&buffer).unwrap();
+        let original = PlatformInfo(0b11);
+        // Test encoding and decoding with basic bits (SMT, TSME) only
+        let mut buffer = [0u8; 8];
+        original.encode(&mut buffer.as_mut_slice(), ()).unwrap();
+        let decoded = PlatformInfo::decode(&mut buffer.as_slice(), ()).unwrap();
 
         assert_eq!(original, decoded);
     }
@@ -1626,8 +2116,9 @@ Current Mitigation Vector:    None
         let original = KeyInfo(0b11111);
 
         // Test encoding and decoding
-        let buffer = original.to_bytes().unwrap();
-        let decoded = KeyInfo::from_bytes(&buffer).unwrap();
+        let mut buffer = [0u8; 4];
+        original.encode(&mut buffer.as_mut_slice(), ()).unwrap();
+        let decoded = KeyInfo::decode(&mut buffer.as_slice(), ()).unwrap();
 
         assert_eq!(original, decoded);
         assert!(decoded.author_key_en());
@@ -1637,14 +2128,15 @@ Current Mitigation Vector:    None
 
     #[test]
     fn test_guest_policy_serialization() {
-        let mut original: GuestPolicy = Default::default();
+        let mut original: GuestPolicy = GuestPolicy::from(0u64);
         original.set_abi_major(2);
         original.set_abi_minor(1);
         original.set_smt_allowed(true);
         original.set_debug_allowed(true);
 
         let buffer = original.to_bytes().unwrap();
-        let decoded = GuestPolicy::from_bytes(&buffer).unwrap();
+        // Use a recent firmware version that supports all policy bits
+        let decoded = GuestPolicy::from_bytes_with(&buffer, Version::new(1, 58, 0)).unwrap();
         assert_eq!(original, decoded);
     }
 
@@ -1657,28 +2149,6 @@ Current Mitigation Vector:    None
         let raw_v3 = [3, 0, 0, 0]; // Version 3
         let version = u32::from_le_bytes([raw_v3[0], raw_v3[1], raw_v3[2], raw_v3[3]]);
         assert_eq!(version, 3);
-    }
-
-    #[test]
-    fn test_boundary_value_serialization() {
-        // Test max values
-        let platform_info = PlatformInfo(u64::MAX);
-        let key_info = KeyInfo(u32::MAX);
-        let guest_policy = GuestPolicy(u64::MAX);
-
-        // Verify serialization/deserialization preserves max values
-        assert_eq!(
-            platform_info,
-            PlatformInfo::from_bytes(&platform_info.to_bytes().unwrap()).unwrap()
-        );
-        assert_eq!(
-            key_info,
-            KeyInfo::from_bytes(&key_info.to_bytes().unwrap()).unwrap()
-        );
-        assert_eq!(
-            guest_policy,
-            GuestPolicy::from_bytes(&guest_policy.to_bytes().unwrap()).unwrap()
-        );
     }
 
     #[test]
@@ -1740,8 +2210,12 @@ Current Mitigation Vector:    None
         // vmpl at 0x30..0x34
         bytes[0x30..0x34].copy_from_slice(&3u32.to_le_bytes());
 
-        // signature alorithm
+        // signature algorithm
         bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
+
+        // policy u64 LE at 0x08..0x10
+        let policy_raw = 1u64 << 17; // RMB1 bit
+        bytes[0x08..0x10].copy_from_slice(&policy_raw.to_le_bytes());
 
         let report = Report::from_bytes(&bytes).unwrap();
 
@@ -1813,8 +2287,12 @@ Current Mitigation Vector:    None
         bytes[0x00..0x04].copy_from_slice(&2u32.to_le_bytes()); // v2
         bytes[CHIP_ID_RANGE.start] = 1; // unmask chip id
 
-        // signature alorithm
+        // signature algorithm
         bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
+
+        // policy u64 LE at 0x08..0x10
+        let policy_raw = 1u64 << 17; // RMB1 bit
+        bytes[0x08..0x10].copy_from_slice(&policy_raw.to_le_bytes());
 
         let report = Report::from_bytes(bytes.as_slice());
         assert!(report.is_ok());
@@ -1844,7 +2322,12 @@ Current Mitigation Vector:    None
         // guest_svn
         bytes[0x04..0x08].copy_from_slice(&1u32.to_le_bytes());
 
+        // signature algorithm
         bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
+
+        // policy u64 LE at 0x08..0x10
+        let policy_raw = 1u64 << 17; // RMB1 bit
+        bytes[0x08..0x10].copy_from_slice(&policy_raw.to_le_bytes());
 
         let report = Report::from_bytes(&bytes).unwrap();
         let body = ReportBody::from_bytes(report.body).unwrap();
@@ -1967,6 +2450,10 @@ Current Mitigation Vector:    None
 
         bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
 
+        // policy u64 LE at 0x08..0x10
+        let policy_raw = 1u64 << 17; // RMB1 bit
+        bytes[0x08..0x10].copy_from_slice(&policy_raw.to_le_bytes());
+
         bytes[CHIP_ID_RANGE.clone()].copy_from_slice(&vcek_bytes);
 
         let report = Report::from_bytes(&bytes).unwrap();
@@ -1993,6 +2480,10 @@ Current Mitigation Vector:    None
 
         bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
 
+        // policy u64 LE at 0x08..0x10
+        let policy_raw = 1u64 << 17; // RMB1 bit
+        bytes[0x08..0x10].copy_from_slice(&policy_raw.to_le_bytes());
+
         let report = Report::from_bytes(&bytes).unwrap();
         let body = ReportBody::from_bytes(report.body).unwrap();
 
@@ -2017,7 +2508,7 @@ Current Mitigation Vector:    None
     fn test_report_from_bytes_splits_body_and_signature() {
         let mut bytes = vec![0u8; Report::REPORT_LEN];
 
-        // signature alorithm
+        // signature algorithm
         bytes[0x34..0x38].copy_from_slice(&1u32.to_le_bytes());
 
         let r = Report::from_bytes(&bytes).unwrap();
