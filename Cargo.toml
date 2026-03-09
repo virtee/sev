@@ -67,7 +67,7 @@ x509-cert = { version = "0.2", optional = true }
 byteorder = "1.4"
 base64 = "0.22"
 rdrand = { version = "^0.8", optional = true }
-reqwest = { version = "^0.12", features = ["blocking"], optional = true }
+reqwest = { version = "^0.13", features = ["blocking"], optional = true }
 tokio = { version = "1.48", features = ["rt-multi-thread"], optional = true }
 serde_bytes = { version = "0.11", optional = true }
 
