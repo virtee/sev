@@ -95,7 +95,10 @@ pub mod certs;
 
 pub mod firmware;
 pub mod launch;
-#[cfg(all(any(feature = "sev", feature = "snp"), feature = "openssl"))]
+#[cfg(all(
+    any(feature = "sev", feature = "snp"),
+    any(feature = "openssl", feature = "crypto_nossl")
+))]
 pub mod measurement;
 #[cfg(all(target_os = "linux", feature = "openssl", feature = "sev"))]
 pub mod session;
