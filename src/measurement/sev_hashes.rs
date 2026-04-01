@@ -1,7 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Operations to handle OVMF SEV-HASHES
+#[cfg(feature = "openssl")]
 use openssl::sha::sha256;
+
+#[cfg(feature = "crypto_nossl")]
+fn sha256(data: &[u8]) -> [u8; 32] {
+    use sha2::Digest;
+    let hash = sha2::Sha256::digest(data);
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&hash);
+    out
+}
 use std::fs::File;
 use std::io::Write;
 use std::{
