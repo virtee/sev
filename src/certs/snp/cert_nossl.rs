@@ -106,3 +106,15 @@ impl Certificate {
 fn io_error_other<S: Into<String>>(error: S) -> io::Error {
     io::Error::new(ErrorKind::Other, error.into())
 }
+
+impl From<x509_cert::Certificate> for Certificate {
+    fn from(value: x509_cert::Certificate) -> Self {
+        Self(value)
+    }
+}
+
+impl From<Certificate> for x509_cert::Certificate {
+    fn from(Certificate(cert): Certificate) -> Self {
+        cert
+    }
+}
