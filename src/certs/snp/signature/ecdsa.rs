@@ -1,26 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
 use super::*;
 
-use crate::{
-    parser::{ByteParser, Decoder, Encoder},
-    util::{
-        hexline::HexLine,
-        parser_helper::{ReadExt, WriteExt},
-    },
-};
+use crate::{parser::ByteParser, util::hexline::HexLine};
 
 use std::io::{Read, Result, Write};
 
 #[cfg(feature = "openssl")]
-use crate::certs::snp::{AsLeBytes, FromLe};
+use crate::certs::snp::{AsLeBytes, Certificate, FromLe};
 
 #[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
 use std::convert::TryFrom;
 
 #[cfg(feature = "openssl")]
-use openssl::{bn, ecdsa};
+use openssl::{bn, ecdsa, ecdsa::EcdsaSig, sha::Sha384};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -68,6 +61,8 @@ impl Decoder<()> for Signature {
     fn decode(reader: &mut impl Read, _: ()) -> Result<Self> {
         let r = reader.read_bytes()?;
         let s = reader.read_bytes()?;
+        // Firmware signature field is 0x200 bytes; after r and s, the remaining bytes are reserved/padding.
+        reader.skip_bytes::<368>()?;
         Ok(Self { r, s })
     }
 }
@@ -130,16 +125,6 @@ impl From<ecdsa::EcdsaSig> for Signature {
 }
 
 #[cfg(feature = "openssl")]
-impl TryFrom<&[u8]> for Signature {
-    type Error = Error;
-
-    #[inline]
-    fn try_from(value: &[u8]) -> Result<Self> {
-        Ok(ecdsa::EcdsaSig::from_der(value)?.into())
-    }
-}
-
-#[cfg(feature = "openssl")]
 impl TryFrom<&Signature> for ecdsa::EcdsaSig {
     type Error = Error;
 
@@ -166,23 +151,57 @@ impl TryFrom<&Signature> for p384::ecdsa::Signature {
             GenericArray::clone_from_slice(&s_big_endian),
         )
         .map_err(|e| {
-            Error::new(
-                ErrorKind::Other,
-                format!("failed to deserialize signature from scalars: {e:?}"),
-            )
+            Error::other(format!(
+                "failed to deserialize signature from scalars: {e:?}"
+            ))
         })
     }
 }
 
 #[cfg(feature = "openssl")]
-impl TryFrom<&Signature> for Vec<u8> {
-    type Error = Error;
+/// Verify ECDSA signature on attestation report using VEK certificate
+pub fn verify_ecdsa_signature(body: &[u8], signature: &[u8], vek: &Certificate) -> Result<()> {
+    let sev_sig = Signature::from_bytes(signature)?;
 
-    #[inline]
-    fn try_from(value: &Signature) -> Result<Self> {
-        Ok(ecdsa::EcdsaSig::try_from(value)?.to_der()?)
+    let sig: EcdsaSig = EcdsaSig::try_from(&sev_sig)?;
+
+    let mut hasher = Sha384::new();
+    hasher.update(body);
+    let base_digest = hasher.finish();
+
+    let ec = vek.public_key()?.ec_key()?;
+    let signed = sig.verify(&base_digest, &ec)?;
+    match signed {
+        true => Ok(()),
+        false => Err(Error::other("VEK does not sign the attestation report")),
     }
 }
+
+#[cfg(feature = "crypto_nossl")]
+/// Verify ECDSA signature on attestation report using VEK certificate
+pub fn verify_ecdsa_signature(body: &[u8], signature: &[u8], vek: &Certificate) -> Result<()> {
+    let sev_sig = Signature::from_bytes(signature)?;
+
+    let sig = p384::ecdsa::Signature::try_from(&sev_sig).map_err(|e| {
+        std::io::Error::other(format!(
+            "failed to generate signature from raw bytes: {e:?}"
+        ))
+    })?;
+
+    use sha2::Digest;
+    let base_digest = sha2::Sha384::new_with_prefix(body);
+    let verifying_key =
+        p384::ecdsa::VerifyingKey::from_sec1_bytes(vek.public_key_sec1()).map_err(|e| {
+            std::io::Error::other(format!(
+                "failed to deserialize public key from sec1 bytes: {e:?}"
+            ))
+        })?;
+    use p384::ecdsa::signature::DigestVerifier;
+    verifying_key.verify_digest(base_digest, &sig).map_err(|e| {
+        std::io::Error::other(format!("VEK does not sign the attestation report: {e:?}"))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -262,29 +281,11 @@ mod tests {
         }
 
         #[test]
-        fn test_try_from_bytes() {
-            let r = BigNum::from_dec_str("123").unwrap();
-            let s = BigNum::from_dec_str("456").unwrap();
-            let ecdsa_sig = ecdsa::EcdsaSig::from_private_components(r, s).unwrap();
-            let der = ecdsa_sig.to_der().unwrap();
-            let sig = Signature::try_from(der.as_slice()).unwrap();
-            assert_ne!(sig.r(), &[0u8; 72]);
-            assert_ne!(sig.s(), &[0u8; 72]);
-        }
-
-        #[test]
         fn test_try_into_ecdsa_sig() {
             let sig: Signature = Default::default();
             let ecdsa_sig: ecdsa::EcdsaSig = (&sig).try_into().unwrap();
             assert_eq!(ecdsa_sig.r().to_vec(), vec![]);
             assert_eq!(ecdsa_sig.s().to_vec(), vec![]);
-        }
-
-        #[test]
-        fn test_try_into_vec() {
-            let sig: Signature = Default::default();
-            let der: Vec<u8> = (&sig).try_into().unwrap();
-            assert!(!der.is_empty());
         }
     }
 

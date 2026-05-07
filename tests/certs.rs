@@ -25,8 +25,9 @@ mod sev {
 #[cfg(all(feature = "snp", any(feature = "openssl", feature = "crypto_nossl")))]
 mod snp {
 
+    use std::convert::TryFrom;
+
     use sev::certs::snp::{builtin::milan, ca, Certificate, Chain, Verifiable};
-    use sev::parser::ByteParser;
 
     const TEST_MILAN_VCEK_DER: &[u8] = include_bytes!("certs_data/vcek_milan.der");
 
@@ -76,7 +77,7 @@ mod snp {
 
     #[test]
     fn milan_report() {
-        use sev::firmware::guest::AttestationReport;
+        use sev::firmware::guest::{Report, ReportBody};
 
         let ark = milan::ark().unwrap();
         let ask = milan::ask().unwrap();
@@ -87,14 +88,18 @@ mod snp {
         let chain = Chain { ca, vek: vcek };
 
         let report_bytes = hex::decode(TEST_MILAN_ATTESTATION_REPORT).unwrap();
-        let report = AttestationReport::from_bytes(report_bytes.as_slice()).unwrap();
-
-        assert_eq!((&chain, &report).verify().ok(), Some(()));
+        let report = Report::from_bytes(report_bytes.as_slice()).unwrap();
+        let _body = ReportBody::try_from((&report, &chain))
+            .map_err(|e| {
+                println!("report verification failed: {e}");
+                e
+            })
+            .unwrap();
     }
 
     #[test]
     fn milan_report_invalid() {
-        use sev::firmware::guest::AttestationReport;
+        use sev::firmware::guest::{Report, ReportBody};
 
         let ark = milan::ark().unwrap();
         let ask = milan::ask().unwrap();
@@ -106,9 +111,8 @@ mod snp {
 
         let mut report_bytes = hex::decode(TEST_MILAN_ATTESTATION_REPORT).unwrap();
         report_bytes[21] ^= 0x80;
-        let report = AttestationReport::from_bytes(report_bytes.as_slice()).unwrap();
-
-        assert_eq!((&chain, &report).verify().ok(), None);
+        let report = Report::from_bytes(report_bytes.as_slice()).unwrap();
+        assert!(ReportBody::try_from((&report, &chain)).is_err());
     }
 
     #[cfg(feature = "openssl")]
