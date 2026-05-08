@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#[cfg(feature = "openssl")]
+#[cfg(all(feature = "openssl", feature = "sev"))]
 use openssl::error::ErrorStack;
 use std::{
     array::TryFromSliceError,

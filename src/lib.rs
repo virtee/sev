@@ -111,6 +111,7 @@ pub mod error;
 /// Module for Encoding and Decoding types.
 pub mod parser;
 
+#[cfg(feature = "sev")]
 use crate::parser::Decoder;
 
 #[cfg(all(feature = "sev", feature = "dangerous_hw_tests"))]

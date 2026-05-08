@@ -527,7 +527,8 @@ impl Encoder<Generation> for TcbVersion {
         let buffer = match generation {
             Generation::Milan | Generation::Genoa => self.to_legacy_bytes(),
             Generation::Turin | Generation::Venice => self.to_turin_bytes(),
-            _ => {
+            #[cfg(feature = "sev")]
+            Generation::Naples | Generation::Rome => {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::Unsupported,
                     "Unsupported Processor Generation for TCB writing",
@@ -548,7 +549,8 @@ impl Decoder<Generation> for TcbVersion {
             Generation::Turin | Generation::Venice => {
                 Ok(TcbVersion::from_turin_bytes(&reader.read_bytes()?))
             }
-            _ => Err(std::io::Error::new(
+            #[cfg(feature = "sev")]
+            Generation::Naples | Generation::Rome => Err(std::io::Error::new(
                 std::io::ErrorKind::Unsupported,
                 "Unsupported Processor Generation for TCB parsing",
             )),

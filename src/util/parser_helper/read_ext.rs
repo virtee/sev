@@ -3,6 +3,7 @@
 use crate::parser::Decoder;
 use std::io::Read;
 
+#[allow(dead_code)]
 pub trait ReadExt: Read {
     /// Convenience: read a value with unit params.
     fn read_bytes<T>(&mut self) -> Result<T, std::io::Error>

@@ -2,6 +2,7 @@
 use crate::parser::Encoder;
 use std::io::Write;
 
+#[allow(dead_code)]
 pub trait WriteExt: Write {
     /// Write a value using its Encoder implementation and the provided params
     fn write_bytes<T, P>(&mut self, value: T, params: P) -> Result<(), std::io::Error>
