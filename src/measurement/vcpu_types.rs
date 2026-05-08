@@ -38,6 +38,12 @@ pub enum CpuType {
     EpycGenoa,
     /// EPYC GENOA V1
     EpycGenoaV1,
+    /// EPYC TURIN
+    EpycTurin,
+    /// EPYC TURIN V1
+    EpycTurinV1,
+    /// EPYC TURIN V2
+    EpycTurinV2,
 }
 
 impl TryFrom<u8> for CpuType {
@@ -59,6 +65,9 @@ impl TryFrom<u8> for CpuType {
             12 => Ok(CpuType::EpycMilanV2),
             13 => Ok(CpuType::EpycGenoa),
             14 => Ok(CpuType::EpycGenoaV1),
+            15 => Ok(CpuType::EpycTurin),
+            16 => Ok(CpuType::EpycTurinV1),
+            17 => Ok(CpuType::EpycTurinV2),
             _ => Err(MeasurementError::InvalidVcpuTypeError(value.to_string())),
         }
     }
@@ -73,6 +82,7 @@ impl TryFrom<i32> for CpuType {
             sig if sig == cpu_sig(23, 49, 0) => Ok(CpuType::EpycRome),
             sig if sig == cpu_sig(25, 1, 1) => Ok(CpuType::EpycMilan),
             sig if sig == cpu_sig(25, 17, 0) => Ok(CpuType::EpycGenoa),
+            sig if sig == cpu_sig(26, 0, 0) => Ok(CpuType::EpycTurin),
             _ => Err(MeasurementError::InvalidVcpuSignatureError(
                 value.to_string(),
             )),
@@ -99,6 +109,9 @@ impl CpuType {
             CpuType::EpycMilanV2 => cpu_sig(25, 1, 1),
             CpuType::EpycGenoa => cpu_sig(25, 17, 0),
             CpuType::EpycGenoaV1 => cpu_sig(25, 17, 0),
+            CpuType::EpycTurin => cpu_sig(26, 0, 0),
+            CpuType::EpycTurinV1 => cpu_sig(26, 0, 0),
+            CpuType::EpycTurinV2 => cpu_sig(26, 0, 0),
         }
     }
 }
@@ -121,6 +134,9 @@ impl fmt::Display for CpuType {
             CpuType::EpycMilanV2 => write!(f, "EPYC-Milan-v2"),
             CpuType::EpycGenoa => write!(f, "EPYC-Genoa"),
             CpuType::EpycGenoaV1 => write!(f, "EPYC-Genoa-v1"),
+            CpuType::EpycTurin => write!(f, "EPYC-Turin"),
+            CpuType::EpycTurinV1 => write!(f, "EPYC-Turin-v1"),
+            CpuType::EpycTurinV2 => write!(f, "EPYC-Turin-v2"),
         }
     }
 }
@@ -145,6 +161,9 @@ impl TryFrom<&str> for CpuType {
             "epyc-milan-v2" => Ok(CpuType::EpycMilanV2),
             "epyc-genoa" => Ok(CpuType::EpycGenoa),
             "epyc-genoa-v1" => Ok(CpuType::EpycGenoaV1),
+            "epyc-turin" => Ok(CpuType::EpycTurin),
+            "epyc-turin-v1" => Ok(CpuType::EpycTurinV1),
+            "epyc-turin-v2" => Ok(CpuType::EpycTurinV2),
             _ => Err(MeasurementError::InvalidVcpuTypeError(value.to_string())),
         }
     }
