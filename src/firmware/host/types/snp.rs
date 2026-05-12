@@ -10,7 +10,7 @@ use crate::{
     parser::{ByteParser, Decoder, Encoder},
     util::{
         hexline::HexLine,
-        parser_helper::{ReadExt, WriteExt},
+        parser_helper::{validate_reserved, ReadExt, WriteExt},
     },
     Generation,
 };
@@ -495,6 +495,34 @@ impl TryFrom<FFI::types::SnpSetConfig> for Config {
     }
 }
 
+/// Internal selector for known serialized TCB version layouts.
+///
+/// The TCB version is encoded as an 8-byte value, but the meaning of each byte
+/// depends on the [`Generation`] of the host CPU.
+///
+/// - [`TcbVariant::LegacyTcb`] is used for Milan and Genoa.
+/// - [`TcbVariant::TurinTcb`] is used for Turin and Venice.
+pub(crate) enum TcbVariant {
+    /// Legacy TCB version layout.
+    ///
+    /// - byte 0: bootloader SVN
+    /// - byte 1: PSP OS / TEE SVN
+    /// - bytes 2..6: reserved
+    /// - byte 6: SNP firmware SVN
+    /// - byte 7: microcode SVN
+    LegacyTcb,
+
+    /// Turin-style TCB version layout.
+    ///
+    /// - byte 0: FMC firmware SVN
+    /// - byte 1: bootloader SVN
+    /// - byte 2: PSP OS / TEE SVN
+    /// - byte 3: SNP firmware SVN
+    /// - bytes 4..7: reserved
+    /// - byte 7: microcode SVN
+    TurinTcb,
+}
+
 /// TcbVersion represents the version of the firmware.
 ///
 /// (Chapter 2.2; Table 3)
@@ -516,6 +544,36 @@ pub struct TcbVersion {
     pub snp: u8,
     /// Lowest current patch level of all the cores.
     pub microcode: u8,
+}
+
+impl TryFrom<(&[u8], TcbVariant)> for TcbVersion {
+    type Error = std::io::Error;
+
+    fn try_from(value: (&[u8], TcbVariant)) -> Result<Self, std::io::Error> {
+        let (bytes, variant) = value;
+        match variant {
+            TcbVariant::LegacyTcb => {
+                validate_reserved(&bytes[2..6], 2)?;
+                Ok(Self {
+                    fmc: None,
+                    bootloader: bytes[0],
+                    tee: bytes[1],
+                    snp: bytes[6],
+                    microcode: bytes[7],
+                })
+            }
+            TcbVariant::TurinTcb => {
+                validate_reserved(&bytes[4..7], 4)?;
+                Ok(Self {
+                    fmc: Some(bytes[0]),
+                    bootloader: bytes[1],
+                    tee: bytes[2],
+                    snp: bytes[3],
+                    microcode: bytes[7],
+                })
+            }
+        }
+    }
 }
 
 impl Encoder<Generation> for TcbVersion {
@@ -541,12 +599,13 @@ impl Encoder<Generation> for TcbVersion {
 
 impl Decoder<Generation> for TcbVersion {
     fn decode(reader: &mut impl Read, generation: Generation) -> Result<Self, std::io::Error> {
+        let bytes: [u8; 8] = reader.read_bytes()?;
         match generation {
             Generation::Milan | Generation::Genoa => {
-                Ok(TcbVersion::from_legacy_bytes(&reader.read_bytes()?))
+                TcbVersion::try_from((bytes.as_slice(), TcbVariant::LegacyTcb))
             }
             Generation::Turin | Generation::Venice => {
-                Ok(TcbVersion::from_turin_bytes(&reader.read_bytes()?))
+                TcbVersion::try_from((bytes.as_slice(), TcbVariant::TurinTcb))
             }
             _ => Err(std::io::Error::new(
                 std::io::ErrorKind::Unsupported,
@@ -562,16 +621,6 @@ impl ByteParser<Generation> for TcbVersion {
 }
 
 impl TcbVersion {
-    pub(crate) fn from_legacy_bytes(bytes: &[u8; 8]) -> Self {
-        Self {
-            fmc: None,
-            bootloader: bytes[0],
-            tee: bytes[1],
-            snp: bytes[6],
-            microcode: bytes[7],
-        }
-    }
-
     pub(crate) fn to_legacy_bytes(self) -> [u8; 8] {
         [
             self.bootloader,
@@ -583,16 +632,6 @@ impl TcbVersion {
             self.snp,
             self.microcode,
         ]
-    }
-
-    pub(crate) fn from_turin_bytes(bytes: &[u8; 8]) -> Self {
-        Self {
-            fmc: Some(bytes[0]),
-            bootloader: bytes[1],
-            tee: bytes[2],
-            snp: bytes[3],
-            microcode: bytes[7],
-        }
     }
 
     pub(crate) fn to_turin_bytes(self) -> [u8; 8] {
@@ -1488,7 +1527,8 @@ mod tests {
         let tcb = TcbVersion::new(None, 1, 2, 3, 4);
 
         let serialized = tcb.to_legacy_bytes();
-        let deserialized = TcbVersion::from_legacy_bytes(&serialized);
+        let deserialized =
+            TcbVersion::try_from((serialized.as_slice(), TcbVariant::LegacyTcb)).unwrap();
 
         assert_eq!(tcb, deserialized);
     }
