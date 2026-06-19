@@ -76,4 +76,4 @@ kvm-ioctls = ">=0.16"
 kvm-bindings = "^0.11"
 
 [dev-dependencies]
-serial_test = "3.0"
+serial_test = "3.3"
