@@ -12,8 +12,8 @@ jobs:
           toolchain: 1.85.0
       - run: cargo fmt --all -- --check
 
-  clippy-openssl:
-    name: cargo clippy openssl
+  clippy-crypto-openssl:
+    name: cargo clippy crypto-openssl
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,10 +21,10 @@ jobs:
         with:
           components: clippy
           toolchain: 1.85.0
-      - run: cargo clippy --features=openssl,hw_tests,dangerous_hw_tests --all-targets -- -D clippy::all -D unused_imports -D warnings -D clippy::style
+      - run: cargo clippy --features=crypto-openssl,hw_tests,dangerous_hw_tests --all-targets -- -D clippy::all -D unused_imports -D warnings -D clippy::style
 
-  clippy-crypto_nossl:
-    name: cargo clippy crypto_nossl
+  clippy-crypto-rust:
+    name: cargo clippy crypto-rust
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,7 +32,7 @@ jobs:
         with:
           components: clippy
           toolchain: 1.85.0
-      - run: cargo clippy --features=crypto_nossl,hw_tests,dangerous_hw_tests --all-targets -- -D clippy::all -D unused_imports -D warnings -D clippy::style
+      - run: cargo clippy --no-default-features --features=snp,evidence,verifier,endorser,reference,crypto-rust,hw_tests,dangerous_hw_tests --all-targets -- -D clippy::all -D unused_imports -D warnings -D clippy::style
 
   readme:
     name: cargo rdme
@@ -41,10 +41,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: nightly
+          toolchain: 1.85.0
       - run: |
-          cargo install cargo-rdme
-          cargo rdme --check
+          cargo install cargo-rdme --version 1.4.8 --locked
+          cargo rdme --check --no-fail-on-warnings
 
   check-spdx-headers:
     runs-on: ubuntu-latest

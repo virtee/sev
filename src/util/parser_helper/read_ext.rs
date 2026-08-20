@@ -1,11 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
-// use super::byte_parser::ByteParser;
+
+//! [`Read`] extension methods for firmware wire decoding.
+//!
+//! Implemented for all [`Read`] types. Delegates to
+//! [`Decoder::decode`](crate::parser::Decoder::decode) so callers can chain
+//! field reads in `Decoder` impls without manual buffer management.
+
 use crate::parser::Decoder;
 use std::io::Read;
 
-#[allow(dead_code)]
+/// Extension trait adding decode helpers to any [`Read`] source.
 pub trait ReadExt: Read {
-    /// Convenience: read a value with unit params.
+    /// Decode the next value using [`Decoder<()>`](crate::parser::Decoder).
+    ///
+    /// Advances the reader past the consumed bytes. Equivalent to
+    /// `T::decode(self, ())`.
     fn read_bytes<T>(&mut self) -> Result<T, std::io::Error>
     where
         Self: Sized,
@@ -14,7 +23,12 @@ pub trait ReadExt: Read {
         T::decode(self, ())
     }
 
-    /// Full version with explicit params.
+    /// Decode the next value with an explicit context parameter.
+    ///
+    /// Use when the wire layout depends on [`Generation`](crate::types::shared::Generation),
+    /// [`FirmwareVersion`](crate::types::shared::FirmwareVersion), or another
+    /// decode context (for example [`TcbVersion`](crate::types::snp::TcbVersion)).
+    #[cfg(feature = "snp")]
     fn read_bytes_with<T, P>(&mut self, params: P) -> Result<T, std::io::Error>
     where
         Self: Sized,
@@ -23,7 +37,17 @@ pub trait ReadExt: Read {
         T::decode(self, params)
     }
 
-    /// Read SKIP bytes and verify they are zero; returns a mutable reference to the same reader.
+    /// Read and discard `SKIP` bytes, requiring each to be zero.
+    ///
+    /// Used for firmware **reserved** regions that must be zero-filled on the
+    /// wire. Returns `self` for method chaining. For large skips, reads in
+    /// 256-byte chunks to avoid stack allocation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`std::io::ErrorKind::InvalidData`] if any skipped byte is
+    /// non-zero, or [`std::io::ErrorKind::UnexpectedEof`] if the stream ends
+    /// early.
     fn skip_bytes<const SKIP: usize>(&mut self) -> Result<&mut Self, std::io::Error> {
         if SKIP != 0 {
             // Read in chunks to avoid huge stack allocations for large SKIP.

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#![cfg(all(feature = "openssl", feature = "snp", target_os = "linux"))]
+#![cfg(all(feature = "crypto-openssl", feature = "snp", target_os = "linux"))]
 
 use std::{
     convert::{TryFrom, TryInto},
@@ -12,12 +12,9 @@ use base64::{engine::general_purpose, Engine as _};
 use hex::{self, FromHex};
 
 use sev::{
-    measurement::{
-        idblock::{load_priv_key, snp_calculate_id},
-        idblock_types::{IdAuth, SevEcdsaPubKey, SevEcdsaSig},
-        snp::SnpLaunchDigest,
-    },
+    attestation::reference::snp::idblock::{load_priv_key, snp_calculate_id},
     parser::{ByteParser, Decoder},
+    types::snp::{IdAuth, SevEcdsaPubKey, SevEcdsaSig, SnpLaunchDigest},
 };
 
 // Testing that the appropriate id-block and key digests are being generated.

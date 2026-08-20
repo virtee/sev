@@ -36,13 +36,42 @@ path = "src/lib.rs"
 doc = false
 
 [features]
-default = ["sev", "snp", "openssl?/vendored"]
-openssl = ["dep:openssl"]
-hw_tests = []
-dangerous_hw_tests = ["hw_tests", "dep:reqwest", "dep:tokio"]
+# SNP remote attestation (verifier profile) — no host platform, guest attester, or launch.
+default = [
+    "snp",
+    "attester",
+    "evidence",
+    "verifier",
+    "endorser",
+    "reference",
+    "crypto-openssl",
+]
+
+# Host `/dev/sev` platform management (status, config, certificate export).
+# Legacy SEV host APIs (`platform::sev`) require `endorser` when `sev` is enabled.
+platform = []
+
+# KVM guest launch (requires host platform ioctls).
+launch = ["platform"]
+
+# First-generation SEV (pre-SNP): certificate handling, attestation report
+# verification, launch session, and legacy types. Not enabled by default.
 sev = ["dep:rdrand"]
 snp = []
-crypto_nossl = ["dep:p384", "dep:rsa", "dep:sha2", "dep:x509-cert"]
+
+# RATS attestation roles (independent of platform/launch).
+evidence = []
+reference = []
+verifier = ["evidence", "endorser"]
+endorser = ["evidence"]
+attester = []
+
+# Cryptographic backends (pick one for verifier/endorser/reference).
+crypto-openssl = ["dep:openssl", "openssl?/vendored"]
+crypto-rust = ["dep:p384", "dep:rsa", "dep:sha2", "dep:x509-cert"]
+
+hw_tests = []
+dangerous_hw_tests = ["hw_tests", "dep:reqwest", "dep:tokio"]
 serde = ["dep:serde", "dep:serde-big-array", "dep:serde_bytes"]
 
 [target.'cfg(target_os = "linux")'.dependencies]

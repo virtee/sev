@@ -6,15 +6,6 @@ use crate::launch::snp::*;
 
 use std::marker::PhantomData;
 
-/// Initialize the SEV-SNP platform in KVM.
-#[derive(Default)]
-#[repr(C, packed)]
-#[allow(dead_code)]
-pub struct Init {
-    /// Reserved space, must be always set to 0 when issuing the ioctl.
-    flags: u64,
-}
-
 #[repr(C)]
 pub struct LaunchStart {
     /// Guest policy. See Table 7 of the AMD SEV-SNP Firmware

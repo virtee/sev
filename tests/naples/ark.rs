@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
-use ::sev::certs::sev::builtin::naples::*;
+use ::sev::attestation::endorser::sev::builtin::naples::*;
 
 #[test]
 fn decode() {
@@ -27,7 +27,7 @@ fn encode() {
     assert_eq!(ARK.to_vec(), output);
 }
 
-#[cfg(feature = "openssl")]
+#[cfg(feature = "crypto-openssl")]
 #[test]
 fn verify() {
     let ark = ca::Certificate::decode(&mut &ARK_BAD[..], ()).unwrap();

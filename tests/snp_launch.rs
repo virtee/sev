@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#![cfg(all(feature = "snp", target_os = "linux"))]
+#![cfg(all(feature = "snp", feature = "launch", target_os = "linux"))]
 
 use kvm_bindings::{kvm_create_guest_memfd, kvm_userspace_memory_region2, KVM_MEM_GUEST_MEMFD};
 use kvm_ioctls::{Kvm, VcpuExit};
-use sev::firmware::{guest::GuestPolicy, host::Firmware};
 use sev::launch::{snp::*, PageType};
+use sev::platform::Firmware;
+use sev::types::snp::GuestPolicy;
 use std::os::fd::RawFd;
 use std::slice::from_raw_parts_mut;
 
