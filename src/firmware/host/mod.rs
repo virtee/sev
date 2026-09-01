@@ -266,7 +266,7 @@ impl Firmware {
     /// # Example:
     /// ```ignore
     /// let configuration = Config::new(
-    ///     TcbVersion::new(3, 0, 10, 169),
+    ///     TcbVersion::new(None, Some(3), 0, 10, Some(169)),
     ///     0,
     /// );
     /// let mut firmware: Firmware = Firmware::open().unwrap();
