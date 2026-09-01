@@ -1204,10 +1204,10 @@ Signature Algorithm:          0
 Current TCB:
 
 TCB Version:
-  Microcode:   0
+  Microcode:   None
   SNP:         0
   TEE:         0
-  Boot Loader: 0
+  Boot Loader: None
   FMC:         None
 
 Platform Info (0):
@@ -1260,10 +1260,10 @@ Report ID Migration Agent:
 Reported TCB:
 
 TCB Version:
-  Microcode:   0
+  Microcode:   None
   SNP:         0
   TEE:         0
-  Boot Loader: 0
+  Boot Loader: None
   FMC:         None
 
 CPUID Family ID:              None
@@ -1281,10 +1281,10 @@ Chip ID:
 Committed TCB:
 
 TCB Version:
-  Microcode:   0
+  Microcode:   None
   SNP:         0
   TEE:         0
-  Boot Loader: 0
+  Boot Loader: None
   FMC:         None
 
 Current Version:              0.0.0
@@ -1294,10 +1294,10 @@ Committed Version:            0.0.0
 Launch TCB:
 
 TCB Version:
-  Microcode:   0
+  Microcode:   None
   SNP:         0
   TEE:         0
-  Boot Loader: 0
+  Boot Loader: None
   FMC:         None
 
 Launch Mitigation Vector:     None
