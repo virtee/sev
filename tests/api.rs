@@ -140,14 +140,14 @@ mod snp {
               version (major, minor): {}.{}
               build id: {}
               guests: {}
-              platform tcb microcode version: {}
+              platform tcb microcode version: {:?}
               platform tcb snp version: {}
               platform tcb tee version: {}
-              platform tcb bootloader version: {}
-              reported tcb microcode version: {}
+              platform tcb bootloader version: {:?}
+              reported tcb microcode version: {:?}
               reported tcb snp version: {}
               reported tcb tee version: {}
-              reported tcb bootloader version: {}
+              reported tcb bootloader version: {:?}
               state: {}",
             status.version.0,
             status.version.1,
@@ -187,7 +187,10 @@ mod snp {
     #[serial]
     fn test_host_fw_error() {
         let mut fw: Firmware = Firmware::open().unwrap();
-        let invalid_config = Config::new(TcbVersion::new(None, 100, 100, 100, 100), MaskId(31));
+        let invalid_config = Config::new(
+            TcbVersion::new(None, Some(100), 100, 100, Some(100)),
+            MaskId(31),
+        );
         let fw_error = fw.snp_set_config(invalid_config).unwrap_err().to_string();
         assert_eq!(fw_error, "Firmware Error Encountered: Known SEV FW Error: Status Code: 0x16: Given parameter is invalid.")
     }

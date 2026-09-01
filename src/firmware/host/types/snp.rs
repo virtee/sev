@@ -507,7 +507,8 @@ pub struct TcbVersion {
     pub fmc: Option<u8>,
     /// Current bootloader version.
     /// SVN of PSP bootloader.
-    pub bootloader: u8,
+    /// `None` on Venice, which does not encode a bootloader SVN in TCB.
+    pub bootloader: Option<u8>,
     /// Current PSP OS version.
     /// SVN of PSP operating system.
     pub tee: u8,
@@ -515,7 +516,8 @@ pub struct TcbVersion {
     /// Security Version Number (SVN) of SNP firmware.
     pub snp: u8,
     /// Lowest current patch level of all the cores.
-    pub microcode: u8,
+    /// `None` on Venice, which does not encode a microcode SVN in TCB.
+    pub microcode: Option<u8>,
 }
 
 impl Encoder<Generation> for TcbVersion {
@@ -526,7 +528,8 @@ impl Encoder<Generation> for TcbVersion {
     ) -> Result<(), std::io::Error> {
         let buffer = match generation {
             Generation::Milan | Generation::Genoa => self.to_legacy_bytes(),
-            Generation::Turin | Generation::Venice => self.to_turin_bytes(),
+            Generation::Turin => self.to_turin_bytes(),
+            Generation::Venice => self.to_venice_bytes(),
             #[cfg(feature = "sev")]
             Generation::Naples | Generation::Rome => {
                 return Err(std::io::Error::new(
@@ -546,9 +549,8 @@ impl Decoder<Generation> for TcbVersion {
             Generation::Milan | Generation::Genoa => {
                 Ok(TcbVersion::from_legacy_bytes(&reader.read_bytes()?))
             }
-            Generation::Turin | Generation::Venice => {
-                Ok(TcbVersion::from_turin_bytes(&reader.read_bytes()?))
-            }
+            Generation::Turin => Ok(TcbVersion::from_turin_bytes(&reader.read_bytes()?)),
+            Generation::Venice => Ok(TcbVersion::from_venice_bytes(&reader.read_bytes()?)),
             #[cfg(feature = "sev")]
             Generation::Naples | Generation::Rome => Err(std::io::Error::new(
                 std::io::ErrorKind::Unsupported,
@@ -567,47 +569,61 @@ impl TcbVersion {
     pub(crate) fn from_legacy_bytes(bytes: &[u8; 8]) -> Self {
         Self {
             fmc: None,
-            bootloader: bytes[0],
+            bootloader: Some(bytes[0]),
             tee: bytes[1],
             snp: bytes[6],
-            microcode: bytes[7],
+            microcode: Some(bytes[7]),
         }
     }
 
     pub(crate) fn to_legacy_bytes(self) -> [u8; 8] {
         [
-            self.bootloader,
+            self.bootloader.unwrap_or(0),
             self.tee,
             0,
             0,
             0,
             0,
             self.snp,
-            self.microcode,
+            self.microcode.unwrap_or(0),
         ]
     }
 
     pub(crate) fn from_turin_bytes(bytes: &[u8; 8]) -> Self {
         Self {
             fmc: Some(bytes[0]),
-            bootloader: bytes[1],
+            bootloader: Some(bytes[1]),
             tee: bytes[2],
             snp: bytes[3],
-            microcode: bytes[7],
+            microcode: Some(bytes[7]),
         }
     }
 
     pub(crate) fn to_turin_bytes(self) -> [u8; 8] {
         [
             self.fmc.unwrap_or(0),
-            self.bootloader,
+            self.bootloader.unwrap_or(0),
             self.tee,
             self.snp,
             0,
             0,
             0,
-            self.microcode,
+            self.microcode.unwrap_or(0),
         ]
+    }
+
+    pub(crate) fn from_venice_bytes(bytes: &[u8; 8]) -> Self {
+        Self {
+            fmc: Some(bytes[0]),
+            tee: bytes[1],
+            snp: bytes[2],
+            bootloader: None,
+            microcode: None,
+        }
+    }
+
+    pub(crate) fn to_venice_bytes(self) -> [u8; 8] {
+        [self.fmc.unwrap_or(0), self.tee, self.snp, 0, 0, 0, 0, 0]
     }
 }
 
@@ -621,18 +637,25 @@ impl Display for TcbVersion {
   TEE:         {}
   Boot Loader: {}
   FMC:         {}"#,
-            self.microcode,
+            self.microcode.map_or("None".to_string(), |v| v.to_string()),
             self.snp,
             self.tee,
-            self.bootloader,
-            self.fmc.map_or("None".to_string(), |fmc| fmc.to_string())
+            self.bootloader
+                .map_or("None".to_string(), |v| v.to_string()),
+            self.fmc.map_or("None".to_string(), |v| v.to_string())
         )
     }
 }
 
 impl TcbVersion {
     /// Creates a new instance of a TcbVersion
-    pub fn new(fmc: Option<u8>, bootloader: u8, tee: u8, snp: u8, microcode: u8) -> Self {
+    pub fn new(
+        fmc: Option<u8>,
+        bootloader: Option<u8>,
+        tee: u8,
+        snp: u8,
+        microcode: Option<u8>,
+    ) -> Self {
         Self {
             fmc,
             bootloader,
@@ -1063,11 +1086,11 @@ mod tests {
     // Test TcbVersion struct and methods
     #[test]
     fn test_tcb_version() {
-        let tcb = TcbVersion::new(None, 1, 2, 3, 4);
-        assert_eq!(tcb.bootloader, 1);
+        let tcb = TcbVersion::new(None, Some(1), 2, 3, Some(4));
+        assert_eq!(tcb.bootloader, Some(1));
         assert_eq!(tcb.tee, 2);
         assert_eq!(tcb.snp, 3);
-        assert_eq!(tcb.microcode, 4);
+        assert_eq!(tcb.microcode, Some(4));
 
         // Test Display implementation
         let display_output = format!("{}", tcb);
@@ -1079,7 +1102,7 @@ mod tests {
     #[test]
     #[cfg(feature = "snp")]
     fn test_config() {
-        let tcb = TcbVersion::new(None, 1, 2, 3, 4);
+        let tcb = TcbVersion::new(None, Some(1), 2, 3, Some(4));
         let mask = MaskId(0x3);
         let config = Config::new(tcb, mask);
 
@@ -1144,11 +1167,11 @@ mod tests {
 
     #[test]
     fn test_tcb_version_creation_and_display() {
-        let tcb = TcbVersion::new(None, 1, 2, 3, 4);
-        assert_eq!(tcb.bootloader, 1);
+        let tcb = TcbVersion::new(None, Some(1), 2, 3, Some(4));
+        assert_eq!(tcb.bootloader, Some(1));
         assert_eq!(tcb.tee, 2);
         assert_eq!(tcb.snp, 3);
-        assert_eq!(tcb.microcode, 4);
+        assert_eq!(tcb.microcode, Some(4));
 
         let display = format!("{}", tcb);
         assert!(display.contains("Microcode:   4"));
@@ -1177,7 +1200,7 @@ mod tests {
     #[test]
     #[cfg(feature = "snp")]
     fn test_config_conversions() {
-        let tcb = TcbVersion::new(None, 1, 2, 3, 4);
+        let tcb = TcbVersion::new(None, Some(1), 2, 3, Some(4));
         let mask = MaskId(0x3);
         let config = Config::new(tcb, mask);
 
@@ -1202,19 +1225,19 @@ mod tests {
         status.is_rmp_init = PlatformInit(1);
         assert!(status.is_rmp_init.is_rmp_init());
 
-        status.platform_tcb_version = TcbVersion::new(None, 1, 2, 3, 4);
+        status.platform_tcb_version = TcbVersion::new(None, Some(1), 2, 3, Some(4));
         assert_eq!(status.platform_tcb_version.snp, 3);
     }
 
     #[test]
     fn test_tcb_status() {
         let status = TcbStatus {
-            platform_version: TcbVersion::new(None, 1, 2, 3, 4),
-            reported_version: TcbVersion::new(None, 5, 6, 7, 8),
+            platform_version: TcbVersion::new(None, Some(1), 2, 3, Some(4)),
+            reported_version: TcbVersion::new(None, Some(5), 6, 7, Some(8)),
         };
 
-        assert_eq!(status.platform_version.bootloader, 1);
-        assert_eq!(status.reported_version.bootloader, 5);
+        assert_eq!(status.platform_version.bootloader, Some(1));
+        assert_eq!(status.reported_version.bootloader, Some(5));
 
         let default_status = TcbStatus::default();
         assert_eq!(default_status.platform_version, Default::default());
@@ -1223,7 +1246,7 @@ mod tests {
     #[test]
     #[cfg(feature = "snp")]
     fn test_config_error_cases() {
-        let tcb = TcbVersion::new(None, 255, 255, 255, 255);
+        let tcb = TcbVersion::new(None, Some(255), 255, 255, Some(255));
         let mask = MaskId(u32::MAX);
         let config = Config::new(tcb, mask);
 
@@ -1240,7 +1263,7 @@ mod tests {
     #[cfg(feature = "snp")]
     fn test_config_edge_cases() {
         // Test with maximum values
-        let tcb = TcbVersion::new(Some(255), 255, 255, 255, 255);
+        let tcb = TcbVersion::new(Some(255), Some(255), 255, 255, Some(255));
         let mask_id = MaskId(u32::MAX);
         let config = Config::new(tcb, mask_id);
 
@@ -1259,7 +1282,7 @@ mod tests {
         assert_eq!(round_trip_mask_id, mask_id);
 
         // Test with minimum values
-        let tcb = TcbVersion::new(Some(0), 0, 0, 0, 0);
+        let tcb = TcbVersion::new(Some(0), Some(0), 0, 0, Some(0));
         let mask_id = MaskId(0);
         let config = Config::new(tcb, mask_id);
 
@@ -1281,7 +1304,7 @@ mod tests {
     #[test]
     #[cfg(feature = "snp")]
     fn test_different_generation_conversions() {
-        let tcb = TcbVersion::new(Some(1), 2, 3, 4, 5);
+        let tcb = TcbVersion::new(Some(1), Some(2), 3, 4, Some(5));
         let mask_id = MaskId(0x3);
         let config = Config::new(tcb, mask_id);
 
@@ -1304,9 +1327,16 @@ mod tests {
             assert!(round_trip.is_ok());
             let round_trip = round_trip.unwrap();
 
-            // For non-Turin generations, FMC will be lost in the conversion
             match generation {
-                Generation::Turin | Generation::Venice => assert_eq!(round_trip.reported_tcb, tcb),
+                Generation::Turin => assert_eq!(round_trip.reported_tcb, tcb),
+                Generation::Venice => {
+                    // Venice TCB layout does not encode bootloader or microcode.
+                    assert_eq!(round_trip.reported_tcb.fmc, tcb.fmc);
+                    assert_eq!(round_trip.reported_tcb.tee, tcb.tee);
+                    assert_eq!(round_trip.reported_tcb.snp, tcb.snp);
+                    assert_eq!(round_trip.reported_tcb.bootloader, None);
+                    assert_eq!(round_trip.reported_tcb.microcode, None);
+                }
                 _ => {
                     // FMC field is not preserved for legacy generations
                     assert_eq!(round_trip.reported_tcb.bootloader, tcb.bootloader);
@@ -1323,9 +1353,9 @@ mod tests {
 
     #[test]
     fn test_version_comparisons() {
-        let v1 = TcbVersion::new(None, 1, 2, 3, 4);
-        let v2 = TcbVersion::new(None, 1, 2, 3, 5);
-        let v3 = TcbVersion::new(None, 1, 2, 3, 4);
+        let v1 = TcbVersion::new(None, Some(1), 2, 3, Some(4));
+        let v2 = TcbVersion::new(None, Some(1), 2, 3, Some(5));
+        let v3 = TcbVersion::new(None, Some(1), 2, 3, Some(4));
 
         assert!(v1 < v2);
         assert_eq!(v1, v3);
@@ -1487,12 +1517,58 @@ mod tests {
 
     #[test]
     fn test_tcb_version_deserialization() {
-        let tcb = TcbVersion::new(None, 1, 2, 3, 4);
+        let tcb = TcbVersion::new(None, Some(1), 2, 3, Some(4));
 
         let serialized = tcb.to_legacy_bytes();
         let deserialized = TcbVersion::from_legacy_bytes(&serialized);
 
         assert_eq!(tcb, deserialized);
+    }
+
+    #[test]
+    fn test_tcb_version_turin_deserialization() {
+        let tcb = TcbVersion::new(Some(1), Some(2), 3, 4, Some(5));
+
+        let serialized = tcb.to_turin_bytes();
+        assert_eq!(serialized, [1, 2, 3, 4, 0, 0, 0, 5]);
+
+        let deserialized = TcbVersion::from_turin_bytes(&serialized);
+        assert_eq!(deserialized, tcb);
+        assert_eq!(
+            TcbVersion::from_bytes_with(&serialized, Generation::Turin).unwrap(),
+            tcb
+        );
+    }
+
+    #[test]
+    fn test_tcb_version_venice_deserialization() {
+        let tcb = TcbVersion::new(Some(1), None, 2, 3, None);
+
+        let serialized = tcb.to_venice_bytes();
+        assert_eq!(serialized, [1, 2, 3, 0, 0, 0, 0, 0]);
+
+        let deserialized = TcbVersion::from_venice_bytes(&serialized);
+        assert_eq!(deserialized, tcb);
+        assert_eq!(deserialized.bootloader, None);
+        assert_eq!(deserialized.microcode, None);
+        assert_eq!(
+            TcbVersion::from_bytes_with(&serialized, Generation::Venice).unwrap(),
+            tcb
+        );
+    }
+
+    #[test]
+    fn test_tcb_version_venice_drops_unused_fields() {
+        let tcb = TcbVersion::new(Some(1), Some(2), 3, 4, Some(5));
+        let serialized = tcb.to_venice_bytes();
+        assert_eq!(serialized, [1, 3, 4, 0, 0, 0, 0, 0]);
+
+        let deserialized = TcbVersion::from_venice_bytes(&serialized);
+        assert_eq!(deserialized.fmc, Some(1));
+        assert_eq!(deserialized.tee, 3);
+        assert_eq!(deserialized.snp, 4);
+        assert_eq!(deserialized.bootloader, None);
+        assert_eq!(deserialized.microcode, None);
     }
 
     #[test]
@@ -1731,10 +1807,10 @@ mod tests {
     #[test]
     fn test_tcb_version_default() {
         let tcb_version: TcbVersion = Default::default();
-        assert_eq!(tcb_version.bootloader, 0);
+        assert_eq!(tcb_version.bootloader, None);
         assert_eq!(tcb_version.tee, 0);
         assert_eq!(tcb_version.snp, 0);
-        assert_eq!(tcb_version.microcode, 0);
+        assert_eq!(tcb_version.microcode, None);
     }
 
     #[test]
@@ -1769,17 +1845,17 @@ mod tests {
             guest_count: 0,
             platform_tcb_version: TcbVersion {
                 fmc: None,
-                bootloader: 1,
+                bootloader: Some(1),
                 tee: 1,
                 snp: 1,
-                microcode: 1,
+                microcode: Some(1),
             },
             reported_tcb_version: TcbVersion {
                 fmc: None,
-                bootloader: 1,
+                bootloader: Some(1),
                 tee: 1,
                 snp: 1,
-                microcode: 1,
+                microcode: Some(1),
             },
         };
         let raw_actual: FFI::types::SnpPlatformStatus = FFI::types::SnpPlatformStatus {
@@ -1805,17 +1881,17 @@ mod tests {
             guest_count: 0,
             platform_tcb_version: TcbVersion {
                 fmc: Some(1),
-                bootloader: 1,
+                bootloader: Some(1),
                 tee: 1,
                 snp: 1,
-                microcode: 1,
+                microcode: Some(1),
             },
             reported_tcb_version: TcbVersion {
                 fmc: Some(1),
-                bootloader: 1,
+                bootloader: Some(1),
                 tee: 1,
                 snp: 1,
-                microcode: 1,
+                microcode: Some(1),
             },
         };
         let raw_actual: FFI::types::SnpPlatformStatus = FFI::types::SnpPlatformStatus {
@@ -1827,6 +1903,42 @@ mod tests {
         };
         let actual =
             SnpPlatformStatus::from_bytes_with(&raw_actual.buffer, Generation::Turin).unwrap();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_snp_platform_status_venice() {
+        let expected: SnpPlatformStatus = SnpPlatformStatus {
+            version: (1, 1),
+            state: 1,
+            is_rmp_init: PlatformInit(1),
+            build_id: 1,
+            platform_policy: PlatformPolicy(1),
+            guest_count: 0,
+            platform_tcb_version: TcbVersion {
+                fmc: Some(1),
+                bootloader: None,
+                tee: 1,
+                snp: 1,
+                microcode: None,
+            },
+            reported_tcb_version: TcbVersion {
+                fmc: Some(1),
+                bootloader: None,
+                tee: 1,
+                snp: 1,
+                microcode: None,
+            },
+        };
+        let raw_actual: FFI::types::SnpPlatformStatus = FFI::types::SnpPlatformStatus {
+            buffer: [
+                1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, // Other stuff
+                1, 1, 1, 0, 0, 0, 0, 0, // Platform TCB: FMC, TEE, SNP
+                1, 1, 1, 0, 0, 0, 0, 0, // Reported TCB: FMC, TEE, SNP
+            ],
+        };
+        let actual =
+            SnpPlatformStatus::from_bytes_with(&raw_actual.buffer, Generation::Venice).unwrap();
         assert_eq!(actual, expected);
     }
 
@@ -1861,10 +1973,10 @@ mod tests {
         // Verify the fields
         assert_eq!(hashstick.iv, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
         assert_eq!(hashstick.vlek_wrapped.as_ref(), &[42; 384]);
-        assert_eq!(hashstick.tcb_version.bootloader, 1);
+        assert_eq!(hashstick.tcb_version.bootloader, Some(1));
         assert_eq!(hashstick.tcb_version.tee, 2);
         assert_eq!(hashstick.tcb_version.snp, 3);
-        assert_eq!(hashstick.tcb_version.microcode, 4);
+        assert_eq!(hashstick.tcb_version.microcode, Some(4));
         assert_eq!(
             hashstick.vlek_auth_tag,
             [9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0]
@@ -1877,7 +1989,7 @@ mod tests {
         let hashstick = WrappedVlekHashstick {
             iv: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
             vlek_wrapped: [42; 384],
-            tcb_version: TcbVersion::new(None, 1, 2, 3, 4),
+            tcb_version: TcbVersion::new(None, Some(1), 2, 3, Some(4)),
             vlek_auth_tag: [9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0],
         };
 
@@ -1895,10 +2007,10 @@ mod tests {
         let tcb_bytes = &buffer[0x190..0x198];
 
         let tcb = TcbVersion::from_bytes_with(tcb_bytes, Generation::Milan).unwrap();
-        assert_eq!(tcb.bootloader, 1);
+        assert_eq!(tcb.bootloader, Some(1));
         assert_eq!(tcb.tee, 2);
         assert_eq!(tcb.snp, 3);
-        assert_eq!(tcb.microcode, 4);
+        assert_eq!(tcb.microcode, Some(4));
 
         assert_eq!(&buffer[0x198..0x1A0], &[0, 0, 0, 0, 0, 0, 0, 0]); // Reserved field 2
         assert_eq!(
@@ -1926,7 +2038,7 @@ mod tests {
         let hashstick = WrappedVlekHashstick {
             iv: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
             vlek_wrapped: [42; 384],
-            tcb_version: TcbVersion::new(None, 1, 2, 3, 4),
+            tcb_version: TcbVersion::new(None, Some(1), 2, 3, Some(4)),
             vlek_auth_tag: [9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0],
         };
 
