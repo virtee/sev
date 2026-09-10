@@ -1,10 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(feature = "snp")]
+mod etcb;
+
 #[cfg(feature = "sev")]
 mod sev;
 
 #[cfg(feature = "snp")]
 mod snp;
+
+#[cfg(feature = "snp")]
+pub use self::etcb::*;
 
 #[cfg(feature = "sev")]
 pub use self::sev::*;
