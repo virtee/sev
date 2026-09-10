@@ -1,19 +1,53 @@
 // SPDX-License-Identifier: Apache-2.0
 
+//! Whole-buffer helpers built on [`super::Encoder`] and [`super::Decoder`].
+//!
+//! [`ByteParser`] is the highest-level trait in the parser stack. Types that
+//! map to a complete fixed-size firmware struct implement it to provide
+//! `from_bytes` / `to_bytes` (and parameterized variants) without callers
+//! managing a [`Read`] / [`Write`] cursor themselves.
+//!
+//! # When to implement
+//!
+//! Implement [`ByteParser`] alongside [`Decoder`](super::Decoder) and
+//! [`Encoder`](super::Encoder) when:
+//!
+//! - The type corresponds to a standalone firmware buffer (report field, ioctl
+//!   payload slice, platform status block).
+//! - You want length validation via [`Self::EXPECTED_LEN`].
+//!
+//! For nested sub-fields inside a larger struct, [`Decoder`] / [`Encoder`] alone
+//! are sufficient — the parent type's `decode` calls them in sequence.
+//!
+//! # Length validation
+//!
+//! Set [`ByteParser::EXPECTED_LEN`] to enforce an exact byte count on
+//! `from_bytes*` and `to_bytes*`. Leave it `None` for variable-length types.
+
 use std::convert::{TryFrom, TryInto};
 
 use super::{Decoder, Encoder};
 
-/// Adapter trait: convert to/from an owned byte container using Encoder/Decoder.
+/// Convert between owned byte buffers and parsed firmware types.
+///
+/// The associated type [`Bytes`](Self::Bytes) is the container returned by
+/// encoding (typically `[u8; N]` for fixed-size structs). The parameter `P`
+/// matches the context type on the corresponding [`Decoder`](super::Decoder)
+/// and [`Encoder`](super::Encoder) impls.
 pub trait ByteParser<P> {
-    /// Byte container definition
-    /// Must be constructible and mutable as bytes for encoding,
+    /// Owned byte container produced by [`Self::to_bytes_with`].
     type Bytes: AsRef<[u8]>;
 
-    /// Expected size of the byte container
+    /// Expected buffer length, if the wire format is fixed-size.
+    ///
+    /// When set, `from_bytes*` rejects shorter or longer inputs and `to_bytes*`
+    /// rejects encoding that produces a different length.
     const EXPECTED_LEN: Option<usize> = None;
 
-    /// Decode from an owned byte container with params.
+    /// Decode from a byte slice with context parameter `params`.
+    ///
+    /// Validates [`Self::EXPECTED_LEN`] when set, then delegates to
+    /// [`Decoder::decode`](super::Decoder::decode).
     fn from_bytes_with(bytes: &[u8], params: P) -> Result<Self, std::io::Error>
     where
         Self: Sized + Decoder<P>,
@@ -31,7 +65,10 @@ pub trait ByteParser<P> {
         Self::decode(&mut rdr, params)
     }
 
-    /// Encode into an owned byte container with params.
+    /// Encode into an owned byte container with context parameter `params`.
+    ///
+    /// Validates [`Self::EXPECTED_LEN`] when set, then delegates to
+    /// [`Encoder::encode`](super::Encoder::encode).
     fn to_bytes_with(&self, params: P) -> Result<Self::Bytes, std::io::Error>
     where
         Self: Encoder<P>,
@@ -53,7 +90,6 @@ pub trait ByteParser<P> {
             }
         }
 
-        // Now do the actual conversion; map any error to io::Error
         Self::Bytes::try_from(v).map_err(|_e| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
@@ -62,7 +98,7 @@ pub trait ByteParser<P> {
         })
     }
 
-    /// Helper from_bytes Function in case no parameters are needed
+    /// Decode from a byte slice with no context parameter (`P = ()`).
     fn from_bytes(bytes: &[u8]) -> Result<Self, std::io::Error>
     where
         Self: Sized + Decoder<()>,
@@ -80,7 +116,7 @@ pub trait ByteParser<P> {
         Self::decode(&mut rdr, ())
     }
 
-    /// Helper to_bytes function in case no parameters are needed
+    /// Encode into an owned byte container with no context parameter (`P = ()`).
     fn to_bytes(&self) -> Result<Self::Bytes, std::io::Error>
     where
         Self: Encoder<()>,
@@ -102,7 +138,6 @@ pub trait ByteParser<P> {
             }
         }
 
-        // Now do the actual conversion; map any error to io::Error
         Self::Bytes::try_from(v).map_err(|_e| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidData,

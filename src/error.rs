@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#[cfg(all(feature = "openssl", feature = "sev"))]
-use openssl::error::ErrorStack;
+//! Error types returned by public crate APIs.
+//!
+//! Most ioctl wrappers surface [`UserApiError`], which wraps firmware status
+//! codes, certificate parsing failures, and attestation report errors. Lower-
+//! level modules define focused enums such as [`CertError`] and
+//! [`HashstickError`] that convert into [`UserApiError`] where appropriate.
+
 use std::{
     array::TryFromSliceError,
     convert::From,
@@ -10,12 +15,15 @@ use std::{
     io,
 };
 
-#[cfg(all(feature = "openssl", feature = "sev"))]
+#[cfg(all(feature = "crypto-openssl", feature = "sev"))]
+use openssl::error::ErrorStack;
+
+#[cfg(all(feature = "crypto-openssl", feature = "sev"))]
 use rdrand::ErrorCode;
 
 use std::os::raw::c_int;
 
-#[cfg(feature = "openssl")]
+#[cfg(feature = "crypto-openssl")]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 /// Used for representing known errors when handling snp::Certificates.
 pub enum CertFormatError {
@@ -23,10 +31,10 @@ pub enum CertFormatError {
     UnknownFormat,
 }
 
-#[cfg(feature = "openssl")]
+#[cfg(feature = "crypto-openssl")]
 impl std::error::Error for CertFormatError {}
 
-#[cfg(feature = "openssl")]
+#[cfg(feature = "crypto-openssl")]
 impl std::fmt::Display for CertFormatError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -511,8 +519,12 @@ impl From<FirmwareError> for c_int {
     }
 }
 
+/// Top-level error returned by public ioctl wrappers and attestation helpers.
+///
+/// Individual variants wrap [`FirmwareError`], [`CertError`], VMM errors, and
+/// attestation parsing failures. Use [`std::error::Error::source`] to inspect
+/// the underlying cause.
 #[derive(Debug)]
-/// Wrapper Error for Firmware or User API Errors
 pub enum UserApiError {
     /// Sev Firmware related errors.
     FirmwareError(FirmwareError),
@@ -904,7 +916,7 @@ impl std::convert::From<TryFromSliceError> for ArrayError {
 /// Errors when calculating the ID BLOCK
 #[derive(Debug)]
 pub enum IdBlockError {
-    #[cfg(all(feature = "snp", feature = "openssl"))]
+    #[cfg(all(feature = "snp", feature = "crypto-openssl"))]
     /// TryFrom Slice Error handling
     CryptoErrorStack(openssl::error::ErrorStack),
 
@@ -930,7 +942,7 @@ pub enum IdBlockError {
 impl std::fmt::Display for IdBlockError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            #[cfg(all(feature = "snp", feature = "openssl"))]
+            #[cfg(all(feature = "snp", feature = "crypto-openssl"))]
             IdBlockError::CryptoErrorStack(e) => write!(f, "Error when with OPENSSL: {e}"),
             IdBlockError::LargeArrayError(e) => write!(f, "{e}"),
             IdBlockError::FileError(e) => write!(f, "Failed handling file: {e}"),
@@ -951,7 +963,7 @@ impl std::fmt::Display for IdBlockError {
 
 impl std::error::Error for IdBlockError {}
 
-#[cfg(all(feature = "snp", feature = "openssl"))]
+#[cfg(all(feature = "snp", feature = "crypto-openssl"))]
 impl std::convert::From<openssl::error::ErrorStack> for IdBlockError {
     fn from(value: openssl::error::ErrorStack) -> Self {
         Self::CryptoErrorStack(value)
@@ -1119,7 +1131,7 @@ impl std::convert::From<ArrayError> for MeasurementError {
     }
 }
 
-#[cfg(all(feature = "openssl", feature = "sev"))]
+#[cfg(all(feature = "crypto-openssl", feature = "sev"))]
 #[derive(Debug)]
 /// Used to describe errors related to SEV-ES "Sessions".
 pub enum SessionError {
@@ -1133,21 +1145,21 @@ pub enum SessionError {
     IOError(std::io::Error),
 }
 
-#[cfg(all(feature = "openssl", feature = "sev"))]
+#[cfg(all(feature = "crypto-openssl", feature = "sev"))]
 impl From<ErrorCode> for SessionError {
     fn from(value: ErrorCode) -> Self {
         Self::RandError(value)
     }
 }
 
-#[cfg(all(feature = "openssl", feature = "sev"))]
+#[cfg(all(feature = "crypto-openssl", feature = "sev"))]
 impl From<std::io::Error> for SessionError {
     fn from(value: std::io::Error) -> Self {
         Self::IOError(value)
     }
 }
 
-#[cfg(all(feature = "openssl", feature = "sev"))]
+#[cfg(all(feature = "crypto-openssl", feature = "sev"))]
 impl From<ErrorStack> for SessionError {
     fn from(value: ErrorStack) -> Self {
         Self::OpenSSLStack(value)
@@ -1483,7 +1495,7 @@ mod tests {
         }
     }
 
-    #[cfg(all(feature = "openssl", feature = "sev"))]
+    #[cfg(all(feature = "crypto-openssl", feature = "sev"))]
     #[test]
     fn test_openssl_features_complete() {
         // Test CertFormatError

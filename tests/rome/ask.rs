@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
-use ::sev::certs::sev::builtin::rome::*;
+use ::sev::attestation::endorser::sev::builtin::rome::*;
 
 #[test]
 fn decode() {
@@ -18,7 +18,7 @@ fn encode() {
     assert_eq!(ASK.to_vec(), output);
 }
 
-#[cfg(feature = "openssl")]
+#[cfg(feature = "crypto-openssl")]
 #[test]
 fn verify() {
     let mut mut_ark = ARK;

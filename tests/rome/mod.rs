@@ -12,5 +12,6 @@ const CEK: &[u8] = include_bytes!("cek.cert");
 const PEK: &[u8] = include_bytes!("pek.cert");
 const PDH: &[u8] = include_bytes!("pdh.cert");
 
-use ::sev::certs::sev::*;
+use ::sev::attestation::endorser::sev::*;
+use ::sev::attestation::verifier::Verifiable;
 use ::sev::parser::{Decoder, Encoder};

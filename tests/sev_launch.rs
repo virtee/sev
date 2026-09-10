@@ -1,18 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![cfg(all(
-    feature = "openssl",
+    feature = "crypto-openssl",
     target_os = "linux",
     feature = "sev",
+    feature = "launch",
+    feature = "endorser",
+    feature = "verifier",
     feature = "dangerous_hw_tests"
 ))]
 
 use kvm_bindings::kvm_userspace_memory_region;
 use kvm_ioctls::{Kvm, VcpuExit};
 use serial_test::serial;
-use sev::certs::sev::sev::Usage;
-use sev::certs::sev::{sev::Certificate, Signer};
-use sev::{cached_chain, firmware::host::Firmware, launch::sev::*, session::Session};
+use sev::attestation::endorser::sev::cert::Usage;
+use sev::attestation::endorser::sev::{cert::Certificate, Signer};
+use sev::{cached_chain, launch::sev::session::Session, launch::sev::*, platform::Firmware};
 use std::slice::from_raw_parts;
 use std::{convert::TryFrom, os::unix::io::AsRawFd};
 
@@ -29,7 +32,7 @@ fn sev_launch_test() {
     const KVM_X86_SEV_VM: u64 = 2;
 
     let mut sev = Firmware::open().unwrap();
-    let build = sev.platform_status().unwrap().build;
+    let build = sev.platform_status().unwrap().firmware_version;
 
     // Generating OCA cert and private key
     let (mut oca, prv) = Certificate::generate(Usage::OCA).expect("Generating OCA key pair");

@@ -3,12 +3,15 @@
 //! An implementation of the SEV-SNP launch process as a type-state machine.
 //! This ensures (at compile time) that the right steps are called in the
 //! right order.
+//!
+//! Requires `launch`, `snp`, and `platform`. Platform setup uses the shared
+//! `KVM_SEV_INIT2` ioctl.
 
 #[cfg(target_os = "linux")]
 use crate::{
     error::FirmwareError,
-    firmware::guest::GuestPolicy,
     launch::linux::{ioctl::*, shared::*, snp::*},
+    types::snp::GuestPolicy,
 };
 
 use std::{marker::PhantomData, os::unix::io::AsRawFd, result::Result};
@@ -18,7 +21,7 @@ use bitflags::bitflags;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-pub use crate::launch::PageType;
+pub use crate::types::snp::PageType;
 
 /// Launcher type-state that indicates a brand new launch.
 pub struct New;
@@ -49,7 +52,7 @@ impl<T, U: AsRawFd, V: AsRawFd> AsMut<U> for Launcher<T, U, V> {
 
 impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
     /// Begin the SEV-SNP launch process by creating a Launcher and issuing the
-    /// KVM_SNP_INIT ioctl.
+    /// KVM_SEV_INIT2 ioctl.
     pub fn new(vm_fd: U, sev: V) -> Result<Self, FirmwareError> {
         let mut launcher = Launcher {
             vm_fd,

@@ -29,7 +29,7 @@ jobs:
           - sev
 
   sw-sev-openssl-only:
-    name: sw sev openssl only ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
+    name: sw sev crypto-openssl only ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -52,11 +52,10 @@ jobs:
           - name: release
             flag: --release
         features:
-          - sev
-          - openssl
+          - sev,evidence,verifier,endorser,reference,crypto-openssl
 
-  sw-sev-crypto_nossl-only:
-    name: sw sev crypto_nossl only ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
+  sw-sev-crypto-rust-only:
+    name: sw sev crypto-rust only ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -80,7 +79,6 @@ jobs:
             flag: --release
         features:
           - sev
-          - crypto_nossl
 
   sw-snp-only:
     name: sw snp-only ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
@@ -109,7 +107,7 @@ jobs:
           - snp    
 
   sw-snp-openssl-only:
-    name: sw snp openssl only ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
+    name: sw snp crypto-openssl only ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -132,11 +130,10 @@ jobs:
           - name: release
             flag: --release
         features:
-          - snp
-          - openssl
+          - snp,evidence,verifier,endorser,reference,crypto-openssl
 
-  sw-snp-crypto_nossl-only:
-    name: sw snp crypto_nossl only ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
+  sw-snp-crypto-rust-only:
+    name: sw snp crypto-rust only ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -159,11 +156,10 @@ jobs:
           - name: release
             flag: --release
         features:
-          - snp
-          - crypto_nossl
+          - snp,evidence,verifier,endorser,reference,crypto-rust
 
-  sw-openssl:
-    name: sw openssl ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
+  sw-crypto-openssl:
+    name: sw crypto-openssl ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -186,17 +182,18 @@ jobs:
           - name: release
             flag: --release
         features:
-          - openssl
+          - crypto-openssl
 
-  sw-crypto_nossl:
-    name: sw crypto_nossl ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
+  sw-crypto-rust:
+    name: sw crypto-rust ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ matrix.toolchain }}
-      - run: cargo test ${{ matrix.profile.flag }} --features=${{ matrix.features }}
+      - run: cargo test ${{ matrix.profile.flag }} --no-default-features --features=${{ matrix.features }}
+
     strategy:
       fail-fast: false
       matrix:
@@ -212,4 +209,90 @@ jobs:
           - name: release
             flag: --release
         features:
-          - crypto_nossl
+          - snp,evidence,verifier,endorser,reference,crypto-rust
+
+  # Each RATS role and host feature in isolation.
+  #
+  # The jobs above always enable evidence+verifier+endorser+reference together,
+  # so a module that reaches across roles still compiles there. This job is what
+  # catches it: a feature-gated item whose gate does not match its dependencies
+  # (a trait impl that vanishes, a `mod` gated more loosely than what it
+  # imports) shows up here and nowhere else.
+  #
+  # `--all-targets` covers tests/ too, whose `#[cfg]` gates are just as prone to
+  # drifting from what they import. Combinations rejected by a `compile_error!`
+  # in lib.rs (e.g. sev+platform without endorser) are intentionally absent.
+  #
+  # This compiles but does not run: several combinations have no hardware or no
+  # tests to speak of, and behavior is already covered by the jobs above.
+  #
+  # When adding a feature, add it here alone.
+  feature-isolation:
+    name: feature isolation ${{ matrix.features }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - run: cargo check --all-targets --no-default-features --features=${{ matrix.features }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain:
+          - 1.85.0
+          - stable
+        features:
+          # sev: one role at a time
+          - sev
+          - sev,evidence
+          - sev,attester
+          - sev,reference,crypto-openssl
+          - sev,endorser,crypto-openssl
+          - sev,verifier,crypto-openssl
+          # sev host features, with the minimum role each requires
+          - sev,platform,endorser,crypto-openssl
+          - sev,launch,verifier,crypto-openssl
+          # snp: one role at a time, under both crypto backends
+          - snp
+          - snp,evidence
+          - snp,attester
+          - snp,platform
+          - snp,launch
+          - snp,reference,crypto-openssl
+          - snp,reference,crypto-rust
+          - snp,endorser,crypto-openssl
+          - snp,endorser,crypto-rust
+          - snp,verifier,crypto-openssl
+          - snp,verifier,crypto-rust
+
+  cross-snp-aarch64:
+    name: cross snp aarch64 ${{ matrix.toolchain }} ${{ matrix.features }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          targets: aarch64-unknown-linux-gnu
+      - name: Install aarch64 cross toolchain for vendored OpenSSL
+        if: contains(matrix.features, 'crypto-openssl')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+      - run: cargo check --target aarch64-unknown-linux-gnu --no-default-features --features=${{ matrix.features }}
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+          AR_aarch64_unknown_linux_gnu: aarch64-linux-gnu-ar
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain:
+          - 1.85.0
+          - stable
+        features:
+          - snp
+          - snp,evidence,verifier,endorser,reference,crypto-openssl
+          - snp,evidence,verifier,endorser,reference,crypto-rust

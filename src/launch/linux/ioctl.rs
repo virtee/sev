@@ -28,8 +28,6 @@ impl_const_id! {
     /// The ioctl sub number
     pub Id => u32;
 
-    sev::Init = 0,
-    sev::EsInit = 1,
     sev::LaunchStart<'_> = 2,
     sev::LaunchUpdateData<'_> = 3,
     sev::LaunchUpdateVmsa = 4,
@@ -50,8 +48,6 @@ impl_const_id! {
     /// The ioctl sub number
     pub Id => u32;
 
-    sev::Init = 0,
-    sev::EsInit = 1,
     sev::LaunchStart<'_> = 2,
     sev::LaunchUpdateData<'_> = 3,
     sev::LaunchUpdateVmsa = 4,
@@ -92,16 +88,6 @@ pub const KVM_MEMORY_ATTRIBUTE_PRIVATE: u64 = 1 << 3;
 //
 // which would require extra work to wrap around the design decision for
 // that ioctl.
-
-/// Initialize the SEV platform context.
-#[cfg(feature = "sev")]
-#[deprecated(note = "Init2 should be used instead")]
-pub const _INIT: Ioctl<WriteRead, &Command<sev::Init>> = unsafe { ENC_OP.lie() };
-
-/// Initialize the SEV-ES platform context.
-#[cfg(feature = "sev")]
-#[deprecated(note = "Init2 should be used instead")]
-pub const _ES_INIT: Ioctl<WriteRead, &Command<sev::EsInit>> = unsafe { ENC_OP.lie() };
 
 /// Create encrypted guest context.
 #[cfg(feature = "sev")]

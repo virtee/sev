@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-#![cfg(all(feature = "snp", target_os = "linux"))]
+#![cfg(all(feature = "snp", feature = "attester", target_os = "linux"))]
 
-use sev::firmware::guest::*;
+use sev::attestation::attester::snp::Firmware;
+use sev::types::snp::{DerivedKey, GuestFieldSelect};
 
 #[cfg_attr(not(guest), ignore)]
 #[test]

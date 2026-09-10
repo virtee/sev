@@ -1,10 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
+
+//! [`Write`] extension methods for firmware wire encoding.
+//!
+//! Implemented for all [`Write`] types. Delegates to
+//! [`Encoder::encode`](crate::parser::Encoder::encode) and provides zero-fill
+//! padding for reserved struct fields.
+
 use crate::parser::Encoder;
 use std::io::Write;
 
-#[allow(dead_code)]
+/// Extension trait adding encode helpers to any [`Write`] sink.
 pub trait WriteExt: Write {
-    /// Write a value using its Encoder implementation and the provided params
+    /// Encode a value using its [`Encoder`](crate::parser::Encoder) impl.
+    ///
+    /// Pass `()` for context-free types or a context value (such as
+    /// [`Generation`](crate::types::shared::Generation)) when the wire layout
+    /// depends on platform or firmware revision.
     fn write_bytes<T, P>(&mut self, value: T, params: P) -> Result<(), std::io::Error>
     where
         Self: Sized,
@@ -13,6 +24,9 @@ pub trait WriteExt: Write {
         value.encode(self, params)
     }
 
+    /// Write `SKIP` zero bytes for a reserved firmware field.
+    ///
+    /// Returns `self` for method chaining. A no-op when `SKIP` is `0`.
     fn skip_bytes<const SKIP: usize>(&mut self) -> Result<&mut Self, std::io::Error>
     where
         Self: Sized,

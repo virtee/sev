@@ -3,20 +3,26 @@
 //! An implementation of the SEV (non-ES, non-SNP) launch process as a type-state machine.
 //! This ensures (at compile time) that the right steps are called in the
 //! right order.
+//!
+//! Requires `launch`, `sev`, `platform`, `endorser`, and `verifier`. Platform
+//! setup uses the shared `KVM_SEV_INIT2` ioctl.
 
 use crate::{
     error::{FirmwareError, SevError},
-    firmware::host::Version,
     parser::{Decoder, Encoder},
+    types::sev::Version,
     util::{TypeLoad, TypeSave},
 };
+
+#[cfg(feature = "crypto-openssl")]
+pub mod session;
 
 #[cfg(target_os = "linux")]
 use crate::launch::linux::ioctl::*;
 #[cfg(target_os = "linux")]
 use crate::launch::linux::{sev::*, shared::*};
-use crate::*;
 
+use std::io::{Read, Write};
 use std::{convert::TryFrom, mem::MaybeUninit, os::unix::io::AsRawFd, result::Result};
 
 use bitflags::bitflags;
@@ -52,7 +58,7 @@ impl<T, U: AsRawFd, V: AsRawFd> Launcher<T, U, V> {
 }
 
 impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
-    /// Begin the SEV launch process.
+    /// Begin the SEV launch process via the `KVM_SEV_INIT2` ioctl.
     pub fn new(kvm: U, sev: V) -> Result<Self, FirmwareError> {
         let mut launcher = Launcher {
             vm_fd: kvm,
@@ -71,7 +77,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
         Ok(launcher)
     }
 
-    /// Begin the SEV-ES launch process.
+    /// Begin the SEV-ES launch process via the `KVM_SEV_INIT2` ioctl.
     pub fn new_es(kvm: U, sev: V) -> Result<Self, FirmwareError> {
         let mut launcher = Launcher {
             vm_fd: kvm,
@@ -377,7 +383,7 @@ pub struct Start {
     pub policy: Policy,
 
     /// The tenant's Diffie-Hellman certificate.
-    pub cert: certs::sev::sev::Certificate,
+    pub cert: crate::attestation::endorser::sev::cert::Certificate,
 
     /// A secure channel with the AMD SP.
     pub session: Session,

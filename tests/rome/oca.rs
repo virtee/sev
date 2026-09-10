@@ -4,12 +4,12 @@ use super::*;
 
 #[test]
 fn decode() {
-    sev::Certificate::decode(&mut &OCA[..], ()).unwrap();
+    cert::Certificate::decode(&mut &OCA[..], ()).unwrap();
 }
 
 #[test]
 fn encode() {
-    let oca = sev::Certificate::decode(&mut &OCA[..], ()).unwrap();
+    let oca = cert::Certificate::decode(&mut &OCA[..], ()).unwrap();
 
     let mut output = Vec::new();
     oca.encode(&mut output, ()).unwrap();
@@ -17,19 +17,19 @@ fn encode() {
     assert_eq!(OCA.to_vec(), output);
 }
 
-#[cfg(feature = "openssl")]
+#[cfg(feature = "crypto-openssl")]
 #[test]
 fn verify() {
     let mut mut_oca = OCA;
-    let oca = sev::Certificate::decode(&mut mut_oca, ()).unwrap();
+    let oca = cert::Certificate::decode(&mut mut_oca, ()).unwrap();
     (&oca, &oca).verify().unwrap();
 }
 
-#[cfg(feature = "openssl")]
+#[cfg(feature = "crypto-openssl")]
 #[test]
 fn create() {
-    let mut pdh = sev::Certificate::decode(&mut &PDH[..], ()).unwrap();
-    let (mut oca, key) = sev::Certificate::generate(sev::Usage::OCA).unwrap();
+    let mut pdh = cert::Certificate::decode(&mut &PDH[..], ()).unwrap();
+    let (mut oca, key) = cert::Certificate::generate(cert::Usage::OCA).unwrap();
 
     assert!((&pdh, &pdh).verify().is_err());
     assert!((&oca, &pdh).verify().is_err());

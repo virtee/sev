@@ -1,9 +1,39 @@
 // SPDX-License-Identifier: Apache-2.0
 
+//! Deserialize firmware ABI types from byte streams.
+//!
+//! [`Decoder`] is the read-side primitive. Complex types in [`crate::types`]
+//! implement `decode` by reading fields sequentially from a [`Read`] source,
+//! advancing the reader cursor as each field is consumed.
+//!
+//! # Context parameter
+//!
+//! Pass `()` for fixed layouts. Pass [`Generation`](crate::types::shared::Generation)
+//! or [`FirmwareVersion`](crate::types::shared::FirmwareVersion) when
+//! field width or validation rules depend on platform or firmware revision.
+//!
+//! # Primitive impls
+//!
+//! - Integers: read `size_of` bytes and interpret as little-endian.
+//! - `[u8; N]`: read exactly `N` bytes.
+//! - [`Vec<u8>`]: read from current position to end-of-stream.
+
 use std::io::Read;
-/// Trait used to express decoding relationships.
+
+/// Read a value from a byte stream in firmware wire format.
+///
+/// The type parameter `T` carries layout context (see module docs). Implementors
+/// under [`crate::types`] read fields in the order defined by the AMD firmware
+/// specification. The reader cursor advances past consumed bytes.
+///
+/// # Example
+///
+/// ```ignore
+/// let mut reader = &buf[..];
+/// let value = MyType::decode(&mut reader, Generation::Turin)?;
+/// ```
 pub trait Decoder<T>: Sized {
-    /// Decodes from the reader with the given parameters.
+    /// Deserialize a value from `reader` using `params` for context-dependent layouts.
     fn decode(reader: &mut impl Read, params: T) -> Result<Self, std::io::Error>;
 }
 
