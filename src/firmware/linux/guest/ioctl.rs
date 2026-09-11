@@ -7,6 +7,7 @@ use crate::firmware::linux::guest::types::{
 use std::marker::PhantomData;
 
 use iocuddle::{Group, Ioctl, WriteRead};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 pub enum GuestIoctl {
     GetReport = 0x0,
@@ -27,10 +28,13 @@ pub const SNP_GET_EXT_REPORT: Ioctl<WriteRead, &GuestRequest<ExtReportReq, Repor
     unsafe { SEV.write_read(GuestIoctl::GetExtReport as u8) };
 
 /// The default structure used for making requests to the PSP as a guest owner.
-#[repr(C)]
+#[repr(C, packed)]
+#[derive(FromBytes, IntoBytes, Immutable, KnownLayout, Unaligned)]
 pub struct GuestRequest<'a, 'b, Req, Rsp> {
     /// Message version number (must be non-zero)
     pub message_version: u32,
+    /// Padding to match the kernel `snp_guest_request_ioctl` layout.
+    _pad: u32,
     /// Request structure address.
     pub request_data: u64,
     /// Response structure address.
@@ -53,6 +57,7 @@ impl<'a, 'b, Req, Rsp> GuestRequest<'a, 'b, Req, Rsp> {
     pub fn new(ver: Option<u32>, req: &'a mut Req, rsp: &'b mut Rsp) -> Self {
         Self {
             message_version: ver.unwrap_or(1),
+            _pad: 0,
             request_data: req as *mut Req as u64,
             response_data: rsp as *mut Rsp as u64,
             fw_err: Default::default(),
@@ -73,17 +78,25 @@ mod tests {
 
         // Test with explicit version
         let guest_req = GuestRequest::new(Some(2), &mut req, &mut rsp);
-        assert_eq!(guest_req.message_version, 2);
-        assert_ne!(guest_req.request_data, 0);
-        assert_ne!(guest_req.response_data, 0);
-        assert_eq!(guest_req.fw_err, 0);
+        let message_version = { guest_req.message_version };
+        let request_data = { guest_req.request_data };
+        let response_data = { guest_req.response_data };
+        let fw_err = { guest_req.fw_err };
+        assert_eq!(message_version, 2);
+        assert_ne!(request_data, 0);
+        assert_ne!(response_data, 0);
+        assert_eq!(fw_err, 0);
 
         // Test with default version
         let guest_req = GuestRequest::new(None, &mut req, &mut rsp);
-        assert_eq!(guest_req.message_version, 1);
-        assert_ne!(guest_req.request_data, 0);
-        assert_ne!(guest_req.response_data, 0);
-        assert_eq!(guest_req.fw_err, 0);
+        let message_version = { guest_req.message_version };
+        let request_data = { guest_req.request_data };
+        let response_data = { guest_req.response_data };
+        let fw_err = { guest_req.fw_err };
+        assert_eq!(message_version, 1);
+        assert_ne!(request_data, 0);
+        assert_ne!(response_data, 0);
+        assert_eq!(fw_err, 0);
     }
 
     #[test]
