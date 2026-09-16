@@ -65,7 +65,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
         let mut cmd = Command::from(&launcher.sev, &init);
 
         INIT2
-            .ioctl(&mut launcher.vm_fd, &mut cmd)
+            .ioctl(borrow_fd(&launcher.vm_fd), &mut cmd)
             .map_err(|_| cmd.encapsulate())?;
 
         Ok(launcher)
@@ -83,7 +83,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
 
         let mut cmd = Command::from(&launcher.sev, &init);
         INIT2
-            .ioctl(&mut launcher.vm_fd, &mut cmd)
+            .ioctl(borrow_fd(&launcher.vm_fd), &mut cmd)
             .map_err(|_| cmd.encapsulate())?;
 
         Ok(launcher)
@@ -94,7 +94,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
         let mut launch_start = LaunchStart::new(&start.policy, &start.cert, &start.session);
         let mut cmd = Command::from_mut(&self.sev, &mut launch_start);
         LAUNCH_START
-            .ioctl(&mut self.vm_fd, &mut cmd)
+            .ioctl(borrow_fd(&self.vm_fd), &mut cmd)
             .map_err(|_| cmd.encapsulate())?;
 
         let next = Launcher {
@@ -116,7 +116,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
         KvmEncRegion::new(data).register(&mut self.vm_fd)?;
 
         LAUNCH_UPDATE_DATA
-            .ioctl(&mut self.vm_fd, &mut cmd)
+            .ioctl(borrow_fd(&self.vm_fd), &mut cmd)
             .map_err(|_| cmd.encapsulate())?;
 
         Ok(())
@@ -135,7 +135,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
         let mut cmd = Command::from(&self.sev, &launch_update_data);
 
         LAUNCH_UPDATE_DATA
-            .ioctl(&mut self.vm_fd, &mut cmd)
+            .ioctl(borrow_fd(&self.vm_fd), &mut cmd)
             .map_err(|_| cmd.encapsulate())?;
 
         Ok(())
@@ -147,7 +147,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
         let mut cmd = Command::from(&self.sev, &launch_update_vmsa);
 
         LAUNCH_UPDATE_VMSA
-            .ioctl(&mut self.vm_fd, &mut cmd)
+            .ioctl(borrow_fd(&self.vm_fd), &mut cmd)
             .map_err(|_| cmd.encapsulate())?;
 
         Ok(())
@@ -159,7 +159,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
         let mut launch_measure = LaunchMeasure::new(&mut measurement);
         let mut cmd = Command::from_mut(&self.sev, &mut launch_measure);
         LAUNCH_MEASUREMENT
-            .ioctl(&mut self.vm_fd, &mut cmd)
+            .ioctl(borrow_fd(&self.vm_fd), &mut cmd)
             .map_err(|_| cmd.encapsulate())?;
 
         let next = Launcher {
@@ -187,7 +187,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Measured, U, V> {
         let launch_secret = LaunchSecret::new(&secret.header, guest, &secret.ciphertext[..]);
         let mut cmd = Command::from(&self.sev, &launch_secret);
         LAUNCH_SECRET
-            .ioctl(&mut self.vm_fd, &mut cmd)
+            .ioctl(borrow_fd(&self.vm_fd), &mut cmd)
             .map_err(|_| cmd.encapsulate())?;
         Ok(())
     }
@@ -196,7 +196,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Measured, U, V> {
     pub fn finish(mut self) -> Result<Handle, FirmwareError> {
         let mut cmd = Command::from(&self.sev, &LaunchFinish);
         LAUNCH_FINISH
-            .ioctl(&mut self.vm_fd, &mut cmd)
+            .ioctl(borrow_fd(&self.vm_fd), &mut cmd)
             .map_err(|_| cmd.encapsulate())?;
         Ok(self.state.0)
     }
@@ -206,7 +206,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Measured, U, V> {
     pub fn finish_attestable(mut self) -> Result<Launcher<Finished, U, V>, FirmwareError> {
         let mut cmd = Command::from(&self.sev, &LaunchFinish);
         LAUNCH_FINISH
-            .ioctl(&mut self.vm_fd, &mut cmd)
+            .ioctl(borrow_fd(&self.vm_fd), &mut cmd)
             .map_err(|_| cmd.encapsulate())?;
 
         let next = Launcher {
@@ -227,7 +227,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Finished, U, V> {
         let mut len = 0;
 
         let e = LAUNCH_ATTESTATION
-            .ioctl(&mut self.vm_fd, &mut cmd)
+            .ioctl(borrow_fd(&self.vm_fd), &mut cmd)
             .map_err(|_| cmd.encapsulate());
 
         if let Err(err) = e {
@@ -243,7 +243,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Finished, U, V> {
         cmd = Command::from_mut(&self.sev, &mut second);
 
         LAUNCH_ATTESTATION
-            .ioctl(&mut self.vm_fd, &mut cmd)
+            .ioctl(borrow_fd(&self.vm_fd), &mut cmd)
             .map_err(|_| cmd.encapsulate())?;
 
         Ok(bytes)

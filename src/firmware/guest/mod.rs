@@ -101,7 +101,7 @@ impl Firmware {
 
         SNP_GET_REPORT
             .ioctl(&mut self.0, &mut request)
-            .map_err(|_| map_fw_err(request.fw_err.into()))?;
+            .map_err(|_| map_fw_err({ request.fw_err }.into()))?;
 
         // Make sure response status is successful
         if response.status != 0 {
@@ -148,7 +148,7 @@ impl Firmware {
             .ioctl(&mut self.0, &mut guest_request)
             .is_err()
         {
-            match guest_request.fw_err.into() {
+            match { guest_request.fw_err }.into() {
                 // The kernel patch by pgonda@google.com in kernel hash 47894e0f
                 // changed the ioctl return to succeed instead of returning an
                 // error when encountering an invalid certificate length. This was
@@ -169,9 +169,9 @@ impl Firmware {
                         );
                     SNP_GET_EXT_REPORT
                         .ioctl(&mut self.0, &mut guest_request_retry)
-                        .map_err(|_| map_fw_err(guest_request_retry.fw_err.into()))?;
+                        .map_err(|_| map_fw_err({ guest_request_retry.fw_err }.into()))?;
                 }
-                _ => Err(map_fw_err(guest_request.fw_err.into()))?,
+                _ => Err(map_fw_err({ guest_request.fw_err }.into()))?,
             }
         }
 
@@ -248,7 +248,7 @@ impl Firmware {
 
             SNP_GET_DERIVED_KEY
                 .ioctl(&mut self.0, &mut request)
-                .map_err(|_| map_fw_err(request.fw_err.into()))?;
+                .map_err(|_| map_fw_err({ request.fw_err }.into()))?;
         }
 
         // Make sure response status is successfuls

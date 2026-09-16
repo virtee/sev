@@ -12,6 +12,7 @@ use crate::error::FirmwareError;
 use std::marker::PhantomData;
 
 use iocuddle::*;
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 // These enum ordinal values are defined in the Linux kernel
 // source code: include/uapi/linux/psp-sev.h
@@ -125,6 +126,7 @@ pub const SNP_VLEK_LOAD: Ioctl<WriteRead, &Command<SnpVlekLoad>> = unsafe { SEV.
 ///
 /// This struct is defined in the Linux kernel: include/uapi/linux/psp-sev.h
 #[repr(C, packed)]
+#[derive(FromBytes, IntoBytes, Immutable, KnownLayout, Unaligned)]
 pub struct Command<'a, T: Id> {
     pub code: u32,
     pub data: u64,
