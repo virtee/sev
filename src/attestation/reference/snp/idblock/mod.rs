@@ -54,7 +54,7 @@
 //! [`super::snp_calc_launch_digest`](crate::attestation::reference::snp::snp_calc_launch_digest)
 //! or [`super::calc_snp_ovmf_hash`](crate::attestation::reference::snp::calc_snp_ovmf_hash).
 //! After guest boot, compare it to
-//! [`ReportBody::measurement`](crate::attestation::evidence::snp::ReportBody::measurement)
+//! [`ReportBody::measurement`](crate::attestation::verifier::report::snp::ReportBody::measurement)
 //! in a verified attestation report.
 //!
 //! # Typical workflow
@@ -155,13 +155,13 @@ pub struct IdMeasurements {
     /// SHA-384 digest of the ID key public key wire bytes.
     ///
     /// Same size as [`SnpLaunchDigest`] (48 bytes). Often embedded in guest
-    /// policy or compared against [`ReportBody::id_key_digest`](crate::attestation::evidence::snp::ReportBody::id_key_digest)
+    /// policy or compared against [`ReportBody::id_key_digest`](crate::attestation::verifier::report::snp::ReportBody::id_key_digest)
     /// after attestation.
     pub id_key_digest: SnpLaunchDigest,
     /// SHA-384 digest of the author key public key wire bytes.
     ///
     /// Same size as [`SnpLaunchDigest`] (48 bytes). Often compared against
-    /// [`ReportBody::author_key_digest`](crate::attestation::evidence::snp::ReportBody::author_key_digest)
+    /// [`ReportBody::author_key_digest`](crate::attestation::verifier::report::snp::ReportBody::author_key_digest)
     /// after attestation.
     pub auth_key_digest: SnpLaunchDigest,
 }
@@ -342,8 +342,8 @@ pub fn load_priv_key(path: PathBuf) -> Result<EcKey<Private>, IdBlockError> {
 /// # Returns
 ///
 /// A [`SnpLaunchDigest`] suitable for guest policy fields or comparison against
-/// [`ReportBody::id_key_digest`](crate::attestation::evidence::snp::ReportBody::id_key_digest)
-/// / [`ReportBody::author_key_digest`](crate::attestation::evidence::snp::ReportBody::author_key_digest).
+/// [`ReportBody::id_key_digest`](crate::attestation::verifier::report::snp::ReportBody::id_key_digest)
+/// / [`ReportBody::author_key_digest`](crate::attestation::verifier::report::snp::ReportBody::author_key_digest).
 ///
 /// # Errors
 ///

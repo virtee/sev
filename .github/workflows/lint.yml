@@ -32,7 +32,7 @@ jobs:
         with:
           components: clippy
           toolchain: 1.85.0
-      - run: cargo clippy --no-default-features --features=snp,evidence,verifier,endorser,reference,crypto-rust,hw_tests,dangerous_hw_tests --all-targets -- -D clippy::all -D unused_imports -D warnings -D clippy::style
+      - run: cargo clippy --no-default-features --features=snp,verifier,endorser,reference,crypto-rust,hw_tests,dangerous_hw_tests --all-targets -- -D clippy::all -D unused_imports -D warnings -D clippy::style
 
   readme:
     name: cargo rdme

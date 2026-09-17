@@ -23,13 +23,13 @@
 //! ```
 //!
 //! Typical downstream steps (see [`crate::attestation::verifier`] and
-//! [`crate::attestation::evidence::snp`]):
+//! [`crate::attestation::verifier::report::snp`]):
 //!
-//! 1. Frame the report with [`Report::from_bytes`](crate::attestation::evidence::snp::Report::from_bytes).
+//! 1. Frame the report with [`Report::from_bytes`](crate::attestation::verifier::report::snp::Report::from_bytes).
 //! 2. Obtain endorsement material from [`crate::attestation::endorser::snp`]
 //!    (built-in roots, host-exported cert table, or files).
 //! 3. Verify the report signature and parse fields with
-//!    [`ReportBody::try_from`](crate::attestation::evidence::snp::ReportBody).
+//!    [`ReportBody::try_from`](crate::attestation::verifier::report::snp::ReportBody).
 //!
 //! # API summary
 //!
@@ -104,7 +104,7 @@ impl Firmware {
     /// Request a standard attestation report from the ASP.
     ///
     /// Returns the raw 1184-byte report blob. Parse it with
-    /// [`Report::from_bytes`](crate::attestation::evidence::snp::Report::from_bytes);
+    /// [`Report::from_bytes`](crate::attestation::verifier::report::snp::Report::from_bytes);
     /// do not interpret body fields before verification.
     ///
     /// # Arguments

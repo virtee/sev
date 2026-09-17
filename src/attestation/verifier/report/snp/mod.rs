@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-//! SEV-SNP attestation report evidence.
+//! SEV-SNP attestation report types and parsing.
 //!
 //! [`Report`] is the top-level attestation report. [`ReportBody`] and the
 //! [`fields`](self::fields) submodule expose parsed report sections for

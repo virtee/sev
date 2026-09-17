@@ -188,7 +188,7 @@ pub fn calc_snp_ovmf_hash(ovmf_file: PathBuf) -> Result<SnpLaunchDigest, Measure
 /// The result is the full **expected measurement** (launch digest) for the
 /// guest — the value stored in
 /// [`IdBlock::launch_digest`](crate::types::snp::IdBlock::launch_digest) and
-/// compared against [`ReportBody::measurement`](crate::attestation::evidence::snp::ReportBody::measurement)
+/// compared against [`ReportBody::measurement`](crate::attestation::verifier::report::snp::ReportBody::measurement)
 /// after attestation.
 ///
 /// # Arguments

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
-//! RATS Verifier role: appraise attestation evidence and endorsements.
+//! RATS Verifier role: appraise attestation reports and endorsements.
 //!
 //! This module implements the **Verifier** role in the RATS architecture. It
 //! validates cryptographic relationships between endorsement material and
-//! attestation evidence so callers can treat parsed report fields as authentic.
+//! attestation reports so callers can treat parsed report fields as authentic.
 //!
-//! Evidence types live in [`crate::attestation::evidence`]; endorsement
+//! Report framing and field parsing live in [`report`](self::report); endorsement
 //! material is parsed in [`crate::attestation::endorser`]. The verifier connects
 //! the two through [`Verifiable`] implementations.
 //!
@@ -14,7 +14,8 @@
 //!
 //! | Module | Scope |
 //! |--------|-------|
-//! | [`snp`](self::snp) | SEV-SNP certificate chains and attestation reports (default) |
+//! | [`report`](self::report) | Attestation report framing and body parsing |
+//! | [`snp`](self::snp) | SEV-SNP certificate chains and report verification (default) |
 //! | [`sev`](self::sev) | Legacy first-generation SEV (requires `sev` feature) |
 //!
 //! # Core API
@@ -32,9 +33,11 @@
 //!
 //! ```ignore
 //! use sev::attestation::{
-//!     evidence::snp::{Report, ReportBody},
 //!     endorser::snp::Chain,
-//!     verifier::Verifiable,
+//!     verifier::{
+//!         Verifiable,
+//!         report::snp::{Report, ReportBody},
+//!     },
 //! };
 //!
 //! let chain = Chain::from_pem(&pem_bytes)?;
@@ -49,11 +52,13 @@
 //!
 //! # Features
 //!
-//! Requires the `verifier` feature (which pulls in `evidence` and `endorser`),
-//! plus either `snp` or `sev`, and a crypto backend (`crypto-openssl` or
-//! `crypto-rust` for SNP).
+//! Requires the `verifier` feature (which pulls in `endorser`), plus either
+//! `snp` or `sev`, and a crypto backend (`crypto-openssl` or `crypto-rust` for
+//! SNP).
 
 mod verifiable;
+
+pub mod report;
 
 #[cfg(all(
     feature = "snp",

@@ -39,8 +39,6 @@ doc = false
 # SNP remote attestation (verifier profile) — no host platform, guest attester, or launch.
 default = [
     "snp",
-    "attester",
-    "evidence",
     "verifier",
     "endorser",
     "reference",
@@ -60,9 +58,8 @@ sev = ["dep:rdrand"]
 snp = []
 
 # RATS attestation roles (independent of platform/launch).
-evidence = []
 reference = []
-verifier = ["evidence", "endorser"]
+verifier = ["endorser"]
 endorser = []
 attester = []
 

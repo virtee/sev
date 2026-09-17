@@ -3,8 +3,10 @@
 //! RATS-oriented attestation types, production, verification, and reference
 //! values.
 //!
-//! Enable individual role features (`evidence`, `verifier`, `endorser`,
-//! `attester`, `reference`) to compile only the attestation surface you need.
+//! Enable individual role features (`verifier`, `endorser`, `attester`,
+//! `reference`) to compile only the attestation surface you need. Attestation
+//! report parsing lives under [`verifier::report`](crate::attestation::verifier::report)
+//! as part of the verifier role.
 //!
 //! Offline launch digest wire types (OVMF, vCPU, VMSA) live in
 //! [`crate::types::shared::reference`] and are shared by
@@ -16,9 +18,6 @@
     any(feature = "sev", feature = "snp")
 ))]
 pub mod attester;
-
-#[cfg(all(feature = "evidence", any(feature = "sev", feature = "snp")))]
-pub mod evidence;
 
 #[cfg(all(
     feature = "endorser",
@@ -59,10 +58,18 @@ pub mod verifier;
 ))]
 pub use verifier::Verifiable;
 
-#[cfg(all(feature = "evidence", feature = "snp"))]
-pub use evidence::snp::{
+#[cfg(all(
+    feature = "verifier",
+    feature = "snp",
+    any(feature = "crypto-openssl", feature = "crypto-rust")
+))]
+pub use verifier::report::snp::{
     KeyInfo, PlatformInfo, Report, ReportBody, ReportVariant, Signature, SignatureAlgorithm,
 };
 
-#[cfg(all(feature = "evidence", feature = "sev", feature = "crypto-openssl"))]
-pub use evidence::sev::LegacyAttestationReport;
+#[cfg(all(
+    feature = "verifier",
+    feature = "sev",
+    feature = "crypto-openssl"
+))]
+pub use verifier::report::sev::LegacyAttestationReport;

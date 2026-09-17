@@ -23,7 +23,7 @@ roles.
       └────────────────┴────────────────────────┘
                        │
              attestation (RATS roles)
-             evidence · verifier · endorser · attester · reference
+             verifier · endorser · attester · reference
 ```
 
 - [`types`] — firmware ABI **vocabulary** (TCB, guest policy, ID block, cert
@@ -31,7 +31,7 @@ roles.
 - `firmware` (internal) — Linux ioctl transport layouts
 - [`platform`] — host `/dev/sev` management
 - [`attestation::attester`] — guest `/dev/sev-guest` evidence collection
-- [`attestation::evidence`] — attestation report framing and parsing
+- [`attestation::verifier::report`] — attestation report framing and parsing
 - [`attestation::verifier`] — signature and chain verification
 - [`attestation::endorser`] — endorsement material (VCEK/VLEK chains)
 - [`attestation::reference`] — launch digest and ID block reference values
@@ -39,7 +39,7 @@ roles.
 
 # Feature profiles
 
-Defaults target **SNP remote attestation verifiers** — evidence parsing,
+Defaults target **SNP remote attestation verifiers** — report parsing,
 signature verification, and endorsement handling — without compiling host
 platform or guest launch code:
 
@@ -51,7 +51,7 @@ Common opt-in profiles:
 
 | Goal | Features to enable |
 |------|-------------------|
-| Verify SNP reports (default) | `snp`, `evidence`, `verifier`, `endorser`, `crypto-openssl` |
+| Verify SNP reports (default) | `snp`, `verifier`, `endorser`, `crypto-openssl` |
 | Collect guest evidence | add `attester` |
 | Manage host platform (`/dev/sev`) | add `platform` (legacy SEV also needs `endorser` + `verifier`) |
 | Launch KVM guests | add `launch` (implies `platform`) |
@@ -61,7 +61,7 @@ Common opt-in profiles:
 Example — verifier with Rust crypto, no OpenSSL:
 
 ```toml
-sev = { version = "7", default-features = false, features = ["snp", "verifier", "endorser", "evidence", "crypto-rust"] }
+sev = { version = "7", default-features = false, features = ["snp", "verifier", "endorser", "crypto-rust"] }
 ```
 
 # Module guide
@@ -69,7 +69,7 @@ sev = { version = "7", default-features = false, features = ["snp", "verifier", 
 | Module | Feature gates | Purpose |
 |--------|---------------|---------|
 | [`types`] | `sev` and/or `snp` | Shared firmware ABI wire types |
-| [`attestation`] | role features | RATS evidence, verification, endorsement, attestation, reference values |
+| [`attestation`] | role features | RATS verification, endorsement, attestation, reference values |
 | [`platform`] | `platform` | Host `/dev/sev` platform management |
 | [`launch`] | `launch` | KVM guest bring-up (requires `platform`; legacy SEV also needs `endorser` + `verifier`) |
 | [`error`] | always | Error types for ioctl and parsing failures |
@@ -98,7 +98,7 @@ Generation-specific modules:
 - [`types::sev`] — legacy SEV platform status and state (requires `sev`)
 
 **Attestation reports** (`Report`, `ReportBody`, `Signature`) live in
-[`attestation::evidence::snp`], not in `types`. Evidence types compose
+[`attestation::verifier::report::snp`], not in `types`. Evidence types compose
 wire atoms from `types` (for example `TcbVersion` and `GuestPolicy` inside
 `ReportBody`).
 
@@ -112,8 +112,7 @@ Enable the role features you need:
 
 | Feature | Module | Role |
 |---------|--------|------|
-| `evidence` | [`attestation::evidence::snp`] | Parse attestation reports (untrusted framing + body fields) |
-| `verifier` | [`attestation::verifier`] | Verify signatures and certificate chains |
+| `verifier` | [`attestation::verifier`] | Parse reports, verify signatures and certificate chains |
 | `endorser` | [`attestation::endorser`] | VCEK/VLEK chains and built-in CA material |
 | `attester` | [`attestation::attester`] | Guest evidence collection (`/dev/sev-guest`) |
 | `reference` | [`attestation::reference`] | Launch digest and ID block reference values |
@@ -122,7 +121,7 @@ Typical verifier flow:
 
 ```rust
 use sev::attestation::{
-    evidence::snp::{Report, ReportBody},
+    verifier::report::snp::{Report, ReportBody},
     endorser::snp::Chain,
     verifier::Verifiable,
 };
@@ -133,7 +132,7 @@ let chain = Chain::from_pem(&ark_pem, &ask_pem, &vek_pem)?;
 let body = ReportBody::try_from((&report, &chain))?;
 ```
 
-Parse evidence with [`attestation::evidence::snp`], verify with
+Parse reports with [`attestation::verifier::report::snp`], verify with
 [`attestation::verifier::snp`], and resolve endorsement material with
 [`attestation::endorser::snp`].
 
@@ -143,7 +142,7 @@ With `feature = "sev"`, the same [`attestation`] module provides legacy roles:
 
 | Module | Role |
 |--------|------|
-| [`attestation::evidence::sev`] | `LegacyAttestationReport` parsing |
+| [`attestation::verifier::report::sev`] | `LegacyAttestationReport` parsing |
 | [`attestation::verifier::sev`] | PEK/PDH/CEK chain and report verification |
 | [`attestation::endorser::sev`] | Built-in ARK/ASK and certificate chains |
 | [`attestation::reference::sev`] | Legacy SEV / SEV-ES launch digest reference calculation |
@@ -190,8 +189,8 @@ cargo cinstall --prefix=/usr --libdir=/usr/lib64 --features launch
 [`types::snp`]: https://docs.rs/sev/latest/sev/types/snp/
 [`types::sev`]: https://docs.rs/sev/latest/sev/types/sev/
 [`attestation`]: https://docs.rs/sev/latest/sev/attestation/
-[`attestation::evidence::snp`]: https://docs.rs/sev/latest/sev/attestation/evidence/snp/
-[`attestation::evidence::sev`]: https://docs.rs/sev/latest/sev/attestation/evidence/sev/
+[`attestation::verifier::report::snp`]: https://docs.rs/sev/latest/sev/attestation/verifier/report/snp/
+[`attestation::verifier::report::sev`]: https://docs.rs/sev/latest/sev/attestation/verifier/report/sev/
 [`attestation::verifier`]: https://docs.rs/sev/latest/sev/attestation/verifier/
 [`attestation::verifier::snp`]: https://docs.rs/sev/latest/sev/attestation/verifier/snp/
 [`attestation::verifier::sev`]: https://docs.rs/sev/latest/sev/attestation/verifier/sev/

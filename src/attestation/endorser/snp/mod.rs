@@ -40,7 +40,7 @@
 //! use sev::{
 //!     attestation::{
 //!         attester::snp::Firmware,
-//!         evidence::snp::Report,
+//!         verifier::report::snp::Report,
 //!         endorser::snp::Chain,
 //!         verifier::Verifiable,
 //!     },
@@ -54,7 +54,7 @@
 //! ```
 //!
 //! For verified field access, use
-//! [`ReportBody::try_from((&report, &chain))`](crate::attestation::evidence::snp::ReportBody).
+//! [`ReportBody::try_from((&report, &chain))`](crate::attestation::verifier::report::snp::ReportBody).
 //!
 //! # Features
 //!

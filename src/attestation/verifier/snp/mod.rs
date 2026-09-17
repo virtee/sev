@@ -4,7 +4,7 @@
 //!
 //! This module implements the RATS **Verifier** role for SEV-SNP. It validates
 //! AMD endorsement chains and attestation report signatures so callers can trust
-//! evidence from [`crate::attestation::evidence::snp`].
+//! evidence from [`crate::attestation::verifier::report::snp`].
 //!
 //! Endorsement material is parsed in [`crate::attestation::endorser::snp`]; this
 //! module performs the cryptographic checks. All verification entry points
@@ -34,7 +34,7 @@
 //! use sev::{
 //!     attestation::{
 //!         attester::snp::Firmware,
-//!         evidence::snp::{Report, ReportBody},
+//!         verifier::report::snp::{Report, ReportBody},
 //!         endorser::snp::Chain,
 //!         verifier::Verifiable,
 //!     },
@@ -51,11 +51,11 @@
 //! let body = ReportBody::try_from((&report, &chain))?;
 //! ```
 //!
-//! [`Report`](crate::attestation::evidence::snp::Report) is a zero-copy view over
-//! untrusted bytes. Prefer [`ReportBody::try_from`](crate::attestation::evidence::snp::ReportBody)
+//! [`Report`](crate::attestation::verifier::report::snp::Report) is a zero-copy view over
+//! untrusted bytes. Prefer [`ReportBody::try_from`](crate::attestation::verifier::report::snp::ReportBody)
 //! (with a [`Chain`](crate::attestation::endorser::snp::Chain) or
 //! [`Certificate`](crate::attestation::endorser::snp::Certificate)) over parsing
-//! [`ReportBody::from_bytes`](crate::attestation::evidence::snp::ReportBody) directly,
+//! [`ReportBody::from_bytes`](crate::attestation::verifier::report::snp::ReportBody) directly,
 //! so signature checks run before typed field access.
 //!
 //! # Submodules

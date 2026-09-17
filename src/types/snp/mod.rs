@@ -10,7 +10,7 @@
 //! | Category | Types / modules | Typical consumers |
 //! |----------|-----------------|-------------------|
 //! | Endorsement | [`CertType`], [`CertTableEntry`] | [`crate::attestation::endorser::snp`], guest cert table |
-//! | Attestation reports | [`GuestPolicy`], [`TcbVersion`] | [`crate::attestation::evidence::snp`] |
+//! | Attestation reports | [`GuestPolicy`], [`TcbVersion`] | [`crate::attestation::verifier::report::snp`] |
 //! | Launch | [`IdBlock`], [`IdAuth`], [`SnpLaunchDigest`], [`PageType`] | [`crate::launch`], [`crate::attestation::reference::snp`] |
 //! | Platform | [`platform`](self::platform), [`MaskId`](platform_config::MaskId) | [`crate::platform::snp`] |
 //! | Guest keys | [`DerivedKey`](derived_key::DerivedKey), [`GuestFieldSelect`](derived_key::GuestFieldSelect) | [`crate::attestation::attester::snp`] |

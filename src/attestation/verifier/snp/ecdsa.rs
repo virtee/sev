@@ -11,7 +11,7 @@
 //! [`verify_ecdsa_signature`] directly.
 
 use crate::attestation::endorser::snp::Certificate;
-use crate::attestation::evidence::snp::Signature;
+use crate::attestation::verifier::report::snp::Signature;
 use crate::parser::ByteParser;
 
 use std::convert::TryFrom;
@@ -131,7 +131,7 @@ pub fn verify_ecdsa_signature(body: &[u8], signature: &[u8], vek: &Certificate) 
 
 #[cfg(test)]
 mod tests {
-    use crate::attestation::evidence::snp::Signature;
+    use crate::attestation::verifier::report::snp::Signature;
 
     #[cfg(feature = "crypto-openssl")]
     mod openssl_tests {

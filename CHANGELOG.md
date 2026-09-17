@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Changed
+
+- Removed the `evidence` Cargo feature. Attestation report types moved from
+  `attestation::evidence` to [`attestation::verifier::report`](crate::attestation::verifier::report)
+  as part of the verifier role (`verifier` still implies `endorser`).
+
 ### Added
 
 - Introduced [`FirmwareVersion`](crate::types::shared::FirmwareVersion) in
@@ -41,7 +47,7 @@ All notable changes to this project will be documented in this file.
 - Moved `CertType` and `MaskId` into `snp::types`; `platform`
   re-exports them for compatibility.
 - Moved `DerivedKey` and `GuestFieldSelect` into `snp::types::derived_key`.
-- Introduced the `attestation` module with `attestation::evidence::snp` for
+- Introduced the `attestation` module with `attestation::verifier::report::snp` for
   SNP attestation report types (`Report`, `ReportBody`, `ReportVariant`,
   `KeyInfo`, `PlatformInfo`).
 - Introduced `attestation::verifier::snp` for SNP report signature
@@ -51,7 +57,7 @@ All notable changes to this project will be documented in this file.
 - Moved the SNP `Verifiable` trait and all verification impls into
   `attestation::verifier`.
 - Moved SNP report signature wire types (`SignatureAlgorithm`, `Signature`)
-  into `attestation::evidence::snp` and ECDSA verification into
+  into `attestation::verifier::report::snp` and ECDSA verification into
   `attestation::verifier::snp`.
 - Introduced `attestation::attester::snp` for the SNP guest attester role
   (`attestation::attester::snp::Firmware`).
@@ -66,7 +72,7 @@ All notable changes to this project will be documented in this file.
   Low-level Linux ioctl definitions remain internal under `firmware`.
 - Moved legacy SEV certificate chains into `attestation::endorser::sev` and
   verification into `attestation::verifier::sev`. Moved
-  `LegacyAttestationReport` into `attestation::evidence::sev`.
+  `LegacyAttestationReport` into `attestation::verifier::report::sev`.
 
 ### Changed
 
@@ -94,7 +100,7 @@ All notable changes to this project will be documented in this file.
   replaces `Status::build`.
 - Host platform APIs and guest launch are no longer compiled by default; enable
   `platform` or `launch` explicitly when needed.
-- Default features are now `snp`, `evidence`, `verifier`, `endorser`,
+- Default features are now `snp`, `verifier`, `endorser`,
   `reference`, and `crypto-openssl`.
 - Removed `openssl` and `crypto_nossl` feature aliases; use `crypto-openssl`
   and `crypto-rust` instead.
@@ -102,7 +108,7 @@ All notable changes to this project will be documented in this file.
 - SNP platform APIs take [`Generation`] explicitly instead of auto-detecting via
   CPUID. [`Generation::identify_host_generation`](crate::types::shared::Generation::identify_host_generation)
   remains available on Linux x86_64 as an optional helper.
-- Moved `PlatformInfo` and `KeyInfo` to `attestation::evidence::snp::fields`.
+- Moved `PlatformInfo` and `KeyInfo` to `attestation::verifier::report::snp::fields`.
   These are grouped report-body parsing views, not standalone SNP ABI types.
 - Grouped `Version` and `GuestPolicy` under `snp::types::primitives` and `MaskId`
   under `snp::types::platform_config`. `GuestPolicy` is shared across the
@@ -111,10 +117,10 @@ All notable changes to this project will be documented in this file.
 - Grouped `DerivedKey` and `GuestFieldSelect` under `snp::types::derived_key`
   for the `SNP_GET_DERIVED_KEY` guest ioctl ABI.
 - Moved `Report`, `ReportBody`, and `ReportVariant` from the guest firmware
-  path into `attestation::evidence::snp`, split across `report`, `body`, and
+  path into `attestation::verifier::report::snp`, split across `report`, `body`, and
   `variant` submodules. Flat re-exports at `attestation` are unchanged.
 - Moved SNP report verification (`Verifiable` impls and verified
-  `ReportBody` `TryFrom` paths) from `attestation::evidence::snp::report` into
+  `ReportBody` `TryFrom` paths) from `attestation::verifier::report::snp::report` into
   `attestation::verifier::snp`. Evidence retains framing and parse-only APIs.
 - Moved SNP certificate chain types (`Certificate`, `Chain`, `ca`, `builtin`)
   from `certs::snp` into `attestation::endorser::snp`.

@@ -9,10 +9,10 @@
 //!
 //! For most callers, prefer the higher-level impls in [`super::report`] that
 //! assemble `(algorithm, body, signature, vek)` from a parsed
-//! [`Report`](crate::attestation::evidence::snp::Report).
+//! [`Report`](crate::attestation::verifier::report::snp::Report).
 
 use crate::attestation::endorser::snp::Certificate;
-use crate::attestation::evidence::snp::SignatureAlgorithm;
+use crate::attestation::verifier::report::snp::SignatureAlgorithm;
 use crate::attestation::verifier::Verifiable;
 
 use super::ecdsa;

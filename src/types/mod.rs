@@ -43,7 +43,7 @@
 //! | C ioctl payloads | [`crate::firmware`] |
 //! | Host `/dev/sev` API | [`crate::platform`] |
 //! | Guest `/dev/sev-guest` API | [`crate::attestation::attester::snp`] |
-//! | Attestation evidence | [`crate::attestation::evidence::snp`] |
+//! | Attestation reports | [`crate::attestation::verifier::report::snp`] |
 //! | Launch digest calculation | [`crate::attestation::reference`] |
 //! | OVMF / VMSA wire types | [`crate::types::shared::reference`] |
 

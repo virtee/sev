@@ -52,7 +52,7 @@ jobs:
           - name: release
             flag: --release
         features:
-          - sev,evidence,verifier,endorser,reference,crypto-openssl
+          - sev,verifier,endorser,reference,crypto-openssl
 
   sw-sev-crypto-rust-only:
     name: sw sev crypto-rust only ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
@@ -130,7 +130,7 @@ jobs:
           - name: release
             flag: --release
         features:
-          - snp,evidence,verifier,endorser,reference,crypto-openssl
+          - snp,verifier,endorser,reference,crypto-openssl
 
   sw-snp-crypto-rust-only:
     name: sw snp crypto-rust only ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
@@ -156,7 +156,7 @@ jobs:
           - name: release
             flag: --release
         features:
-          - snp,evidence,verifier,endorser,reference,crypto-rust
+          - snp,verifier,endorser,reference,crypto-rust
 
   sw-crypto-openssl:
     name: sw crypto-openssl ${{ matrix.runner }} ${{ matrix.toolchain }} ${{ matrix.profile.name }} ${{ matrix.features }}
@@ -209,11 +209,11 @@ jobs:
           - name: release
             flag: --release
         features:
-          - snp,evidence,verifier,endorser,reference,crypto-rust
+          - snp,verifier,endorser,reference,crypto-rust
 
   # Each RATS role and host feature in isolation.
   #
-  # The jobs above always enable evidence+verifier+endorser+reference together,
+  # The jobs above always enable verifier+endorser+reference together,
   # so a module that reaches across roles still compiles there. This job is what
   # catches it: a feature-gated item whose gate does not match its dependencies
   # (a trait impl that vanishes, a `mod` gated more loosely than what it
@@ -246,7 +246,7 @@ jobs:
         features:
           # sev: one role at a time
           - sev
-          - sev,evidence
+          - sev
           - sev,attester
           - sev,reference,crypto-openssl
           - sev,endorser,crypto-openssl
@@ -256,7 +256,7 @@ jobs:
           - sev,launch,verifier,crypto-openssl
           # snp: one role at a time, under both crypto backends
           - snp
-          - snp,evidence
+          - snp
           - snp,attester
           - snp,platform
           - snp,launch
@@ -294,5 +294,5 @@ jobs:
           - stable
         features:
           - snp
-          - snp,evidence,verifier,endorser,reference,crypto-openssl
-          - snp,evidence,verifier,endorser,reference,crypto-rust
+          - snp,verifier,endorser,reference,crypto-openssl
+          - snp,verifier,endorser,reference,crypto-rust

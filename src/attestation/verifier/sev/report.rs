@@ -2,7 +2,7 @@
 
 use crate::attestation::endorser::sev::cert::{Certificate, EcdsaSignature, Usage};
 use crate::attestation::endorser::sev::PublicKey;
-use crate::attestation::evidence::sev::LegacyAttestationReport;
+use crate::attestation::verifier::report::sev::LegacyAttestationReport;
 use crate::attestation::verifier::Verifiable;
 
 use openssl::{ec::EcKey, ecdsa::EcdsaSig, pkey::Public, sha::Sha256};

@@ -3,7 +3,7 @@
 //! High-level attestation report verification.
 //!
 //! Combines chain or VEK validation with report signature checks, and provides
-//! the recommended path to a verified [`ReportBody`](crate::attestation::evidence::snp::ReportBody).
+//! the recommended path to a verified [`ReportBody`](crate::attestation::verifier::report::snp::ReportBody).
 //!
 //! # Usage
 //!
@@ -14,7 +14,7 @@
 //! report fields without repeating the signature check.
 
 use crate::attestation::endorser::snp::{Certificate, Chain};
-use crate::attestation::evidence::snp::{Report, ReportBody};
+use crate::attestation::verifier::report::snp::{Report, ReportBody};
 use crate::attestation::verifier::Verifiable;
 
 /// Verify an attestation report signature using a trusted VEK certificate.
