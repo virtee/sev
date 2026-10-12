@@ -35,7 +35,8 @@ pub(crate) const DEFAULT_ID_VERSION: u32 = 1;
 pub(crate) const DEFAULT_ID_POLICY: u64 = 0x30000;
 
 pub(crate) const CURVE_P384_NID: Nid = openssl::nid::Nid::SECP384R1;
-pub(crate) const DEFAULT_KEY_ALGO: u32 = 1;
+/// Default key algorithm for ID block signing (ECDSA P-384).
+pub const DEFAULT_KEY_ALGO: u32 = 1;
 pub(crate) const CURVE_P384: u32 = 2;
 
 pub(crate) const ID_BLK_ID_BITS: usize = 128;

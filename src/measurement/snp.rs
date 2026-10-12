@@ -207,6 +207,7 @@ pub fn calc_snp_ovmf_hash(ovmf_file: PathBuf) -> Result<SnpLaunchDigest, Measure
 }
 
 /// Arguments required to calculate the SNP measurement
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct SnpMeasurementArgs<'a> {
     /// Number of vcpus
     pub vcpus: u32,
