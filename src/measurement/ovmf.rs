@@ -17,7 +17,7 @@ use super::snp::SnpLaunchDigest;
 use uuid::{uuid, Uuid};
 
 #[cfg(feature = "serde")]
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// Convert a UUID into a little endian slice
 pub fn guid_le_to_slice(guid: &str) -> Result<[u8; 16], MeasurementError> {
@@ -258,6 +258,25 @@ pub struct OvmfBlob {
     pub bytes: Vec<u8>,
     /// Launch digest of the OVMF firmware data.
     pub digest: Option<SnpLaunchDigest>,
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for OvmfBlob {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use base64::{engine::general_purpose::STANDARD, Engine};
+        let raw = self.to_bytes().map_err(serde::ser::Error::custom)?;
+        serializer.serialize_str(&STANDARD.encode(raw))
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for OvmfBlob {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use base64::{engine::general_purpose::STANDARD, Engine};
+        let s = String::deserialize(deserializer)?;
+        let raw = STANDARD.decode(s).map_err(serde::de::Error::custom)?;
+        OvmfBlob::try_from(raw.as_slice()).map_err(serde::de::Error::custom)
+    }
 }
 
 /// OVMF Structure
