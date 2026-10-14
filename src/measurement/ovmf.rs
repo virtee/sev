@@ -253,6 +253,7 @@ const OVMF_SEV_META_DATA_GUID: Uuid = uuid!("dc886566-984a-4798-a75e-5585a7bf67c
 /// Pairs the serialized `table` and `metadata_items` with an
 /// [`SnpLaunchDigest`] of the original firmware image, which is
 /// sufficient to resume a launch measurement without the full OVMF file.
+#[derive(Clone)]
 pub struct OvmfBlob {
     /// Serialized table and metadata items.
     pub bytes: Vec<u8>,

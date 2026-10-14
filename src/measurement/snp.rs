@@ -227,7 +227,7 @@ pub struct SnpMeasurementArgs<'a> {
     /// vcpu type
     pub vcpu_type: CpuType,
     /// Path to OVMF file
-    pub ovmf_file: PathBuf,
+    pub ovmf_file: Option<PathBuf>,
     /// Active kernel guest features
     pub guest_features: GuestFeatures,
     /// Path to kernel file
@@ -244,26 +244,39 @@ pub struct SnpMeasurementArgs<'a> {
     pub kernel_hash_str: Option<&'a str>,
     /// Already calculated initrd hash
     pub initrd_hash_str: Option<&'a str>,
+    /// Already calculated ovmf hash + metadata & footer fields
+    pub ovmf_blob: Option<OvmfBlob>,
 }
 
 /// Calulate an SEV-SNP launch digest
 pub fn snp_calc_launch_digest(
     snp_measurement: SnpMeasurementArgs,
 ) -> Result<SnpLaunchDigest, MeasurementError> {
-    let ovmf = OVMF::new(snp_measurement.ovmf_file.clone())?;
-
-    let mut gctx: Gctx<Updating> = match snp_measurement.ovmf_hash_str {
-        Some(hash) => {
-            let ovmf_hash = Vec::from_hex(hash)?;
-            Gctx::new(ovmf_hash.as_slice())?
+    
+    let (ovmf, mut gctx) = match (&snp_measurement.ovmf_blob, &snp_measurement.ovmf_file) {
+        (Some(blob), _) => {
+            let digest = blob.digest.ok_or(OVMFError::UnknownError)?;
+            let digest_bytes: Vec<u8> = digest.try_into()?;
+            let ovmf = OVMF::try_from(blob.clone())?;
+            let gctx = Gctx::new(&digest_bytes)?;
+            (ovmf, gctx)
         }
-        _ => {
-            let mut gctx = Gctx::default();
-
-            gctx.update_page(PageType::Normal, ovmf.gpa(), Some(ovmf.data()), None)?;
-
-            gctx
+        (None, Some(ovmf_file)) => {
+            let ovmf = OVMF::new(ovmf_file.clone())?;
+            let gctx = match snp_measurement.ovmf_hash_str {
+                Some(hash) => {
+                    let ovmf_hash = Vec::from_hex(hash)?;
+                    Gctx::new(ovmf_hash.as_slice())?
+                }
+                _ => {
+                    let mut gctx = Gctx::default();
+                    gctx.update_page(PageType::Normal, ovmf.gpa(), Some(ovmf.data()), None)?;
+                    gctx
+                }
+            };
+            (ovmf, gctx)
         }
+        (None, None) => return Err(OVMFError::UnknownError)?,
     };
 
     let sev_hashes: Option<SevHashes> = Option::try_from(&snp_measurement)?;
