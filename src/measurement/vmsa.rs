@@ -46,6 +46,7 @@ impl FromStr for SevMode {
 
 /// Supported Virtual Machine Monitors
 #[derive(Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum VMMType {
     /// QEMU
     QEMU = 1,

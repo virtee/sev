@@ -5,8 +5,12 @@ use std::{convert::TryFrom, fmt};
 
 use crate::error::MeasurementError;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 /// All currently available QEMU vCPU types
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum CpuType {
     /// EPYC
     Epyc,

@@ -44,6 +44,24 @@ pub fn gen_id_auth_block(
     ))
 }
 
+/// Create an IdAuth struct from the given params
+pub fn auth_block(
+    id_block: &IdBlock,
+    id_ec_pub_key: SevEcdsaPubKey,
+    id_sig: SevEcdsaSig,
+    author_ec_priv_key: EcKey<Private>
+) -> Result<IdAuth, IdBlockError> {
+    let id_auth = IdAuth::default();
+    let id_key_algo = id_auth.id_key_algo;
+    let author_key_algo = id_auth.author_key_algo;
+
+    id_auth
+        .with_id_pubkey(id_ec_pub_key)?
+        .with_id_block_sig(id_key_algo, id_sig)?
+        .verify_id_block_sig(id_block)?
+        .sign_id_key(author_key_algo, author_ec_priv_key)
+}
+
 enum KeyFormat {
     Pem,
     Der,
@@ -105,6 +123,11 @@ pub fn generate_key_digest(key_path: PathBuf) -> Result<SnpLaunchDigest, IdBlock
     Ok(SnpLaunchDigest::new(sha384(pub_key.to_bytes()?.as_slice())))
 }
 
+/// Generate the sha384 digest of the provided pem key (same sized digest as SNP Launch Digest)
+pub fn get_key_digest(pub_key: SevEcdsaPubKey) -> Result<SnpLaunchDigest, IdBlockError> {
+    Ok(SnpLaunchDigest::new(sha384(pub_key.to_bytes()?.as_slice())))
+}
+
 /// Calculate the different pieces needed for a complete pre-attestation.
 /// ID-BLOCK, AUTH-BLOCK, id-key digest and auth-key digest.
 pub fn snp_calculate_id(
@@ -125,5 +148,24 @@ pub fn snp_calculate_id(
         id_key_digest: generate_key_digest(id_key_file)?,
 
         auth_key_digest: generate_key_digest(auth_key_file)?,
+    })
+}
+
+
+/// Calculate the different pieces needed for a complete pre-attestation.
+/// ID-BLOCK, AUTH-BLOCK, id-key digest and auth-key digest.
+pub fn compile_id_measurements(
+    id_block: IdBlock,
+    id_sig: SevEcdsaSig,
+    id_ec_pub_key: SevEcdsaPubKey,
+    author_ec_priv_key: EcKey<Private>,
+) -> Result<IdMeasurements, IdBlockError>{
+    let author_ec_pub_key: SevEcdsaPubKey = SevEcdsaPubKey::try_from(&author_ec_priv_key)?;
+
+    Ok(IdMeasurements {
+        id_block: id_block,
+        id_auth: auth_block(&id_block, id_ec_pub_key, id_sig, author_ec_priv_key)?,
+        id_key_digest: get_key_digest(id_ec_pub_key)?,
+        auth_key_digest: get_key_digest(author_ec_pub_key)?,
     })
 }
