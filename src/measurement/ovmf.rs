@@ -10,9 +10,10 @@ use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
     fs::File,
-    io::Read,
+    io::{Cursor, Read},
     path::PathBuf,
 };
+use super::snp::SnpLaunchDigest;
 use uuid::{uuid, Uuid};
 
 #[cfg(feature = "serde")]
@@ -246,6 +247,19 @@ const SEV_HASH_TABLE_RV_GUID: Uuid = uuid!("7255371f-3a3b-4b04-927b-1da6efa8d454
 const SEV_ES_RESET_BLOCK_GUID: Uuid = uuid!("00f771de-1a7e-4fcb-890e-68c77e2fb44e");
 const OVMF_SEV_META_DATA_GUID: Uuid = uuid!("dc886566-984a-4798-a75e-5585a7bf67cc");
 
+/// Compact binary representation of an OVMF's parsed metadata,
+/// excluding the raw firmware data.
+///
+/// Pairs the serialized `table` and `metadata_items` with an
+/// [`SnpLaunchDigest`] of the original firmware image, which is
+/// sufficient to resume a launch measurement without the full OVMF file.
+pub struct OvmfBlob {
+    /// Serialized table and metadata items.
+    pub bytes: Vec<u8>,
+    /// Launch digest of the OVMF firmware data.
+    pub digest: Option<SnpLaunchDigest>,
+}
+
 /// OVMF Structure
 pub struct OVMF {
     /// OVMF data
@@ -429,5 +443,99 @@ impl OVMF {
         }
 
         Ok(())
+    }
+}
+
+impl OvmfBlob {
+    /// Create an `OvmfBlob` from a parsed [`OVMF`] and an optional launch
+    /// digest computed from its firmware data.
+    pub fn new(ovmf: &OVMF, digest: Option<SnpLaunchDigest>) -> Result<Self, MeasurementError> {
+        let mut buf = Vec::new();
+
+        let num_entries = ovmf.table.len() as u32;
+        buf.write_bytes(num_entries, ())?;
+        for (uuid, data) in &ovmf.table {
+            buf.write_all(uuid.as_bytes())?;
+            let data_len = data.len() as u32;
+            buf.write_bytes(data_len, ())?;
+            buf.write_all(data)?;
+        }
+
+        let num_items = ovmf.metadata_items.len() as u32;
+        buf.write_bytes(num_items, ())?;
+        for item in &ovmf.metadata_items {
+            buf.write_bytes(*item, ())?;
+        }
+
+        Ok(OvmfBlob { bytes: buf, digest })
+    }
+
+    /// Serialize the entire `OvmfBlob` into a single binary buffer.
+    pub fn to_bytes(&self) -> Result<Vec<u8>, MeasurementError> {
+        let mut buf = Vec::new();
+        match &self.digest {
+            Some(digest) => {
+                buf.write_bytes(1u8, ())?;
+                buf.write_bytes(*digest, ())?;
+            }
+            None => {
+                buf.write_bytes(0u8, ())?;
+            }
+        }
+        let bytes_len = self.bytes.len() as u32;
+        buf.write_bytes(bytes_len, ())?;
+        buf.write_all(&self.bytes)?;
+        Ok(buf)
+    }
+}
+
+impl TryFrom<&[u8]> for OvmfBlob {
+    type Error = MeasurementError;
+
+    fn try_from(data: &[u8]) -> Result<Self, MeasurementError> {
+        let mut cursor = Cursor::new(data);
+        let has_digest: u8 = cursor.read_bytes()?;
+        let digest = if has_digest != 0 {
+            Some(cursor.read_bytes()?)
+        } else {
+            None
+        };
+        let bytes_len: u32 = cursor.read_bytes()?;
+        let mut bytes = vec![0u8; bytes_len as usize];
+        cursor.read_exact(&mut bytes)?;
+        Ok(OvmfBlob { bytes, digest })
+    }
+}
+
+impl TryFrom<OvmfBlob> for OVMF {
+    type Error = MeasurementError;
+
+    fn try_from(blob: OvmfBlob) -> Result<Self, MeasurementError> {
+        let mut cursor = Cursor::new(&blob.bytes);
+
+        let num_entries: u32 = cursor.read_bytes()?;
+        let mut table = HashMap::with_capacity(num_entries as usize);
+        for _ in 0..num_entries {
+            let mut uuid_bytes = [0u8; 16];
+            cursor.read_exact(&mut uuid_bytes)?;
+            let uuid = Uuid::from_bytes(uuid_bytes);
+            let data_len: u32 = cursor.read_bytes()?;
+            let mut data = vec![0u8; data_len as usize];
+            cursor.read_exact(&mut data)?;
+            table.insert(uuid, data);
+        }
+
+        let num_items: u32 = cursor.read_bytes()?;
+        let mut metadata_items = Vec::with_capacity(num_items as usize);
+        for _ in 0..num_items {
+            let item: OvmfSevMetadataSectionDesc = cursor.read_bytes()?;
+            metadata_items.push(item);
+        }
+
+        Ok(Self {
+            data: Vec::new(),
+            table,
+            metadata_items,
+        })
     }
 }

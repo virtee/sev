@@ -6,7 +6,7 @@ use crate::{
     launch::PageType,
     measurement::{
         gctx::{Gctx, Updating, VMSA_GPA},
-        ovmf::{OvmfSevMetadataSectionDesc, SectionType, OVMF},
+        ovmf::{OvmfBlob, OvmfSevMetadataSectionDesc, SectionType, OVMF},
         sev_hashes::SevHashes,
         vcpu_types::CpuType,
         vmsa::{GuestFeatures, VMMType, VMSA},
@@ -204,6 +204,19 @@ pub fn calc_snp_ovmf_hash(ovmf_file: PathBuf) -> Result<SnpLaunchDigest, Measure
     let gctx = gctx.finished();
 
     Ok(gctx.ld())
+}
+
+/// Get an exportable representation of the OVMF containing the OVMF Hash + OVMF Footer Table & Metadata
+///  which facilitates resuming a launch measurement remotely
+pub fn get_snp_ovmf_blob(ovmf_file: PathBuf) -> Result<OvmfBlob, MeasurementError>{
+    let ovmf = OVMF::new(ovmf_file)?;
+    let mut gctx = Gctx::default();
+
+    gctx.update_page(PageType::Normal, ovmf.gpa(), Some(ovmf.data()), None)?;
+
+    let gctx = gctx.finished();
+
+    OvmfBlob::new(&ovmf, Some(gctx.ld()))
 }
 
 /// Arguments required to calculate the SNP measurement
