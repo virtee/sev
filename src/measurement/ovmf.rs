@@ -254,7 +254,7 @@ const OVMF_SEV_META_DATA_GUID: Uuid = uuid!("dc886566-984a-4798-a75e-5585a7bf67c
 /// [`SnpLaunchDigest`] of the original firmware image, which is
 /// sufficient to resume a launch measurement without the full OVMF file.
 #[derive(Clone)]
-pub struct OvmfBlob {
+pub struct OvmfMeasurement {
     /// Serialized table and metadata items.
     pub bytes: Vec<u8>,
     /// Launch digest of the OVMF firmware data.
@@ -262,7 +262,7 @@ pub struct OvmfBlob {
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for OvmfBlob {
+impl Serialize for OvmfMeasurement {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use base64::{engine::general_purpose::STANDARD, Engine};
         let raw = self.to_bytes().map_err(serde::ser::Error::custom)?;
@@ -271,12 +271,12 @@ impl Serialize for OvmfBlob {
 }
 
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for OvmfBlob {
+impl<'de> Deserialize<'de> for OvmfMeasurement {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         use base64::{engine::general_purpose::STANDARD, Engine};
         let s = String::deserialize(deserializer)?;
         let raw = STANDARD.decode(s).map_err(serde::de::Error::custom)?;
-        OvmfBlob::try_from(raw.as_slice()).map_err(serde::de::Error::custom)
+        OvmfMeasurement::try_from(raw.as_slice()).map_err(serde::de::Error::custom)
     }
 }
 
@@ -466,8 +466,8 @@ impl OVMF {
     }
 }
 
-impl OvmfBlob {
-    /// Create an `OvmfBlob` from a parsed [`OVMF`] and an optional launch
+impl OvmfMeasurement {
+    /// Create an `OvmfMeasurement` from a parsed [`OVMF`] and an optional launch
     /// digest computed from its firmware data.
     pub fn new(ovmf: &OVMF, digest: Option<SnpLaunchDigest>) -> Result<Self, MeasurementError> {
         let mut buf = Vec::new();
@@ -487,10 +487,10 @@ impl OvmfBlob {
             buf.write_bytes(*item, ())?;
         }
 
-        Ok(OvmfBlob { bytes: buf, digest })
+        Ok(OvmfMeasurement { bytes: buf, digest })
     }
 
-    /// Serialize the entire `OvmfBlob` into a single binary buffer.
+    /// Serialize the entire `OvmfMeasurement` into a single binary buffer.
     pub fn to_bytes(&self) -> Result<Vec<u8>, MeasurementError> {
         let mut buf = Vec::new();
         match &self.digest {
@@ -509,7 +509,7 @@ impl OvmfBlob {
     }
 }
 
-impl TryFrom<&[u8]> for OvmfBlob {
+impl TryFrom<&[u8]> for OvmfMeasurement {
     type Error = MeasurementError;
 
     fn try_from(data: &[u8]) -> Result<Self, MeasurementError> {
@@ -523,14 +523,14 @@ impl TryFrom<&[u8]> for OvmfBlob {
         let bytes_len: u32 = cursor.read_bytes()?;
         let mut bytes = vec![0u8; bytes_len as usize];
         cursor.read_exact(&mut bytes)?;
-        Ok(OvmfBlob { bytes, digest })
+        Ok(OvmfMeasurement { bytes, digest })
     }
 }
 
-impl TryFrom<OvmfBlob> for OVMF {
+impl TryFrom<OvmfMeasurement> for OVMF {
     type Error = MeasurementError;
 
-    fn try_from(blob: OvmfBlob) -> Result<Self, MeasurementError> {
+    fn try_from(blob: OvmfMeasurement) -> Result<Self, MeasurementError> {
         let mut cursor = Cursor::new(&blob.bytes);
 
         let num_entries: u32 = cursor.read_bytes()?;

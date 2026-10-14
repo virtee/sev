@@ -6,7 +6,7 @@ use crate::{
     launch::PageType,
     measurement::{
         gctx::{Gctx, Updating, VMSA_GPA},
-        ovmf::{OvmfBlob, OvmfSevMetadataSectionDesc, SectionType, OVMF},
+        ovmf::{OvmfMeasurement, OvmfSevMetadataSectionDesc, SectionType, OVMF},
         sev_hashes::SevHashes,
         vcpu_types::CpuType,
         vmsa::{GuestFeatures, VMMType, VMSA},
@@ -208,7 +208,7 @@ pub fn calc_snp_ovmf_hash(ovmf_file: PathBuf) -> Result<SnpLaunchDigest, Measure
 
 /// Get an exportable representation of the OVMF containing the OVMF Hash + OVMF Footer Table & Metadata
 ///  which facilitates resuming a launch measurement remotely
-pub fn get_snp_ovmf_blob(ovmf_file: PathBuf) -> Result<OvmfBlob, MeasurementError>{
+pub fn get_snp_ovmf_measurement(ovmf_file: PathBuf) -> Result<OvmfMeasurement, MeasurementError>{
     let ovmf = OVMF::new(ovmf_file)?;
     let mut gctx = Gctx::default();
 
@@ -216,7 +216,7 @@ pub fn get_snp_ovmf_blob(ovmf_file: PathBuf) -> Result<OvmfBlob, MeasurementErro
 
     let gctx = gctx.finished();
 
-    OvmfBlob::new(&ovmf, Some(gctx.ld()))
+    OvmfMeasurement::new(&ovmf, Some(gctx.ld()))
 }
 
 /// Arguments required to calculate the SNP measurement
@@ -245,7 +245,7 @@ pub struct SnpMeasurementArgs<'a> {
     /// Already calculated initrd hash
     pub initrd_hash_str: Option<&'a str>,
     /// Already calculated ovmf hash + metadata & footer fields
-    pub ovmf_blob: Option<OvmfBlob>,
+    pub ovmf_measurement: Option<OvmfMeasurement>,
 }
 
 /// Calulate an SEV-SNP launch digest
@@ -253,11 +253,11 @@ pub fn snp_calc_launch_digest(
     snp_measurement: SnpMeasurementArgs,
 ) -> Result<SnpLaunchDigest, MeasurementError> {
     
-    let (ovmf, mut gctx) = match (&snp_measurement.ovmf_blob, &snp_measurement.ovmf_file) {
-        (Some(blob), _) => {
-            let digest = blob.digest.ok_or(OVMFError::UnknownError)?;
+    let (ovmf, mut gctx) = match (&snp_measurement.ovmf_measurement, &snp_measurement.ovmf_file) {
+        (Some(ovmf_m), _) => {
+            let digest = ovmf_m.digest.ok_or(OVMFError::UnknownError)?;
             let digest_bytes: Vec<u8> = digest.try_into()?;
-            let ovmf = OVMF::try_from(blob.clone())?;
+            let ovmf = OVMF::try_from(ovmf_m.clone())?;
             let gctx = Gctx::new(&digest_bytes)?;
             (ovmf, gctx)
         }
