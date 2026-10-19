@@ -1,3 +1,12 @@
+[workspace]
+members = [".", "sev-attester", "sev-core", "sev-endorser", "sev-platform", "sev-reference", "sev-types", "sev-verifier"]
+default-members = ["."]
+
+[workspace.package]
+license = "Apache-2.0"
+edition = "2018"
+rust-version = "1.85.0"
+
 [package]
 name = "sev"
 version = "8.0.0"

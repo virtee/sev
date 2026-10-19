@@ -1040,7 +1040,7 @@ dependencies = [
  "num-integer",
  "num-iter",
  "num-traits",
- "rand 0.8.5",
+ "rand 0.8.8",
  "smallvec",
  "zeroize",
 ]
@@ -1777,6 +1777,52 @@ dependencies = [
  "tokio",
  "uuid",
  "x509-cert",
+]
+
+[[package]]
+name = "sev-attester"
+version = "8.0.0"
+dependencies = [
+ "sev-types",
+]
+
+[[package]]
+name = "sev-core"
+version = "8.0.0"
+
+[[package]]
+name = "sev-endorser"
+version = "8.0.0"
+dependencies = [
+ "sev-types",
+]
+
+[[package]]
+name = "sev-platform"
+version = "8.0.0"
+dependencies = [
+ "sev-types",
+]
+
+[[package]]
+name = "sev-reference"
+version = "8.0.0"
+dependencies = [
+ "sev-types",
+]
+
+[[package]]
+name = "sev-types"
+version = "8.0.0"
+dependencies = [
+ "sev-core",
+]
+
+[[package]]
+name = "sev-verifier"
+version = "8.0.0"
+dependencies = [
+ "sev-types",
 ]
 
 [[package]]
