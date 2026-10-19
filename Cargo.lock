@@ -1782,6 +1782,9 @@ dependencies = [
 [[package]]
 name = "sev-attester"
 version = "0.1.0"
+dependencies = [
+ "sev-types",
+]
 
 [[package]]
 name = "sev-core"
@@ -1790,22 +1793,37 @@ version = "0.1.0"
 [[package]]
 name = "sev-endorser"
 version = "0.1.0"
+dependencies = [
+ "sev-types",
+]
 
 [[package]]
 name = "sev-platform"
 version = "0.1.0"
+dependencies = [
+ "sev-types",
+]
 
 [[package]]
 name = "sev-reference"
 version = "0.1.0"
+dependencies = [
+ "sev-types",
+]
 
 [[package]]
 name = "sev-types"
 version = "0.1.0"
+dependencies = [
+ "sev-core",
+]
 
 [[package]]
 name = "sev-verifier"
 version = "0.1.0"
+dependencies = [
+ "sev-types",
+]
 
 [[package]]
 name = "sha2"
