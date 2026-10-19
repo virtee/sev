@@ -1780,6 +1780,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "sev-attester"
+version = "0.1.0"
+
+[[package]]
+name = "sev-core"
+version = "0.1.0"
+
+[[package]]
+name = "sev-endorser"
+version = "0.1.0"
+
+[[package]]
+name = "sev-platform"
+version = "0.1.0"
+
+[[package]]
+name = "sev-reference"
+version = "0.1.0"
+
+[[package]]
+name = "sev-types"
+version = "0.1.0"
+
+[[package]]
+name = "sev-verifier"
+version = "0.1.0"
+
+[[package]]
 name = "sha2"
 version = "0.10.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
