@@ -1,9 +1,9 @@
 [package]
 name = "sev-endorser"
-version = "0.1.0"
+version = "8.0.0"
 license.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-sev-types = { version = "0.1.0", path = "../sev-types" }
+sev-types = { version = "8.0.0", path = "../sev-types" }
