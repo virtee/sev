@@ -6,7 +6,7 @@ use crate::certs::snp::{Certificate, Chain, Verifiable};
 use crate::{
     certs::snp::ecdsa::Signature,
     error::AttestationReportError,
-    firmware::host::TcbVersion,
+    firmware::host::{EtcbVersion, TcbVersion},
     parser::{ByteParser, Decoder, Encoder},
     util::{
         hexline::HexLine,
@@ -199,6 +199,9 @@ pub enum ReportVariant {
 
     /// Version 5 of the Attestation Report
     V5,
+
+    /// Version 6 of the Attestation Report
+    V6,
 }
 
 impl Encoder<()> for ReportVariant {
@@ -207,6 +210,7 @@ impl Encoder<()> for ReportVariant {
             ReportVariant::V2 => writer.write_bytes(2u32, ())?,
             ReportVariant::V3 => writer.write_bytes(3u32, ())?,
             ReportVariant::V5 => writer.write_bytes(5u32, ())?,
+            ReportVariant::V6 => writer.write_bytes(6u32, ())?,
         };
         Ok(())
     }
@@ -220,7 +224,8 @@ impl Decoder<()> for ReportVariant {
             2 => Self::V2,
             3 | 4 => Self::V3,
             5 => Self::V5,
-            _ => Self::V5,
+            6 => Self::V6,
+            _ => Self::V6,
         })
     }
 }
@@ -323,6 +328,15 @@ pub struct AttestationReport {
     pub launch_mit_vector: Option<u64>,
     /// Value is set to the current verified mitigation vectore value (CurrentMitVector).
     pub current_mit_vector: Option<u64>,
+
+    // 208h [192:0] Reserved. MBZ
+    /// The CurrentEtcb. Only reported by Venice parts; `None` on all others.
+    pub current_etcb: Option<EtcbVersion>,
+    /// The LaunchEtcb. Only reported by Venice parts; `None` on all others.
+    pub launch_etcb: Option<EtcbVersion>,
+    /// The CommitedEtcb. Only reported by Venice parts; `None` on all others.
+    pub committed_etcb: Option<EtcbVersion>,
+
     /// Signature of bytes 0 to 0x29F inclusive of this report.
     /// The format of the signature is found within Signature.
     pub signature: Signature,
@@ -359,6 +373,9 @@ impl Default for AttestationReport {
             launch_tcb: Default::default(),
             launch_mit_vector: Default::default(),
             current_mit_vector: Default::default(),
+            current_etcb: Default::default(),
+            launch_etcb: Default::default(),
+            committed_etcb: Default::default(),
             signature: Default::default(),
         }
     }
@@ -370,7 +387,8 @@ impl Encoder<()> for AttestationReport {
         let variant = match self.version {
             2 => ReportVariant::V2,
             3 | 4 => ReportVariant::V3,
-            _ => ReportVariant::V5,
+            5 => ReportVariant::V5,
+            _ => ReportVariant::V6,
         };
 
         let generation = match variant {
@@ -436,18 +454,30 @@ impl Encoder<()> for AttestationReport {
         // Write launch and current mitigation vectors based on variant
         match variant {
             ReportVariant::V2 | ReportVariant::V3 => {
-                writer
-                    .skip_bytes::<168>()?
-                    .write_bytes(self.signature, ())?;
+                writer.skip_bytes::<40>()?;
             }
             _ => {
                 writer.write_bytes(self.launch_mit_vector.unwrap_or(0), ())?;
                 writer.write_bytes(self.current_mit_vector.unwrap_or(0), ())?;
-                writer
-                    .skip_bytes::<152>()?
-                    .write_bytes(self.signature, ())?;
+                writer.skip_bytes::<24>()?;
             }
         }
+
+        // Write extended TCBs based on variant and generation. Only Venice V6
+        // parts report extended TCBs; on every other generation the 96-byte
+        // span is MBZ.
+        match (variant, generation) {
+            (ReportVariant::V6, Generation::Venice) => {
+                writer.write_bytes(self.current_etcb.unwrap_or_default(), ())?;
+                writer.write_bytes(self.launch_etcb.unwrap_or_default(), ())?;
+                writer.write_bytes(self.committed_etcb.unwrap_or_default(), ())?;
+            }
+            _ => {
+                writer.skip_bytes::<96>()?;
+            }
+        }
+
+        writer.skip_bytes::<32>()?.write_bytes(self.signature, ())?;
 
         Ok(())
     }
@@ -513,17 +543,36 @@ impl Decoder<()> for AttestationReport {
         let committed = stepper.skip_bytes::<1>()?.read_bytes()?;
         let launch_tcb = stepper.skip_bytes::<1>()?.read_bytes_with(generation)?;
 
-        // mit vecor fields were added in V5 and later.
-        let (launch_mit_vector, current_mit_vector, signature) = match variant {
+        // Mit vector fields were added in V5 and later.
+        let (launch_mit_vector, current_mit_vector) = match variant {
             ReportVariant::V2 | ReportVariant::V3 => {
-                (None, None, stepper.skip_bytes::<168>()?.read_bytes()?)
+                stepper.skip_bytes::<40>()?;
+                (None, None)
             }
-            _ => (
-                Some(stepper.read_bytes()?),
-                Some(stepper.read_bytes()?),
-                stepper.skip_bytes::<152>()?.read_bytes()?,
-            ),
+            _ => {
+                let launch_mit_vector = stepper.read_bytes()?;
+                let current_mit_vector = stepper.read_bytes()?;
+                stepper.skip_bytes::<24>()?;
+                (Some(launch_mit_vector), Some(current_mit_vector))
+            }
         };
+
+        // Extended TCBs are only reported by Venice V6 parts; elsewhere the
+        // 96-byte span is MBZ.
+        let (current_etcb, launch_etcb, committed_etcb) = match (variant, generation) {
+            (ReportVariant::V6, Generation::Venice) => {
+                let current_etcb = stepper.read_bytes()?;
+                let launch_etcb = stepper.read_bytes()?;
+                let committed_etcb = stepper.read_bytes()?;
+                (Some(current_etcb), Some(launch_etcb), Some(committed_etcb))
+            }
+            _ => {
+                stepper.skip_bytes::<96>()?;
+                (None, None, None)
+            }
+        };
+
+        let signature = stepper.skip_bytes::<32>()?.read_bytes()?;
 
         Ok(Self {
             version,
@@ -554,6 +603,9 @@ impl Decoder<()> for AttestationReport {
             launch_tcb,
             launch_mit_vector,
             current_mit_vector,
+            current_etcb,
+            launch_etcb,
+            committed_etcb,
             signature,
         })
     }
@@ -649,6 +701,18 @@ Launch Mitigation Vector:     {}
 
 Current Mitigation Vector:    {}
 
+Current ETCB:
+
+{}
+
+Launch ETCB:
+
+{}
+
+Committed ETCB:
+
+{}
+
 {}"#,
             self.version,
             self.guest_svn,
@@ -683,6 +747,12 @@ Current Mitigation Vector:    {}
                 .map_or("None".to_string(), |lmv| lmv.to_string()),
             self.current_mit_vector
                 .map_or("None".to_string(), |cmv| cmv.to_string()),
+            self.current_etcb
+                .map_or("None".to_string(), |etcb| etcb.to_string()),
+            self.launch_etcb
+                .map_or("None".to_string(), |etcb| etcb.to_string()),
+            self.committed_etcb
+                .map_or("None".to_string(), |etcb| etcb.to_string()),
             self.signature
         )
     }
@@ -1044,7 +1114,8 @@ bitfield! {
     /// SIGNING_KEY field: Encodes the key used to sign this report.
     /// (0) VCEK
     /// (1) VLEK
-    /// (2-6) RESERVED
+    /// (2) Chip-secret VCEK
+    /// (3-6) RESERVED
     /// (7) NONE
     pub signing_key, _: 4,2;
 
@@ -1086,6 +1157,7 @@ impl Display for KeyInfo {
         let signing_key = match self.signing_key() {
             0 => "vcek",
             1 => "vlek",
+            2 => "csvcek",
             7 => "none",
             _ => "unknown",
         };
@@ -1304,6 +1376,18 @@ Launch Mitigation Vector:     None
 
 Current Mitigation Vector:    None
 
+Current ETCB:
+
+None
+
+Launch ETCB:
+
+None
+
+Committed ETCB:
+
+None
+
 Signature:
   R:
 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
@@ -1492,6 +1576,17 @@ Signature:
     mask chip key:      false
     signing key:        vlek"#;
         let actual: KeyInfo = KeyInfo(0b100);
+
+        assert_eq!(expected, actual.to_string());
+    }
+
+    #[test]
+    fn test_key_info_fmt_csvcek() {
+        let expected: &str = r#"Key Information:
+    author key enabled: false
+    mask chip key:      false
+    signing key:        csvcek"#;
+        let actual: KeyInfo = KeyInfo(0b1000);
 
         assert_eq!(expected, actual.to_string());
     }
@@ -1772,6 +1867,107 @@ Signature:
         let result = report.encode(&mut FailingWriter, ());
         assert!(result.is_err());
         assert!(writer.flush().is_ok());
+    }
+
+    /// Builds an extended TCB whose fourteen SVNs ascend from `base`, so a
+    /// misplaced field shows up as a wrong value rather than a wrong length.
+    fn sample_report_etcb(base: u8) -> EtcbVersion {
+        EtcbVersion {
+            ip_key_manager: base,
+            mp1: base + 1,
+            art_fmc: base + 2,
+            art_rt: base + 3,
+            had_driver: base + 4,
+            boot_driver: base + 5,
+            pre_esid: base + 6,
+            tmpm: base + 7,
+            microcode: base + 8,
+            soc_driver: base + 9,
+            asp_os_driver: base + 10,
+            fhp_driver: base + 11,
+            dpe_driver: base + 12,
+            arg: base + 13,
+        }
+    }
+
+    /// The extended TCBs sit at 220h, 240h and 260h, bracketed by reserved
+    /// bytes at 208h and 280h, with the signature following at 2A0h.
+    #[test]
+    fn test_attestation_report_venice_etcb_offsets() {
+        const RESERVED_208: usize = 0x208;
+        const CURRENT_ETCB: usize = 0x220;
+        const LAUNCH_ETCB: usize = 0x240;
+        const COMMITTED_ETCB: usize = 0x260;
+        const RESERVED_280: usize = 0x280;
+        const SIGNATURE: usize = 0x2A0;
+
+        let report = AttestationReport {
+            version: 6,
+            // Family 1Ah, model 50h identifies a Venice part.
+            cpuid_fam_id: Some(0x1A),
+            cpuid_mod_id: Some(0x50),
+            cpuid_step: Some(0),
+            launch_mit_vector: Some(0),
+            current_mit_vector: Some(0),
+            // Venice TCBs carry an FMC byte, unlike `TcbVersion::default()`.
+            // Venice TCBs do not encode bootloader or microcode SVNs.
+            current_tcb: TcbVersion::new(Some(1), None, 1, 0, None),
+            reported_tcb: TcbVersion::new(Some(1), None, 1, 0, None),
+            committed_tcb: TcbVersion::new(Some(1), None, 1, 0, None),
+            launch_tcb: TcbVersion::new(Some(0), None, 0, 0, None),
+            current_etcb: Some(sample_report_etcb(1)),
+            launch_etcb: Some(sample_report_etcb(21)),
+            committed_etcb: Some(sample_report_etcb(41)),
+            ..Default::default()
+        };
+
+        let bytes = report.to_bytes().unwrap();
+
+        assert_eq!(
+            bytes[CURRENT_ETCB..LAUNCH_ETCB],
+            sample_report_etcb(1).to_venice_bytes()
+        );
+        assert_eq!(
+            bytes[LAUNCH_ETCB..COMMITTED_ETCB],
+            sample_report_etcb(21).to_venice_bytes()
+        );
+        assert_eq!(
+            bytes[COMMITTED_ETCB..RESERVED_280],
+            sample_report_etcb(41).to_venice_bytes()
+        );
+
+        // The reserved bytes on either side of the block are MBZ.
+        assert_eq!(bytes[RESERVED_208..CURRENT_ETCB], [0u8; 24]);
+        assert_eq!(bytes[RESERVED_280..SIGNATURE], [0u8; 32]);
+
+        assert_eq!(AttestationReport::from_bytes(&bytes).unwrap(), report);
+    }
+
+    /// Non-Venice parts leave 208h through 2A0h reserved, so extended TCBs are
+    /// neither written nor read there.
+    #[test]
+    fn test_attestation_report_non_venice_etcb_reserved() {
+        let report = AttestationReport {
+            version: 5,
+            // Family 1Ah, model 02h identifies a Turin part.
+            cpuid_fam_id: Some(0x1A),
+            cpuid_mod_id: Some(0x02),
+            cpuid_step: Some(0),
+            launch_mit_vector: Some(0),
+            current_mit_vector: Some(0),
+            current_etcb: Some(sample_report_etcb(1)),
+            launch_etcb: Some(sample_report_etcb(21)),
+            committed_etcb: Some(sample_report_etcb(41)),
+            ..Default::default()
+        };
+
+        let bytes = report.to_bytes().unwrap();
+        assert_eq!(bytes[0x208..0x2A0], [0u8; 152]);
+
+        let decoded = AttestationReport::from_bytes(&bytes).unwrap();
+        assert_eq!(decoded.current_etcb, None);
+        assert_eq!(decoded.launch_etcb, None);
+        assert_eq!(decoded.committed_etcb, None);
     }
 
     #[test]
