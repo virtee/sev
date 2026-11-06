@@ -274,8 +274,8 @@ impl Generation {
                 )),
             },
             0x1A => match model {
-                0x0..=0x11 => Ok(Self::Turin),
-                0x50..=0x57 | 0x90..=0x9F | 0xA0..=0xAF | 0xC0..=0xC7 => Ok(Self::Venice),
+                0x0..=0x1F => Ok(Self::Turin),
+                0x50..=0x5F | 0xC0..=0xCF => Ok(Self::Venice),
                 _ => Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
                     "processor is not of know SEV-SNP model.",
