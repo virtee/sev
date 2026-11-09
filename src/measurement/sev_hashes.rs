@@ -22,6 +22,7 @@ use std::{
     str::FromStr,
 };
 
+use hex::FromHex;
 use uuid::{uuid, Uuid};
 
 use crate::error::*;
@@ -31,7 +32,8 @@ use crate::util::parser_helper::{ReadExt, WriteExt};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-type Sha256Hash = [u8; 32];
+/// A 32 byte-buffer intended to hold a Sha256Hash
+pub type Sha256Hash = [u8; 32];
 
 /// GUID stored as little endian
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -245,6 +247,7 @@ const SEV_INITRD_ENTRY_GUID: Uuid = uuid!("44baf731-3a2f-4bd7-9af1-41e29169781d"
 const SEV_CMDLINE_ENTRY_GUID: Uuid = uuid!("97d02dd8-bd20-4c94-aa78-e7714d36ab2a");
 
 /// Struct containing the 3 possible SEV hashes
+#[derive(Debug, Default)]
 pub struct SevHashes {
     /// Kernel hash
     kernel_hash: Sha256Hash,
@@ -254,6 +257,74 @@ pub struct SevHashes {
     cmdline_hash: Sha256Hash,
 }
 
+/// Generates hash from user provided cmdline
+pub fn get_cmdline_hash(append: Option<&str>) -> Sha256Hash {
+    match append {
+        Some(append_str) => {
+            let mut append_bytes = append_str.trim().as_bytes().to_vec();
+            append_bytes.extend_from_slice(b"\x00");
+            sha256(&append_bytes)
+        }
+
+        None => sha256(b"\x00"),
+    }
+}
+
+/// Generates hash from user provided initrd file
+pub fn get_initrd_hash(initrd: Option<PathBuf>) -> Result<Sha256Hash, MeasurementError> {
+    let initrd_data = match initrd {
+        Some(path) => {
+            let mut initrd_file = File::open(path)?;
+            let mut data = Vec::new();
+            initrd_file.read_to_end(&mut data)?;
+            data
+        }
+        None => Vec::new(),
+    };
+    Ok(sha256(&initrd_data))
+}
+
+/// Generates hash from user provided kernel file
+pub fn get_kernel_hash(kernel: PathBuf) -> Result<Sha256Hash, MeasurementError> {
+    let mut kernel_file = File::open(kernel)?;
+    let mut kernel_data = Vec::new();
+    kernel_file.read_to_end(&mut kernel_data)?;
+    Ok(sha256(&kernel_data))
+}
+
+impl<'a> TryFrom<&crate::measurement::snp::SnpMeasurementArgs<'a>> for Option<SevHashes> {
+    type Error = MeasurementError;
+
+    fn try_from(
+        args: &crate::measurement::snp::SnpMeasurementArgs<'a>,
+    ) -> Result<Self, MeasurementError> {
+        let base = match (args.kernel_hash_str, &args.kernel_file) {
+            (Some(hash), _) => {
+                let hash: Sha256Hash = Vec::from_hex(hash)?
+                    .try_into()
+                    .map_err(|_| MeasurementError::InvalidHashLength)?;
+                Some(SevHashes::default().kernel_hash(hash))
+            }
+            (None, Some(file)) => Some(SevHashes::default().kernel(file.clone())?),
+            (None, None) => None,
+        };
+
+        base.map(|sev_hashes| -> Result<_, MeasurementError> {
+            let sev_hashes = match args.initrd_hash_str {
+                Some(hash) => {
+                    let hash: Sha256Hash = Vec::from_hex(hash)?
+                        .try_into()
+                        .map_err(|_| MeasurementError::InvalidHashLength)?;
+                    sev_hashes.initrd_hash(hash)
+                }
+                None => sev_hashes.initrd(args.initrd_file.clone())?,
+            };
+            Ok(sev_hashes.cmdline(args.append))
+        })
+        .transpose()
+    }
+}
+
 impl SevHashes {
     /// Generate hashes from the user provided kernel, initrd, and cmdline.
     pub fn new(
@@ -261,38 +332,47 @@ impl SevHashes {
         initrd: Option<PathBuf>,
         append: Option<&str>,
     ) -> Result<Self, MeasurementError> {
-        let mut kernel_file = File::open(kernel)?;
-        let mut kernel_data = Vec::new();
-        kernel_file.read_to_end(&mut kernel_data)?;
+        Ok(Self::default()
+            .kernel(kernel)?
+            .initrd(initrd)?
+            .cmdline(append)
+        )
+    }
 
-        let kernel_hash = sha256(&kernel_data);
-        let initrd_data = match initrd {
-            Some(path) => {
-                let mut initrd_file = File::open(path)?;
-                let mut data = Vec::new();
-                initrd_file.read_to_end(&mut data)?;
-                data
-            }
-            None => Vec::new(),
-        };
+    /// Sets kernel_hash to the provided value
+    pub fn kernel_hash(mut self, kernel_hash: Sha256Hash) -> Self {
+        self.kernel_hash = kernel_hash;
+        self
+    }
 
-        let initrd_hash = sha256(&initrd_data);
+    /// Sets initrd_hash to the provided value
+    pub fn initrd_hash(mut self, initrd_hash: Sha256Hash) -> Self {
+        self.initrd_hash = initrd_hash;
+        self
+    }
 
-        let cmdline_hash = match append {
-            Some(append_str) => {
-                let mut append_bytes = append_str.trim().as_bytes().to_vec();
-                append_bytes.extend_from_slice(b"\x00");
-                sha256(&append_bytes)
-            }
+    /// Sets cmdline_hash to the provided value
+    pub fn cmdline_hash(mut self, cmdline_hash: Sha256Hash) -> Self {
+        self.cmdline_hash = cmdline_hash;
+        self
+    }
 
-            None => sha256(b"\x00"),
-        };
+    /// Generates hash from user provided kernel file
+    pub fn kernel(mut self, kernel: PathBuf) -> Result<Self, MeasurementError> {
+        self.kernel_hash = get_kernel_hash(kernel)?;
+        Ok(self)
+    }
 
-        Ok(SevHashes {
-            kernel_hash,
-            initrd_hash,
-            cmdline_hash,
-        })
+    /// Generates hash from user provided initrd file
+    pub fn initrd(mut self, initrd: Option<PathBuf>) -> Result<Self, MeasurementError> {
+        self.initrd_hash = get_initrd_hash(initrd)?;
+        Ok(self)
+    }
+
+    /// Generates hash from user provided cmdline
+    pub fn cmdline(mut self, append: Option<&str>) -> Self {
+        self.cmdline_hash = get_cmdline_hash(append);
+        self
     }
 
     /// Generate the SEV hashes area - this must be *identical* to the way QEMU
