@@ -80,6 +80,9 @@ impl std::fmt::Display for Build {
     }
 }
 
+// SAFETY: Build and Version contain only u8 fields.
+unsafe impl crate::util::AnyBitPattern for Build {}
+
 impl Decoder<()> for Build {
     fn decode(reader: &mut impl Read, _: ()) -> std::io::Result<Self> {
         reader.load()

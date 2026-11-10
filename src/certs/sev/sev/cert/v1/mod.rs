@@ -29,6 +29,14 @@ impl Certificate {
     }
 }
 
+// SAFETY: All fields of Data, recursively, are integers, arrays, or unions of
+// these.
+unsafe impl crate::util::AnyBitPattern for body::Data {}
+
+// SAFETY: All fields of Signature, recursively, are integers, arrays, or
+// unions of these.
+unsafe impl crate::util::AnyBitPattern for sig::Signature {}
+
 impl Decoder<()> for Certificate {
     fn decode(reader: &mut impl Read, _: ()) -> Result<Self> {
         Ok(Self {

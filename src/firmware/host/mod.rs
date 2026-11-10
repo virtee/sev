@@ -31,7 +31,7 @@ use std::{
 
 #[cfg(feature = "sev")]
 #[cfg(target_os = "linux")]
-use std::mem::MaybeUninit;
+use crate::util::AnyBitPattern;
 
 #[cfg(feature = "snp")]
 #[cfg(target_os = "linux")]
@@ -131,8 +131,7 @@ impl Firmware {
     /// Request a signature for the PEK.
     #[cfg(feature = "sev")]
     pub fn pek_csr(&mut self) -> Result<Certificate, UserApiError> {
-        #[allow(clippy::uninit_assumed_init)]
-        let mut pek: Certificate = unsafe { MaybeUninit::uninit().assume_init() };
+        let mut pek = Certificate::zeroed();
         let mut csr = PekCsr::new(&mut pek);
         let mut cmd_buf = Command::from_mut(&mut csr);
         PEK_CSR
@@ -155,10 +154,8 @@ impl Firmware {
     /// Export the SEV certificate chain.
     #[cfg(feature = "sev")]
     pub fn pdh_cert_export(&mut self) -> Result<Chain, UserApiError> {
-        #[allow(clippy::uninit_assumed_init)]
-        let mut chain: [Certificate; 3] = unsafe { MaybeUninit::uninit().assume_init() };
-        #[allow(clippy::uninit_assumed_init)]
-        let mut pdh: Certificate = unsafe { MaybeUninit::uninit().assume_init() };
+        let mut chain = <[Certificate; 3]>::zeroed();
+        let mut pdh = Certificate::zeroed();
         let mut pdh_cert_export = PdhCertExport::new(&mut pdh, &mut chain);
         let mut cmd_buf = Command::from_mut(&mut pdh_cert_export);
 
