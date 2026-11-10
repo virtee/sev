@@ -6,7 +6,7 @@
 use crate::parser::{Decoder, Encoder};
 
 use super::{
-    util::{TypeLoad, TypeSave},
+    util::{AnyBitPattern, TypeLoad, TypeSave},
     *,
 };
 
@@ -392,6 +392,9 @@ impl Default for Vmsa {
         }
     }
 }
+
+// SAFETY: Vmsa and VmcbSegment contain only integers and integer arrays.
+unsafe impl AnyBitPattern for Vmsa {}
 
 impl Decoder<()> for Vmsa {
     fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
