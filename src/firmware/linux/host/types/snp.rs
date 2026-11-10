@@ -166,52 +166,42 @@ impl CertTableEntry {
     /// };
     /// ```
     ///
+    /// The table ends at the first entry whose GUID is all zeroes. Each entry's
+    /// `offset` is relative to the start of `bytes`, and `offset + length` must
+    /// not exceed `bytes.len()`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CertError::BufferOverflow`] if the table has no terminating
+    /// entry inside `bytes`, or if an entry points outside `bytes`.
     #[cfg(target_os = "linux")]
-    pub unsafe fn parse_table(
-        mut data: *mut CertTableEntry,
-    ) -> Result<Vec<UAPI::CertTableEntry>, uuid::Error> {
-        // Helpful Constance for parsing the data
-        const ZERO_GUID: Uuid = Uuid::from_bytes([0x0; 16]);
+    pub fn parse_table(bytes: &[u8]) -> Result<Vec<UAPI::CertTableEntry>, CertError> {
+        const ENTRY_LEN: usize = std::mem::size_of::<CertTableEntry>();
 
-        // Pre-defined re-usable variables.
-        let table_ptr: *mut u8 = data as *mut u8;
-
-        // Create a location to store the final data.
         let mut retval: Vec<UAPI::CertTableEntry> = vec![];
+        let mut remaining = bytes;
 
-        // Start parsing the PSP data from the pointers.
-        let mut entry: CertTableEntry;
+        while let Some((entry, rest)) = remaining.split_first_chunk::<ENTRY_LEN>() {
+            remaining = rest;
 
-        loop {
-            // Dereference the pointer to parse the table data.
-            entry = *data;
-            let guid: Uuid = Uuid::from_slice(entry.guid.as_slice())?;
-
-            // Once we find a zeroed GUID, we are done.
-            if guid == ZERO_GUID {
-                break;
+            let [guid @ .., o0, o1, o2, o3, l0, l1, l2, l3] = *entry;
+            let guid = Uuid::from_bytes(guid);
+            if guid.is_nil() {
+                return Ok(retval);
             }
 
-            // Calculate the beginning and ending pointers of the raw certificate data.
-            let mut cert_bytes: Vec<u8> = vec![];
-            let mut cert_addr: *mut u8 = table_ptr.offset(entry.offset as isize);
-            let cert_end: *mut u8 = cert_addr.add(entry.length as usize);
+            let start = u32::from_ne_bytes([o0, o1, o2, o3]) as usize;
+            let length = u32::from_ne_bytes([l0, l1, l2, l3]) as usize;
+            let end = start.checked_add(length).ok_or(CertError::BufferOverflow)?;
+            let data = bytes.get(start..end).ok_or(CertError::BufferOverflow)?;
 
-            // Gather the certificate bytes.
-            while cert_addr != cert_end {
-                cert_bytes.push(*cert_addr);
-                cert_addr = cert_addr.add(1usize);
-            }
-
-            // Build the Rust-friendly structure and append vector to be returned when
-            // we are finished.
-            retval.push(UAPI::CertTableEntry::from_guid(&guid, cert_bytes.clone())?);
-
-            // Move the pointer ahead to the next value.
-            data = data.offset(1isize);
+            retval.push(
+                UAPI::CertTableEntry::from_guid(&guid, data.to_vec())
+                    .map_err(|_| CertError::InvalidGUID)?,
+            );
         }
 
-        Ok(retval)
+        Err(CertError::BufferOverflow)
     }
 }
 
@@ -527,6 +517,7 @@ mod test {
     #[cfg(target_os = "linux")]
     mod cert_table_entry {
 
+        use crate::error::CertError;
         use crate::firmware::host as UAPI;
         use crate::firmware::linux::host::types::CertTableEntry;
         use uuid::Uuid;
@@ -565,7 +556,7 @@ mod test {
 
         #[test]
         fn test_parse_table_regular() {
-            let mut cert_bytes: Vec<u8> = vec![
+            let cert_bytes: Vec<u8> = vec![
                 192, 180, 6, 164, 168, 3, 73, 82, 151, 67, 63, 182, 1, 76, 208, 174, 120, 0, 0, 0,
                 25, 0, 0, 0, 74, 183, 179, 121, 187, 172, 79, 228, 160, 47, 5, 174, 243, 39, 199,
                 130, 145, 0, 0, 0, 25, 0, 0, 0, 99, 218, 117, 141, 230, 100, 69, 100, 173, 197,
@@ -577,11 +568,8 @@ mod test {
                 5, 5, 5, 7, 7, 7, 7, 7, 7,
             ];
 
-            let cert_bytes_ptr: *mut CertTableEntry =
-                cert_bytes.as_mut_ptr() as *mut CertTableEntry;
-
             let actual: Vec<UAPI::CertTableEntry> =
-                unsafe { CertTableEntry::parse_table(cert_bytes_ptr).unwrap() };
+                CertTableEntry::parse_table(&cert_bytes).unwrap();
 
             let expected: Vec<UAPI::CertTableEntry> = build_vec_uapi_cert_table();
 
@@ -589,31 +577,29 @@ mod test {
         }
 
         #[test]
-        #[should_panic]
-        fn test_parse_table_offset_short() {
-            let mut cert_bytes: Vec<u8> = vec![
-                192, 180, 6, 164, 168, 3, 73, 82, 151, 67, 63, 182, 1, 76, 208, 174, 120, 0, 0, 0,
-                1, 0, 0, 0, 74, 183, 179, 121, 187, 172, 79, 228, 160, 47, 5, 174, 243, 39, 199,
-                130, 145, 0, 0, 0, 25, 0, 0, 0, 99, 218, 117, 141, 230, 100, 69, 100, 173, 197,
-                244, 185, 59, 232, 172, 205, 170, 0, 0, 0, 15, 0, 0, 0, 251, 182, 237, 116, 231,
-                62, 68, 171, 136, 147, 66, 82, 121, 45, 115, 122, 185, 0, 0, 0, 6, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-                2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-                5, 5, 5, 7, 7, 7, 7, 7, 7,
-            ];
+        fn test_parse_table_entry_out_of_bounds() {
+            let entry = UAPI::CertTableEntry::new(UAPI::CertType::ARK, vec![1; 4]);
+            let mut cert_bytes: Vec<u8> = CertTableEntry::uapi_to_vec_bytes(&[entry]).unwrap();
 
-            let cert_bytes_ptr: *mut CertTableEntry =
-                cert_bytes.as_mut_ptr() as *mut CertTableEntry;
-
-            let actual: Vec<UAPI::CertTableEntry> =
-                unsafe { CertTableEntry::parse_table(cert_bytes_ptr).unwrap() };
-
-            let expected: Vec<UAPI::CertTableEntry> = build_vec_uapi_cert_table();
+            // Make the certificate's length run one byte past the buffer.
+            cert_bytes[20..24].copy_from_slice(&5u32.to_ne_bytes());
 
             assert_eq!(
-                expected, actual,
-                "Invalid certificate offset encountered..."
+                CertTableEntry::parse_table(&cert_bytes),
+                Err(CertError::BufferOverflow)
+            );
+        }
+
+        #[test]
+        fn test_parse_table_empty() {
+            assert_eq!(CertTableEntry::parse_table(&[0u8; 24]), Ok(vec![]));
+        }
+
+        #[test]
+        fn test_parse_table_missing_terminator() {
+            assert_eq!(
+                CertTableEntry::parse_table(&[0u8; 23]),
+                Err(CertError::BufferOverflow)
             );
         }
     }
