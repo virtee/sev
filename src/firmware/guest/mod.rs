@@ -15,10 +15,7 @@ use crate::error::*;
 #[cfg(target_os = "linux")]
 use crate::firmware::{
     host::CertTableEntry,
-    linux::{
-        guest::{ioctl::*, types::*},
-        host as HostFFI,
-    },
+    linux::guest::{ioctl::*, types::*},
 };
 
 #[cfg(target_os = "linux")]
@@ -126,7 +123,7 @@ impl Firmware {
         let mut report_response = ReportRsp::default();
 
         // Define a buffer to store the certificates in.
-        let mut certificate_bytes: Vec<u8>;
+        let mut certificate_bytes: Vec<u8> = vec![];
 
         // Due to the complex buffer allocation, we will take the ReportReq
         // provided by the caller, and create an extended report request object
@@ -143,36 +140,32 @@ impl Firmware {
             &mut report_response,
         );
 
-        // KEEP for Kernels before 47894e0f (5.19), as userspace broke at that hash.
-        if SNP_GET_EXT_REPORT
-            .ioctl(&mut self.0, &mut guest_request)
-            .is_err()
-        {
-            match guest_request.fw_err.into() {
-                // The kernel patch by pgonda@google.com in kernel hash 47894e0f
-                // changed the ioctl return to succeed instead of returning an
-                // error when encountering an invalid certificate length. This was
-                // done to keep the cryptography safe, so we will now just check
-                // the guest_request.fw_err for a new value.
-                //
-                // Check to see if the buffer needs to be resized. If it does, the
-                // we need to resize the buffer to the correct size, and
-                // re-request for the certificates.
-                VmmError::InvalidCertificatePageLength => {
-                    certificate_bytes = vec![0u8; ext_report_request.certs_len as usize];
-                    ext_report_request.certs_address = certificate_bytes.as_mut_ptr() as u64;
-                    let mut guest_request_retry: GuestRequest<ExtReportReq, ReportRsp> =
-                        GuestRequest::new(
-                            message_version,
-                            &mut ext_report_request,
-                            &mut report_response,
-                        );
-                    SNP_GET_EXT_REPORT
-                        .ioctl(&mut self.0, &mut guest_request_retry)
-                        .map_err(|_| map_fw_err(guest_request_retry.fw_err.into()))?;
+        let result = SNP_GET_EXT_REPORT.ioctl(&mut self.0, &mut guest_request);
+
+        // Depending on the kernel version, a certificate buffer that is too
+        // small either fails the ioctl or returns success. Both cases set
+        // fw_err, and this code checks it in either case.
+        match guest_request.fw_err.into() {
+            // Resize the buffer to the length the kernel asked for and
+            // request the certificates again.
+            VmmError::InvalidCertificatePageLength => {
+                certificate_bytes = vec![0u8; ext_report_request.certs_len as usize];
+                ext_report_request.certs_address = certificate_bytes.as_mut_ptr() as u64;
+                let mut guest_request_retry: GuestRequest<ExtReportReq, ReportRsp> =
+                    GuestRequest::new(
+                        message_version,
+                        &mut ext_report_request,
+                        &mut report_response,
+                    );
+                let retry_result = SNP_GET_EXT_REPORT.ioctl(&mut self.0, &mut guest_request_retry);
+                if retry_result.is_err() || guest_request_retry.fw_err != 0 {
+                    Err(map_fw_err(guest_request_retry.fw_err.into()))?
                 }
-                _ => Err(map_fw_err(guest_request.fw_err.into()))?,
             }
+            _ if result.is_err() || guest_request.fw_err != 0 => {
+                Err(map_fw_err(guest_request.fw_err.into()))?
+            }
+            _ => {}
         }
 
         // Make sure response status is successful
@@ -184,15 +177,15 @@ impl Firmware {
             return Ok((report_response.report.to_vec(), None));
         }
 
-        let mut certificates: Vec<CertTableEntry>;
-
-        unsafe {
-            let entries = (ext_report_request.certs_address as *mut HostFFI::types::CertTableEntry)
-                .as_mut()
-                .ok_or(CertError::EmptyCertBuffer)?;
-            certificates = HostFFI::types::CertTableEntry::parse_table(entries)?;
-            certificates.sort();
+        // The kernel writes certificates only into a buffer that this
+        // function allocated. Without one, certs_address still holds the
+        // u64::MAX placeholder from ExtReportReq::new.
+        if certificate_bytes.is_empty() {
+            Err(CertError::EmptyCertBuffer)?
         }
+
+        let mut certificates = CertTableEntry::vec_bytes_to_cert_table(&mut certificate_bytes)?;
+        certificates.sort();
 
         // Return both the Attestation Report, as well as the Cert Table.
         Ok((report_response.report.to_vec(), Some(certificates)))
