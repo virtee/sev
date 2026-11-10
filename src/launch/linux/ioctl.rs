@@ -234,7 +234,7 @@ pub struct Command<'a, T: Id> {
 
 impl<'a, T: Id> Command<'a, T> {
     /// create the command from a mutable subcommand
-    #[cfg(feature = "sev")]
+    #[cfg(any(feature = "sev", feature = "snp"))]
     pub fn from_mut(sev: &'a impl AsRawFd, subcmd: &'a mut T) -> Self {
         Self {
             code: T::ID,
