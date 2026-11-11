@@ -11,6 +11,7 @@ use super::*;
 
 use std::io::{ErrorKind, Result};
 
+use rand_core::TryRng;
 use rdrand::{ErrorCode, RdRand};
 
 use openssl::*;
