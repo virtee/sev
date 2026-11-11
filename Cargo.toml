@@ -63,7 +63,7 @@ lazy_static = "1.4"
 p384 = { version = "0.13", optional = true }
 rsa = { version = "0.9", optional = true }
 sha2 = { version = "0.10", optional = true }
-x509-cert = { version = "0.2", optional = true }
+x509-cert = { version = "0.3", optional = true }
 byteorder = "1.4"
 base64 = "0.22"
 rdrand = { version = "^0.8", optional = true }
