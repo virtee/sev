@@ -31,7 +31,7 @@ pub use chain::Chain;
 use std::io::Result;
 
 #[cfg(any(feature = "openssl", feature = "crypto_nossl"))]
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 
 #[cfg(feature = "openssl")]
 #[allow(dead_code)]
@@ -73,7 +73,7 @@ impl FromLe for openssl::bn::BigNum {
     #[inline]
     fn from_le(value: &[u8]) -> Result<Self> {
         Ok(Self::from_slice(
-            &value.iter().rev().cloned().collect::<Vec<_>>(),
+            &value.iter().rev().copied().collect::<Vec<_>>(),
         )?)
     }
 }

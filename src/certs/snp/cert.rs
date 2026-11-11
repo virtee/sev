@@ -89,12 +89,12 @@ impl Verifiable for (&Certificate, &Certificate) {
         let key: PKey<Public> = signer.public_key()?;
         let signed = signee.verify(&key)?;
 
-        match signed {
-            true => Ok(()),
-            false => Err(Error::new(
-                ErrorKind::Other,
+        if signed {
+            Ok(())
+        } else {
+            Err(Error::other(
                 "Signer certificate does not sign signee certificate",
-            )),
+            ))
         }
     }
 }

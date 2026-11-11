@@ -893,7 +893,7 @@ impl VMSA {
 
         for i in 0..vcpus {
             if i == 0 {
-                pages.push(bsp_page.to_vec())
+                pages.push(bsp_page.clone())
             } else if let Some(v) = ap_save_area_bytes.as_ref() {
                 pages.push(v.clone());
             }

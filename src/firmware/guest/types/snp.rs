@@ -775,9 +775,10 @@ impl Verifiable for (&Chain, &AttestationReport) {
 
         let ec = vek.public_key()?.ec_key()?;
         let signed = sig.verify(&base_digest, &ec)?;
-        match signed {
-            true => Ok(()),
-            false => Err(Error::other("VEK does not sign the attestation report")),
+        if signed {
+            Ok(())
+        } else {
+            Err(Error::other("VEK does not sign the attestation report"))
         }
     }
 }
@@ -800,9 +801,10 @@ impl Verifiable for (&Certificate, &AttestationReport) {
 
         let ec = vek.public_key()?.ec_key()?;
         let signed = sig.verify(&base_digest, &ec)?;
-        match signed {
-            true => Ok(()),
-            false => Err(Error::other("VEK does not sign the attestation report")),
+        if signed {
+            Ok(())
+        } else {
+            Err(Error::other("VEK does not sign the attestation report"))
         }
     }
 }

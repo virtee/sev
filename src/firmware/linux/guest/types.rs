@@ -155,9 +155,8 @@ impl ReportReq {
         if let Some(vmpl) = vmpl {
             if vmpl > MAX_VMPL {
                 return Err(UserApiError::VmplError);
-            } else {
-                request.vmpl = vmpl;
             }
+            request.vmpl = vmpl;
         }
 
         Ok(request)

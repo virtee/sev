@@ -166,12 +166,10 @@ impl TryFrom<&Signature> for p384::ecdsa::Signature {
             s_big_endian[47 - i] = byte;
         }
 
-        p384::ecdsa::Signature::from_scalars(r_big_endian, s_big_endian)
-        .map_err(|e| {
-            Error::new(
-                ErrorKind::Other,
-                format!("failed to deserialize signature from scalars: {e:?}"),
-            )
+        p384::ecdsa::Signature::from_scalars(r_big_endian, s_big_endian).map_err(|e| {
+            Error::other(format!(
+                "failed to deserialize signature from scalars: {e:?}"
+            ))
         })
     }
 }
@@ -233,7 +231,7 @@ mod tests {
     #[test]
     fn test_signature_debug() {
         let sig: Signature = Default::default();
-        let debug_str: String = format!("{:?}", sig);
+        let debug_str: String = format!("{sig:?}");
         assert!(debug_str.starts_with("Signature { r:"));
         assert!(debug_str.contains(", s:"));
     }
@@ -241,7 +239,7 @@ mod tests {
     #[test]
     fn test_signature_display() {
         let sig: Signature = Default::default();
-        let display_str: String = format!("{}", sig);
+        let display_str: String = format!("{sig}");
         assert!(display_str.contains("Signature:"));
         assert!(display_str.contains("R:"));
         assert!(display_str.contains("S:"));

@@ -237,7 +237,7 @@ impl TryFrom<Certificate> for Signature {
 
         Ok(Self {
             id: Some(unsafe { value.preamble.data.sid }),
-            sig: sig.iter().rev().cloned().collect(),
+            sig: sig.iter().rev().copied().collect(),
             kind: pkey::Id::RSA,
             hash: size.into(),
             usage: Usage::ARK.into(),

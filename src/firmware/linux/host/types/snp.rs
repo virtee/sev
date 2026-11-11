@@ -46,13 +46,13 @@ impl From<Vec<u8>> for RawData {
 
 impl From<&Vec<u8>> for RawData {
     fn from(value: &Vec<u8>) -> Self {
-        Self::Vector(value.to_vec())
+        Self::Vector(value.clone())
     }
 }
 
 impl From<&mut Vec<u8>> for RawData {
     fn from(value: &mut Vec<u8>) -> Self {
-        Self::Vector(value.to_vec())
+        Self::Vector(value.clone())
     }
 }
 

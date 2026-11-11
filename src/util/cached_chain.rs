@@ -101,7 +101,7 @@ pub fn get_chain() -> FullChain {
 
     let id = firmware.get_identifier().unwrap();
 
-    let url = format!("{}/{}", CEK_SVC, id);
+    let url = format!("{CEK_SVC}/{id}");
 
     // VCEK in DER format
     let vcek_rsp: Response = get(url).expect("Failed to get CEK certificate");

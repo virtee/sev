@@ -29,9 +29,10 @@ pub fn guid_le_to_slice(guid: &str) -> Result<[u8; 16], MeasurementError> {
 
 /// Types of sections declared by OVMF SEV Metadata, as appears in: https://github.com/tianocore/edk2/blob/edk2-stable202405/OvmfPkg/ResetVector/X64/OvmfSevMetadata.asm
 #[cfg_attr(feature = "serde", derive(Deserialize))]
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum SectionType {
     /// SNP Secure Memory
+    #[default]
     SnpSecMemory = 1,
     /// SNP secret
     SnpSecrets = 2,
@@ -41,12 +42,6 @@ pub enum SectionType {
     SvsmCaa = 4,
     /// SNP kernel hashes
     SnpKernelHashes = 0x10,
-}
-
-impl Default for SectionType {
-    fn default() -> Self {
-        Self::SnpSecMemory
-    }
 }
 
 impl Encoder<()> for SectionType {
@@ -417,7 +412,7 @@ impl OVMF {
                 for i in 0..header.num_items {
                     let offset = (i as usize) * std::mem::size_of::<OvmfSevMetadataSectionDesc>();
                     let item = OvmfSevMetadataSectionDesc::bytes_from_offset(items, offset)?;
-                    self.metadata_items.push(item.to_owned());
+                    self.metadata_items.push(item);
                 }
             }
 

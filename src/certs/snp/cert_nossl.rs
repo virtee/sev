@@ -7,8 +7,7 @@ use rsa::signature; // re-export of signature crate
 use signature::Verifier;
 use spki::ObjectIdentifier;
 use std::convert::TryFrom;
-use std::io;
-use std::io::ErrorKind;
+use std::io::{self, ErrorKind};
 use x509_cert::der; // re-export of der crate
 use x509_cert::spki; // re-export of spki crate
 
@@ -65,7 +64,7 @@ impl Certificate {
     /// Create a Certificate from a PEM-encoded X509 structure.
     pub fn from_pem(pem: &[u8]) -> Result<Self> {
         let cert = x509_cert::Certificate::from_pem(pem)
-            .map_err(|e| io::Error::new(ErrorKind::InvalidData, format!("invalid PEM: {}", e)))?;
+            .map_err(|e| io::Error::new(ErrorKind::InvalidData, format!("invalid PEM: {e}")))?;
         Ok(Self(cert))
     }
 
@@ -75,14 +74,14 @@ impl Certificate {
         Ok(self
             .0
             .to_pem(der::pem::LineEnding::default())
-            .map_err(|e| io_error_other(format!("PEM-encoding failed: {}", e)))?
+            .map_err(|e| io_error_other(format!("PEM-encoding failed: {e}")))?
             .into_bytes())
     }
 
     /// Create a Certificate from a DER-encoded X509 structure.
     pub fn from_der(der: &[u8]) -> Result<Self> {
         let cert = x509_cert::Certificate::from_der(der)
-            .map_err(|e| io::Error::new(ErrorKind::InvalidData, format!("invalid DER: {}", e)))?;
+            .map_err(|e| io::Error::new(ErrorKind::InvalidData, format!("invalid DER: {e}")))?;
         Ok(Self(cert))
     }
 
@@ -104,7 +103,7 @@ impl Certificate {
 }
 
 fn io_error_other<S: Into<String>>(error: S) -> io::Error {
-    io::Error::new(ErrorKind::Other, error.into())
+    io::Error::other(error.into())
 }
 
 impl From<x509_cert::Certificate> for Certificate {

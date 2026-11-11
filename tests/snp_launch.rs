@@ -29,9 +29,7 @@ fn snp_launch_test() {
     // Allocate a 1kB page of memory for the address space of the VM.
     let address_space = unsafe { libc::mmap(0 as _, CODE.len(), 3, 34, -1, 0) };
 
-    if address_space == libc::MAP_FAILED {
-        panic!("mmap() failed");
-    }
+    assert!(address_space != libc::MAP_FAILED, "mmap() failed");
 
     let address_space: &mut [u8] =
         unsafe { from_raw_parts_mut(address_space as *mut u8, CODE.len()) };

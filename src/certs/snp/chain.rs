@@ -144,8 +144,6 @@ impl Chain {
         let mut vcek: Option<Certificate> = None;
         let mut vlek: Option<Certificate> = None;
 
-        let other = ErrorKind::Other;
-
         // Traverse each certificate in the table, find the ARK, ASK, and VCEK.
         for entry in entries {
             let cert = match format {
@@ -156,43 +154,43 @@ impl Chain {
             match entry.cert_type {
                 CertType::ARK => {
                     if ark.is_some() {
-                        return Err(Error::new(other, "more than one ARK certificate found"));
+                        return Err(Error::other("more than one ARK certificate found"));
                     }
 
                     ark = Some(cert);
                 }
                 CertType::ASK => {
                     if ask.is_some() {
-                        return Err(Error::new(other, "more than one ASK certificate found"));
+                        return Err(Error::other("more than one ASK certificate found"));
                     }
 
                     ask = Some(cert);
                 }
                 CertType::VCEK => {
                     if vcek.is_some() {
-                        return Err(Error::new(other, "more than one VCEK certificate found"));
+                        return Err(Error::other("more than one VCEK certificate found"));
                     }
 
                     vcek = Some(cert);
                 }
                 CertType::VLEK => {
                     if vlek.is_some() {
-                        return Err(Error::new(other, "more than one VLEK certificate found"));
+                        return Err(Error::other("more than one VLEK certificate found"));
                     }
 
                     vlek = Some(cert);
                 }
-                _ => continue,
+                _ => {}
             }
         }
 
         // Chain cannot be built without ARK, ASK, and VCEK.
         if ark.is_none() {
-            return Err(Error::new(other, "ARK not found"));
+            return Err(Error::other("ARK not found"));
         } else if ask.is_none() {
-            return Err(Error::new(other, "ASK not found"));
+            return Err(Error::other("ASK not found"));
         } else if vcek.is_none() && vlek.is_none() {
-            return Err(Error::new(other, "VCEK/VLEK not found"));
+            return Err(Error::other("VCEK/VLEK not found"));
         }
 
         // Use the VLEK whenever it is present, but use the VCEK when VLEK is missing.

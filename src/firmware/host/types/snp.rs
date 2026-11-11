@@ -87,7 +87,7 @@ impl Display for CertType {
             CertType::OTHER(guid) => guid.to_string(),
         };
 
-        write!(f, "{}", guid)
+        write!(f, "{guid}")
     }
 }
 
@@ -1093,7 +1093,7 @@ mod tests {
         assert_eq!(tcb.microcode, Some(4));
 
         // Test Display implementation
-        let display_output = format!("{}", tcb);
+        let display_output = format!("{tcb}");
         assert!(display_output.contains("Microcode:   4"));
         assert!(display_output.contains("SNP:         3"));
     }
@@ -1147,7 +1147,7 @@ mod tests {
         assert!(mask.mask_chip_key());
 
         // Test Display implementation
-        let display_output = format!("{}", mask);
+        let display_output = format!("{mask}");
         assert!(display_output.contains("MaskID (3)"));
     }
 
@@ -1173,7 +1173,7 @@ mod tests {
         assert_eq!(tcb.snp, 3);
         assert_eq!(tcb.microcode, Some(4));
 
-        let display = format!("{}", tcb);
+        let display = format!("{tcb}");
         assert!(display.contains("Microcode:   4"));
         assert!(display.contains("SNP:         3"));
         assert!(display.contains("TEE:         2"));
@@ -1191,7 +1191,7 @@ mod tests {
         assert!(mask.mask_chip_id());
         assert!(mask.mask_chip_key());
 
-        let display = format!("{}", mask);
+        let display = format!("{mask}");
         assert!(display.contains("MaskID (3)"));
         assert!(display.contains("Mask Chip ID: true"));
     }
@@ -1591,7 +1591,7 @@ mod tests {
     }
     #[test]
     fn test_cert_table_entry_complete_ordering() {
-        let entries = vec![
+        let entries = [
             CertTableEntry::new(CertType::ARK, vec![1, 2, 3]),
             CertTableEntry::new(CertType::ARK, vec![9, 9, 9]), // Same type, different data
             CertTableEntry::new(CertType::VCEK, vec![1]),
@@ -2043,7 +2043,7 @@ mod tests {
         };
 
         // Convert to string and check contents
-        let display_string = format!("{}", hashstick);
+        let display_string = format!("{hashstick}");
         assert!(display_string.contains("Wrapped VLEK Hashstick:"));
         assert!(display_string.contains("IV:"));
         assert!(display_string.contains("VLEK hashstic Wrapped:"));
