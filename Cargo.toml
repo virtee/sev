@@ -46,7 +46,8 @@ crypto_nossl = ["dep:p384", "dep:rsa", "dep:sha2", "dep:x509-cert"]
 serde = ["dep:serde", "dep:serde-big-array", "dep:serde_bytes"]
 
 [target.'cfg(target_os = "linux")'.dependencies]
-iocuddle = "^0.1"
+iocuddle = "^0.3"
+zerocopy = { version = "0.8", features = ["derive"] }
 
 [dependencies]
 openssl = { version = "0.10", optional = true }

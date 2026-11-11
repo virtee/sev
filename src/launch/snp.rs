@@ -62,7 +62,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
         let mut cmd = Command::from(&launcher.sev, &init);
 
         INIT2
-            .ioctl(&mut launcher.vm_fd, &mut cmd)
+            .ioctl(borrow_fd(&launcher.vm_fd), &mut cmd)
             .map_err(|_| cmd.encapsulate())?;
 
         Ok(launcher)
@@ -74,7 +74,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<New, U, V> {
         let mut cmd = Command::from(&self.sev, &launch_start);
 
         SNP_LAUNCH_START
-            .ioctl(&mut self.vm_fd, &mut cmd)
+            .ioctl(borrow_fd(&self.vm_fd), &mut cmd)
             .map_err(|_| cmd.encapsulate())?;
 
         let launcher = Launcher {
@@ -107,7 +107,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
                 .set_attributes(&mut self.vm_fd)?;
 
             // Perform the SNP_LAUNCH_UPDATE ioctl call
-            match SNP_LAUNCH_UPDATE.ioctl(&mut self.vm_fd, &mut cmd) {
+            match SNP_LAUNCH_UPDATE.ioctl(borrow_fd(&self.vm_fd), &mut cmd) {
                 Ok(_) => {
                     // Check if the entire range has been processed
                     if launch_update_data.len == 0 {
@@ -143,7 +143,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
         let mut cmd = Command::from(&self.sev, &launch_finish);
 
         SNP_LAUNCH_FINISH
-            .ioctl(&mut self.vm_fd, &mut cmd)
+            .ioctl(borrow_fd(&self.vm_fd), &mut cmd)
             .map_err(|_| cmd.encapsulate())?;
 
         Ok((self.vm_fd, self.sev))
