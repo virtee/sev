@@ -157,19 +157,19 @@ impl TryFrom<&Signature> for p384::ecdsa::Signature {
 
     #[inline]
     fn try_from(signature: &Signature) -> Result<Self> {
-        let r_big_endian: Vec<u8> = signature.r.iter().copied().take(48).rev().collect();
-        let s_big_endian: Vec<u8> = signature.s.iter().copied().take(48).rev().collect();
+        let mut r_big_endian = [0u8; 48];
+        let mut s_big_endian = [0u8; 48];
+        for (i, byte) in signature.r.iter().copied().take(48).enumerate() {
+            r_big_endian[47 - i] = byte;
+        }
+        for (i, byte) in signature.s.iter().copied().take(48).enumerate() {
+            s_big_endian[47 - i] = byte;
+        }
 
-        use p384::elliptic_curve::generic_array::GenericArray;
-        p384::ecdsa::Signature::from_scalars(
-            GenericArray::clone_from_slice(&r_big_endian),
-            GenericArray::clone_from_slice(&s_big_endian),
-        )
-        .map_err(|e| {
-            Error::new(
-                ErrorKind::Other,
-                format!("failed to deserialize signature from scalars: {e:?}"),
-            )
+        p384::ecdsa::Signature::from_scalars(r_big_endian, s_big_endian).map_err(|e| {
+            Error::other(format!(
+                "failed to deserialize signature from scalars: {e:?}"
+            ))
         })
     }
 }
@@ -231,7 +231,7 @@ mod tests {
     #[test]
     fn test_signature_debug() {
         let sig: Signature = Default::default();
-        let debug_str: String = format!("{:?}", sig);
+        let debug_str: String = format!("{sig:?}");
         assert!(debug_str.starts_with("Signature { r:"));
         assert!(debug_str.contains(", s:"));
     }
@@ -239,7 +239,7 @@ mod tests {
     #[test]
     fn test_signature_display() {
         let sig: Signature = Default::default();
-        let display_str: String = format!("{}", sig);
+        let display_str: String = format!("{sig}");
         assert!(display_str.contains("Signature:"));
         assert!(display_str.contains("R:"));
         assert!(display_str.contains("S:"));

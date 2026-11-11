@@ -166,7 +166,7 @@ bitfield! {
     #[repr(C)]
     #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
     #[derive(Copy, Clone, PartialEq, Eq)]
-    pub struct GuestFeatures(u64);
+    pub struct GuestFeatures(pub u64);
     impl Debug;
     /// SNPActive
     pub snp_active, _: 0;
@@ -893,7 +893,7 @@ impl VMSA {
 
         for i in 0..vcpus {
             if i == 0 {
-                pages.push(bsp_page.to_vec())
+                pages.push(bsp_page.clone())
             } else if let Some(v) = ap_save_area_bytes.as_ref() {
                 pages.push(v.clone());
             }

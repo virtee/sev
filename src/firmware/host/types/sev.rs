@@ -176,12 +176,12 @@ impl Verifiable for (&Certificate, &LegacyAttestationReport) {
         let base_digest = hasher.finish();
 
         let signed = sig.verify(&base_digest, pub_key)?;
-        match signed {
-            true => Ok(()),
-            false => Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+        if signed {
+            Ok(())
+        } else {
+            Err(std::io::Error::other(
                 "PEK does not sign the attestation report",
-            )),
+            ))
         }
     }
 }

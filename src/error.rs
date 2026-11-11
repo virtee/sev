@@ -285,52 +285,52 @@ impl std::fmt::Display for SevError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let code = *self as u32;
         match self {
-            SevError::InvalidPlatformState => write!(f,"Status Code: 0x{:x}: Invalid platform state.", code),
-            SevError::InvalidGuestState => write!(f,"Status Code: 0x{:x}: Invalid guest state.", code),
-            SevError::InvalidConfig => write!(f,"Status Code: 0x{:x}: Platform configuration invalid.", code),
-            SevError::InvalidLen => write!(f,"Status Code: 0x{:x}: Memory buffer too small.", code),
-            SevError::AlreadyOwned => write!(f,"Status Code: 0x{:x}: Platform is already owned.", code),
-            SevError::InvalidCertificate => write!(f,"Status Code: 0x{:x}: Invalid certificate.", code),
-            SevError::PolicyFailure => write!(f,"Status Code: 0x{:x}: Policy failure.", code),
-            SevError::Inactive => write!(f,"Status Code: 0x{:x}: Guest is inactive.", code),
-            SevError::InvalidAddress => write!(f,"Status Code: 0x{:x}: Provided address is invalid.", code),
-            SevError::BadSignature => write!(f,"Status Code: 0x{:x}: Provided signature is invalid.", code),
-            SevError::BadMeasurement => write!(f,"Status Code: 0x{:x}: Provided measurement is invalid.", code),
-            SevError::AsidOwned => write!(f,"Status Code: 0x{:x}: ASID is already owned.", code),
-            SevError::InvalidAsid => write!(f,"Status Code: 0x{:x}: ASID is invalid.", code),
-            SevError::WbinvdRequired => write!(f,"Status Code: 0x{:x}: WBINVD instruction required.", code),
-            SevError::DfFlushRequired => write!(f,"Status Code: 0x{:x}: DF_FLUSH invocation required.", code),
-            SevError::InvalidGuest => write!(f,"Status Code: 0x{:x}: Guest handle is invalid.", code),
-            SevError::InvalidCommand => write!(f,"Status Code: 0x{:x}: Issued command is invalid.", code),
-            SevError::Active => write!(f,"Status Code: 0x{:x}: Guest is active.", code),
+            SevError::InvalidPlatformState => write!(f,"Status Code: 0x{code:x}: Invalid platform state."),
+            SevError::InvalidGuestState => write!(f,"Status Code: 0x{code:x}: Invalid guest state."),
+            SevError::InvalidConfig => write!(f,"Status Code: 0x{code:x}: Platform configuration invalid."),
+            SevError::InvalidLen => write!(f,"Status Code: 0x{code:x}: Memory buffer too small."),
+            SevError::AlreadyOwned => write!(f,"Status Code: 0x{code:x}: Platform is already owned."),
+            SevError::InvalidCertificate => write!(f,"Status Code: 0x{code:x}: Invalid certificate."),
+            SevError::PolicyFailure => write!(f,"Status Code: 0x{code:x}: Policy failure."),
+            SevError::Inactive => write!(f,"Status Code: 0x{code:x}: Guest is inactive."),
+            SevError::InvalidAddress => write!(f,"Status Code: 0x{code:x}: Provided address is invalid."),
+            SevError::BadSignature => write!(f,"Status Code: 0x{code:x}: Provided signature is invalid."),
+            SevError::BadMeasurement => write!(f,"Status Code: 0x{code:x}: Provided measurement is invalid."),
+            SevError::AsidOwned => write!(f,"Status Code: 0x{code:x}: ASID is already owned."),
+            SevError::InvalidAsid => write!(f,"Status Code: 0x{code:x}: ASID is invalid."),
+            SevError::WbinvdRequired => write!(f,"Status Code: 0x{code:x}: WBINVD instruction required."),
+            SevError::DfFlushRequired => write!(f,"Status Code: 0x{code:x}: DF_FLUSH invocation required."),
+            SevError::InvalidGuest => write!(f,"Status Code: 0x{code:x}: Guest handle is invalid."),
+            SevError::InvalidCommand => write!(f,"Status Code: 0x{code:x}: Issued command is invalid."),
+            SevError::Active => write!(f,"Status Code: 0x{code:x}: Guest is active."),
             SevError::HardwarePlatform => {
-                write!(f,"Status Code: 0x{:x}: Hardware condition occured, safe to re-allocate parameter buffers.", code)
+                write!(f,"Status Code: 0x{code:x}: Hardware condition occured, safe to re-allocate parameter buffers.")
             }
             SevError::HardwareUnsafe => {
-                write!(f,"Status Code: 0x{:x}: Hardware condition occured, unsafe to re-allocate parameter buffers.", code)
+                write!(f,"Status Code: 0x{code:x}: Hardware condition occured, unsafe to re-allocate parameter buffers.")
             }
-            SevError::Unsupported => write!(f,"Status Code: 0x{:x}: Feature is unsupported.", code),
-            SevError::InvalidParam => write!(f,"Status Code: 0x{:x}: Given parameter is invalid.", code),
+            SevError::Unsupported => write!(f,"Status Code: 0x{code:x}: Feature is unsupported."),
+            SevError::InvalidParam => write!(f,"Status Code: 0x{code:x}: Given parameter is invalid."),
             SevError::ResourceLimit => {
-                write!(f,"Status Code: 0x{:x}: SEV firmware has run out of required resources to carry out command.", code)
+                write!(f,"Status Code: 0x{code:x}: SEV firmware has run out of required resources to carry out command.")
             }
-            SevError::SecureDataInvalid => write!(f,"Status Code: 0x{:x}: SEV platform observed a failed integrity check.", code),
-            SevError::InvalidPageSize => write!(f,"Status Code: 0x{:x}: The RMP page size is incorrect.", code),
-            SevError::InvalidPageState => write!(f,"Status Code: 0x{:x}: The RMP page state is incorrect.", code),
-            SevError::InvalidMdataEntry => write!(f,"Status Code: 0x{:x}: The metadata entry is invalid.", code),
-            SevError::InvalidPageOwner => write!(f,"Status Code: 0x{:x}: The page ownership is incorrect.", code),
-            SevError::AEADOFlow => write!(f,"Status Code: 0x{:x}: The AEAD algorithm would have overflowed.", code),
-            SevError::RbModeExited => write!(f,"Status Code: 0x{:x}: A Mailbox mode command was sent while the SEV FW was in Ring Buffer \
+            SevError::SecureDataInvalid => write!(f,"Status Code: 0x{code:x}: SEV platform observed a failed integrity check."),
+            SevError::InvalidPageSize => write!(f,"Status Code: 0x{code:x}: The RMP page size is incorrect."),
+            SevError::InvalidPageState => write!(f,"Status Code: 0x{code:x}: The RMP page state is incorrect."),
+            SevError::InvalidMdataEntry => write!(f,"Status Code: 0x{code:x}: The metadata entry is invalid."),
+            SevError::InvalidPageOwner => write!(f,"Status Code: 0x{code:x}: The page ownership is incorrect."),
+            SevError::AEADOFlow => write!(f,"Status Code: 0x{code:x}: The AEAD algorithm would have overflowed."),
+            SevError::RbModeExited => write!(f,"Status Code: 0x{code:x}: A Mailbox mode command was sent while the SEV FW was in Ring Buffer \
                                     mode. Ring Buffer mode has been exited; the Mailbox mode command has \
-                                    been ignored. Retry is recommended.", code),
-            SevError::RMPInitRequired => write!(f,"Status Code: 0x{:x}: The RMP must be reinitialized.", code),
-            SevError::BadSvn => write!(f,"Status Code: 0x{:x}: SVN of provided image is lower than the committed SVN.", code),
-            SevError::BadVersion => write!(f,"Status Code: 0x{:x}: Firmware version anti-rollback.", code),
-            SevError::ShutdownRequired => write!(f,"Status Code: 0x{:x}: An invocation of SNP_SHUTDOWN is required to complete this action.", code),
-            SevError::UpdateFailed => write!(f,"Status Code: 0x{:x}: Update of the firmware internal state or a guest context page has failed.", code),
-            SevError::RestoreRequired => write!(f,"Status Code: 0x{:x}: Installation of the committed firmware image required.", code),
-            SevError::RMPInitFailed => write!(f,"Status Code: 0x{:x}: The RMP initialization failed.", code),
-            SevError::InvalidKey => write!(f,"Status Code: 0x{:x}: The key requested is invalid, not present, or not allowed.", code),
+                                    been ignored. Retry is recommended."),
+            SevError::RMPInitRequired => write!(f,"Status Code: 0x{code:x}: The RMP must be reinitialized."),
+            SevError::BadSvn => write!(f,"Status Code: 0x{code:x}: SVN of provided image is lower than the committed SVN."),
+            SevError::BadVersion => write!(f,"Status Code: 0x{code:x}: Firmware version anti-rollback."),
+            SevError::ShutdownRequired => write!(f,"Status Code: 0x{code:x}: An invocation of SNP_SHUTDOWN is required to complete this action."),
+            SevError::UpdateFailed => write!(f,"Status Code: 0x{code:x}: Update of the firmware internal state or a guest context page has failed."),
+            SevError::RestoreRequired => write!(f,"Status Code: 0x{code:x}: Installation of the committed firmware image required."),
+            SevError::RMPInitFailed => write!(f,"Status Code: 0x{code:x}: The RMP initialization failed."),
+            SevError::InvalidKey => write!(f,"Status Code: 0x{code:x}: The key requested is invalid, not present, or not allowed."),
             SevError::UnknownError => write!(f,"Unknown SEV Error"),
         }
     }
@@ -1222,7 +1222,7 @@ mod tests {
 
         // Test display and debug
         assert!(raw.to_string().contains("RawFwError: 4294967296"));
-        assert!(format!("{:?}", raw).contains("RawFwError"));
+        assert!(format!("{raw:?}").contains("RawFwError"));
 
         // Test From<u64>
         assert_eq!(RawFwError::from(0x100000000u64), raw);
@@ -1239,7 +1239,7 @@ mod tests {
 
     #[test]
     fn test_firmware_error_complete() {
-        let io_err = std::io::Error::new(std::io::ErrorKind::Other, "test");
+        let io_err = std::io::Error::other("test");
         let variants = vec![
             FirmwareError::IoError(io_err),
             FirmwareError::KnownSevError(SevError::InvalidPlatformState),
@@ -1281,7 +1281,7 @@ mod tests {
         assert!(matches!(fw_err, FirmwareError::UnknownSevError(_)));
 
         // Test From<io::Error>
-        let io_err = std::io::Error::new(std::io::ErrorKind::Other, "test");
+        let io_err = std::io::Error::other("test");
         let fw_err = FirmwareError::from(io_err);
         assert!(matches!(fw_err, FirmwareError::IoError(_)));
     }
@@ -1290,7 +1290,7 @@ mod tests {
     fn test_user_api_error_complete() {
         let variants = vec![
             FirmwareError::UnknownSevError(0).into(),
-            std::io::Error::new(std::io::ErrorKind::Other, "test").into(),
+            std::io::Error::other("test").into(),
             CertError::UnknownError.into(),
             VmmError::Unknown.into(),
             uuid::Uuid::try_from("").unwrap_err().into(),
@@ -1414,7 +1414,7 @@ mod tests {
 
         let variants = vec![
             ArrayError::VectorError("test".into()).into(),
-            std::io::Error::new(std::io::ErrorKind::Other, "test").into(),
+            std::io::Error::other("test").into(),
             slice_err.unwrap_err().into(),
             IdBlockError::SevCurveError(),
             IdBlockError::SevEcsdsaSigError("test".into()),
@@ -1442,7 +1442,7 @@ mod tests {
         let variants = vec![
             slice_err.unwrap_err().into(),
             uuid_err.into(),
-            std::io::Error::new(std::io::ErrorKind::Other, "test").into(),
+            std::io::Error::other("test").into(),
             hex::FromHexError::OddLength.into(),
             GCTXError::UnknownError.into(),
             OVMFError::UnknownError.into(),
@@ -1492,7 +1492,7 @@ mod tests {
         assert!(std::error::Error::source(&cert_err).is_none());
 
         // Test SessionError
-        let io_err = std::io::Error::new(std::io::ErrorKind::Other, "test");
+        let io_err = std::io::Error::other("test");
         let variants = vec![
             SessionError::RandError(ErrorCode::HardwareFailure),
             SessionError::IOError(io_err),
@@ -1500,7 +1500,7 @@ mod tests {
         ];
 
         for err in variants {
-            let debug_str = format!("{:?}", err);
+            let debug_str = format!("{err:?}");
             match err {
                 SessionError::RandError(_) => assert!(debug_str.contains("RandError")),
                 SessionError::IOError(_) => assert!(debug_str.contains("IOError")),
@@ -1509,7 +1509,7 @@ mod tests {
         }
 
         // Test conversions
-        let from_io = SessionError::from(std::io::Error::new(std::io::ErrorKind::Other, "test"));
+        let from_io = SessionError::from(std::io::Error::other("test"));
         assert!(matches!(from_io, SessionError::IOError(_)));
 
         let from_code = SessionError::from(ErrorCode::HardwareFailure);

@@ -85,7 +85,7 @@ impl ByteParser<()> for SnpLaunchDigest {
 impl fmt::LowerHex for SnpLaunchDigest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for b in &self.0 {
-            write!(f, "{:02x}", b)?;
+            write!(f, "{b:02x}")?;
         }
         Ok(())
     }
@@ -99,7 +99,7 @@ impl SnpLaunchDigest {
 
     /// Get the launch digest as a hex string
     pub fn get_hex_ld(self) -> String {
-        format!("{:x}", self)
+        format!("{self:x}")
     }
 }
 

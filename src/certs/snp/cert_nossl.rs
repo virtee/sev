@@ -7,8 +7,7 @@ use rsa::signature; // re-export of signature crate
 use signature::Verifier;
 use spki::ObjectIdentifier;
 use std::convert::TryFrom;
-use std::io;
-use std::io::ErrorKind;
+use std::io::{self, ErrorKind};
 use x509_cert::der; // re-export of der crate
 use x509_cert::spki; // re-export of spki crate
 
@@ -27,28 +26,28 @@ impl Verifiable for (&Certificate, &Certificate) {
         let signer = &self.0 .0;
         let signee = &self.1 .0;
 
-        if signee.signature_algorithm.oid != RSA_SSA_PSS_OID {
+        if signee.signature_algorithm().oid != RSA_SSA_PSS_OID {
             return Err(io_error_other(format!(
                 "unsupported signature algorithm: {:?}",
-                signee.signature_algorithm
+                signee.signature_algorithm()
             )));
         }
 
         let rsa_verifying_key = {
             let signer_spki_ref = signer
-                .tbs_certificate
-                .subject_public_key_info
+                .tbs_certificate()
+                .subject_public_key_info()
                 .owned_to_ref();
-            let signer_pubkey_rsa = rsa::RsaPublicKey::try_from(signer_spki_ref)
+            let signer_pubkey_rsa = rsa::PublicKey::try_from(signer_spki_ref)
                 .map_err(|e| io_error_other(format!("invalid RSA public key: {e:?}")))?;
             rsa::pss::VerifyingKey::<sha2::Sha384>::new(signer_pubkey_rsa)
         };
 
-        let message = signee.tbs_certificate.to_der().map_err(|e| {
+        let message = signee.tbs_certificate().to_der().map_err(|e| {
             io_error_other(format!("failed to encode tbs_certificate as DER: {e:?}"))
         })?;
 
-        let rsa_signature = rsa::pss::Signature::try_from(signee.signature.raw_bytes())
+        let rsa_signature = rsa::pss::Signature::try_from(signee.signature().raw_bytes())
             .map_err(|e| io_error_other(format!("invalid RSA signature: {e:?}")))?;
 
         rsa_verifying_key
@@ -65,7 +64,7 @@ impl Certificate {
     /// Create a Certificate from a PEM-encoded X509 structure.
     pub fn from_pem(pem: &[u8]) -> Result<Self> {
         let cert = x509_cert::Certificate::from_pem(pem)
-            .map_err(|e| io::Error::new(ErrorKind::InvalidData, format!("invalid PEM: {}", e)))?;
+            .map_err(|e| io::Error::new(ErrorKind::InvalidData, format!("invalid PEM: {e}")))?;
         Ok(Self(cert))
     }
 
@@ -75,14 +74,14 @@ impl Certificate {
         Ok(self
             .0
             .to_pem(der::pem::LineEnding::default())
-            .map_err(|e| io_error_other(format!("PEM-encoding failed: {}", e)))?
+            .map_err(|e| io_error_other(format!("PEM-encoding failed: {e}")))?
             .into_bytes())
     }
 
     /// Create a Certificate from a DER-encoded X509 structure.
     pub fn from_der(der: &[u8]) -> Result<Self> {
         let cert = x509_cert::Certificate::from_der(der)
-            .map_err(|e| io::Error::new(ErrorKind::InvalidData, format!("invalid DER: {}", e)))?;
+            .map_err(|e| io::Error::new(ErrorKind::InvalidData, format!("invalid DER: {e}")))?;
         Ok(Self(cert))
     }
 
@@ -96,15 +95,15 @@ impl Certificate {
     /// Retrieve the public key in SEC1 encoding.
     pub fn public_key_sec1(&self) -> &[u8] {
         self.0
-            .tbs_certificate
-            .subject_public_key_info
+            .tbs_certificate()
+            .subject_public_key_info()
             .subject_public_key
             .raw_bytes()
     }
 }
 
 fn io_error_other<S: Into<String>>(error: S) -> io::Error {
-    io::Error::new(ErrorKind::Other, error.into())
+    io::Error::other(error.into())
 }
 
 impl From<x509_cert::Certificate> for Certificate {

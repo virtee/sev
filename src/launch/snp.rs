@@ -124,8 +124,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
                     };
                 }
                 Err(e) if e.raw_os_error() == Some(libc::EAGAIN) => {
-                    // Retry the operation if `-EAGAIN` is returned
-                    continue;
+                    // Retry the operation if `-EAGAIN` is returned.
                 }
                 Err(_) => {
                     // Handle other errors

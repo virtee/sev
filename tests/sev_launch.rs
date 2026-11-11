@@ -57,9 +57,7 @@ fn sev_launch_test() {
     const MEM_SIZE: usize = 0x1000;
     let address_space = unsafe { libc::mmap(0 as _, MEM_SIZE, 3, 34, -1, 0) };
 
-    if address_space == libc::MAP_FAILED {
-        panic!("mmap() failed");
-    }
+    assert!(address_space != libc::MAP_FAILED, "mmap() failed");
 
     let address_space: &[u8] = unsafe { from_raw_parts(address_space as *mut u8, MEM_SIZE) };
 

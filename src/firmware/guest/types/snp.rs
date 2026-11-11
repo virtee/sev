@@ -115,7 +115,7 @@ bitfield! {
     /// |63:7|\-|Reserved. Must be zero.|
     #[repr(C)]
     #[derive(Default, Copy, Clone,PartialEq, Eq, PartialOrd, Ord)]
-    pub struct GuestFieldSelect(u64);
+    pub struct GuestFieldSelect(pub u64);
     impl Debug;
     /// Check/Set guest policy inclusion in derived key.
     pub get_guest_policy, set_guest_policy: 0;
@@ -775,9 +775,10 @@ impl Verifiable for (&Chain, &AttestationReport) {
 
         let ec = vek.public_key()?.ec_key()?;
         let signed = sig.verify(&base_digest, &ec)?;
-        match signed {
-            true => Ok(()),
-            false => Err(Error::other("VEK does not sign the attestation report")),
+        if signed {
+            Ok(())
+        } else {
+            Err(Error::other("VEK does not sign the attestation report"))
         }
     }
 }
@@ -800,9 +801,10 @@ impl Verifiable for (&Certificate, &AttestationReport) {
 
         let ec = vek.public_key()?.ec_key()?;
         let signed = sig.verify(&base_digest, &ec)?;
-        match signed {
-            true => Ok(()),
-            false => Err(Error::other("VEK does not sign the attestation report")),
+        if signed {
+            Ok(())
+        } else {
+            Err(Error::other("VEK does not sign the attestation report"))
         }
     }
 }
@@ -825,15 +827,15 @@ impl Verifiable for (&Chain, &AttestationReport) {
         let measurable_bytes: &[u8] = &raw_report_bytes[..0x2a0];
 
         use sha2::Digest;
-        let base_digest = sha2::Sha384::new_with_prefix(measurable_bytes);
+        let digest = sha2::Sha384::digest(measurable_bytes);
         let verifying_key = p384::ecdsa::VerifyingKey::from_sec1_bytes(vek.public_key_sec1())
             .map_err(|e| {
                 std::io::Error::other(format!(
                     "failed to deserialize public key from sec1 bytes: {e:?}"
                 ))
             })?;
-        use p384::ecdsa::signature::DigestVerifier;
-        verifying_key.verify_digest(base_digest, &sig).map_err(|e| {
+        use p384::ecdsa::signature::hazmat::PrehashVerifier;
+        verifying_key.verify_prehash(&digest, &sig).map_err(|e| {
             std::io::Error::other(format!("VEK does not sign the attestation report: {e:?}"))
         })
     }
@@ -858,15 +860,15 @@ impl Verifiable for (&Certificate, &AttestationReport) {
         let measurable_bytes: &[u8] = &raw_report_bytes[..0x2a0];
 
         use sha2::Digest;
-        let base_digest = sha2::Sha384::new_with_prefix(measurable_bytes);
+        let digest = sha2::Sha384::digest(measurable_bytes);
         let verifying_key = p384::ecdsa::VerifyingKey::from_sec1_bytes(vek.public_key_sec1())
             .map_err(|e| {
                 std::io::Error::other(format!(
                     "failed to deserialize public key from sec1 bytes: {e:?}"
                 ))
             })?;
-        use p384::ecdsa::signature::DigestVerifier;
-        verifying_key.verify_digest(base_digest, &sig).map_err(|e| {
+        use p384::ecdsa::signature::hazmat::PrehashVerifier;
+        verifying_key.verify_prehash(&digest, &sig).map_err(|e| {
             std::io::Error::other(format!("VEK does not sign the attestation report: {e:?}"))
         })
     }
@@ -900,7 +902,7 @@ bitfield! {
     #[repr(C)]
     #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
     #[derive(Default, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
-    pub struct GuestPolicy(u64);
+    pub struct GuestPolicy(pub u64);
     impl Debug;
     /// ABI_MINOR field: Indicates the minor API version.
     pub abi_minor, set_abi_minor: 7, 0;
@@ -1014,7 +1016,7 @@ bitfield! {
     #[repr(C)]
     #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
     #[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-    pub struct PlatformInfo(u64);
+    pub struct PlatformInfo(pub u64);
     impl Debug;
     /// Returns the bit state of SMT
     pub smt_enabled, _: 0;
@@ -1101,7 +1103,7 @@ bitfield! {
     #[repr(C)]
     #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
     #[derive(Default, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
-    pub struct KeyInfo(u32);
+    pub struct KeyInfo(pub u32);
     impl Debug;
     /// AUTHOR_KEY_EN field: Indicates that the digest of the author key is present in AUTHOR_KEY_DIGEST
     pub author_key_en, _: 0;

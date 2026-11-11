@@ -29,7 +29,7 @@ pub(crate) const VMSA_GPA: u64 = 0xFFFFFFFFF000;
 const ZEROS: [u8; LD_BYTES] = [0; LD_BYTES];
 
 fn validate_block_size(length: usize) -> Result<(), GCTXError> {
-    if (length % 4096) != 0 {
+    if !length.is_multiple_of(4096) {
         Err(GCTXError::InvalidBlockSize)
     } else {
         Ok(())

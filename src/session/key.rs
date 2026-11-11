@@ -8,6 +8,7 @@ use std::{
     ptr::write_volatile,
 };
 
+use rand_core::TryRng;
 use rdrand::{ErrorCode, RdRand};
 
 use openssl::*;
