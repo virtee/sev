@@ -115,7 +115,7 @@ bitfield! {
     /// |63:7|\-|Reserved. Must be zero.|
     #[repr(C)]
     #[derive(Default, Copy, Clone,PartialEq, Eq, PartialOrd, Ord)]
-    pub struct GuestFieldSelect(u64);
+    pub struct GuestFieldSelect(pub u64);
     impl Debug;
     /// Check/Set guest policy inclusion in derived key.
     pub get_guest_policy, set_guest_policy: 0;
@@ -900,7 +900,7 @@ bitfield! {
     #[repr(C)]
     #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
     #[derive(Default, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
-    pub struct GuestPolicy(u64);
+    pub struct GuestPolicy(pub u64);
     impl Debug;
     /// ABI_MINOR field: Indicates the minor API version.
     pub abi_minor, set_abi_minor: 7, 0;
@@ -1014,7 +1014,7 @@ bitfield! {
     #[repr(C)]
     #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
     #[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-    pub struct PlatformInfo(u64);
+    pub struct PlatformInfo(pub u64);
     impl Debug;
     /// Returns the bit state of SMT
     pub smt_enabled, _: 0;
@@ -1101,7 +1101,7 @@ bitfield! {
     #[repr(C)]
     #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
     #[derive(Default, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
-    pub struct KeyInfo(u32);
+    pub struct KeyInfo(pub u32);
     impl Debug;
     /// AUTHOR_KEY_EN field: Indicates that the digest of the author key is present in AUTHOR_KEY_DIGEST
     pub author_key_en, _: 0;

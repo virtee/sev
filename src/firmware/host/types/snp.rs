@@ -31,7 +31,7 @@ use serde::{Deserialize, Serialize};
 bitfield! {
     /// The platform's status flags.
     #[derive(Default)]
-    pub struct SnpPlatformStatusFlags(u32);
+    pub struct SnpPlatformStatusFlags(pub u32);
     impl Debug;
 
     /// If set, this platform is owned. Otherwise, it is self-owned.
@@ -286,7 +286,7 @@ bitfield! {
     /// Various platform initialization configuration data. Byte 0x3 in SEV-SNP's
     /// STRUCT_PLATFORM_STATUS.
     #[derive(Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
-    pub struct PlatformInit(u8);
+    pub struct PlatformInit(pub u8);
     impl Debug;
 
     /// Indicates if RMP is initialized.
@@ -676,7 +676,7 @@ bitfield! {
     #[repr(C)]
     #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
     #[derive(Default, Copy, Clone, PartialEq, Eq)]
-    pub struct MaskId(u32);
+    pub struct MaskId(pub u32);
     impl Debug;
     /// Indicates that the CHIP_ID field in the attestation report will alwaysbe zero.
     pub mask_chip_id, _: 0;
@@ -733,7 +733,7 @@ bitfield! {
     /// |31:7|-|Reserved.|
     #[repr(C)]
     #[derive(Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
-    pub struct PlatformPolicy(u32);
+    pub struct PlatformPolicy(pub u32);
     impl Debug;
     /// Indicates that the CHIP_ID field in the attestation report will alwaysbe zero.
     pub mask_chip_id, _: 0;

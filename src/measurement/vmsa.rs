@@ -166,7 +166,7 @@ bitfield! {
     #[repr(C)]
     #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
     #[derive(Copy, Clone, PartialEq, Eq)]
-    pub struct GuestFeatures(u64);
+    pub struct GuestFeatures(pub u64);
     impl Debug;
     /// SNPActive
     pub snp_active, _: 0;
