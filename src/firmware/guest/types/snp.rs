@@ -825,15 +825,15 @@ impl Verifiable for (&Chain, &AttestationReport) {
         let measurable_bytes: &[u8] = &raw_report_bytes[..0x2a0];
 
         use sha2::Digest;
-        let base_digest = sha2::Sha384::new_with_prefix(measurable_bytes);
+        let digest = sha2::Sha384::digest(measurable_bytes);
         let verifying_key = p384::ecdsa::VerifyingKey::from_sec1_bytes(vek.public_key_sec1())
             .map_err(|e| {
                 std::io::Error::other(format!(
                     "failed to deserialize public key from sec1 bytes: {e:?}"
                 ))
             })?;
-        use p384::ecdsa::signature::DigestVerifier;
-        verifying_key.verify_digest(base_digest, &sig).map_err(|e| {
+        use p384::ecdsa::signature::hazmat::PrehashVerifier;
+        verifying_key.verify_prehash(&digest, &sig).map_err(|e| {
             std::io::Error::other(format!("VEK does not sign the attestation report: {e:?}"))
         })
     }
@@ -858,15 +858,15 @@ impl Verifiable for (&Certificate, &AttestationReport) {
         let measurable_bytes: &[u8] = &raw_report_bytes[..0x2a0];
 
         use sha2::Digest;
-        let base_digest = sha2::Sha384::new_with_prefix(measurable_bytes);
+        let digest = sha2::Sha384::digest(measurable_bytes);
         let verifying_key = p384::ecdsa::VerifyingKey::from_sec1_bytes(vek.public_key_sec1())
             .map_err(|e| {
                 std::io::Error::other(format!(
                     "failed to deserialize public key from sec1 bytes: {e:?}"
                 ))
             })?;
-        use p384::ecdsa::signature::DigestVerifier;
-        verifying_key.verify_digest(base_digest, &sig).map_err(|e| {
+        use p384::ecdsa::signature::hazmat::PrehashVerifier;
+        verifying_key.verify_prehash(&digest, &sig).map_err(|e| {
             std::io::Error::other(format!("VEK does not sign the attestation report: {e:?}"))
         })
     }
