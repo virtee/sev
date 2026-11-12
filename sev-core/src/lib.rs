@@ -1,16 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! Traits and concepts shared by the SEV-SNP crates.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#![deny(clippy::all)]
+#![deny(missing_docs)]
+#![allow(clippy::unreadable_literal)]
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub mod parser;
