@@ -11,7 +11,7 @@ use crate::{
     launch::linux::{ioctl::*, shared::*, snp::*},
 };
 
-use std::{marker::PhantomData, os::unix::io::AsRawFd, result::Result};
+use std::{convert::TryFrom, marker::PhantomData, os::unix::io::AsRawFd, result::Result};
 
 use bitflags::bitflags;
 
@@ -96,8 +96,8 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
         gpa_len: u64,
     ) -> Result<(), FirmwareError> {
         loop {
-            let launch_update_data = LaunchUpdate::from(update);
-            let mut cmd = Command::from(&self.sev, &launch_update_data);
+            let mut launch_update_data = LaunchUpdate::from(update);
+            let mut cmd = Command::from_mut(&self.sev, &mut launch_update_data);
 
             // Register the encryption region
             KvmEncRegion::new(update.uaddr).register(&mut self.vm_fd)?;
@@ -116,12 +116,17 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
 
                     // Update the `update` object with the remaining range
                     update.start_gfn = launch_update_data.start_gfn;
-                    update.uaddr = unsafe {
-                        std::slice::from_raw_parts(
-                            launch_update_data.uaddr as *const u8,
-                            launch_update_data.len as usize,
+                    update.uaddr = remaining_range(
+                        update.uaddr,
+                        launch_update_data.uaddr,
+                        launch_update_data.len,
+                    )
+                    .ok_or_else(|| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "SNP_LAUNCH_UPDATE returned a range outside the update buffer",
                         )
-                    };
+                    })?;
                 }
                 Err(e) if e.raw_os_error() == Some(libc::EAGAIN) => {
                     // Retry the operation if `-EAGAIN` is returned
@@ -148,6 +153,16 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
 
         Ok((self.vm_fd, self.sev))
     }
+}
+
+/// Returns the `len` bytes of `data` that start at address `uaddr`, or `None`
+/// if that range is not inside `data`.
+fn remaining_range(data: &[u8], uaddr: u64, len: u64) -> Option<&[u8]> {
+    let start = usize::try_from(uaddr)
+        .ok()?
+        .checked_sub(data.as_ptr() as usize)?;
+    let end = start.checked_add(usize::try_from(len).ok()?)?;
+    data.get(start..end)
 }
 
 /// Encapsulates the various data needed to begin the launch process.
@@ -265,5 +280,42 @@ impl<'a, 'b> Finish<'a, 'b> {
             id_auth,
             host_data,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::remaining_range;
+
+    #[test]
+    fn test_remaining_range_inside() {
+        let data = [1u8, 2, 3, 4, 5, 6];
+        let uaddr = data[2..].as_ptr() as u64;
+
+        assert_eq!(remaining_range(&data, uaddr, 3), Some(&data[2..5]));
+    }
+
+    #[test]
+    fn test_remaining_range_starts_before_buffer() {
+        let data = [1u8, 2, 3, 4, 5, 6];
+        let base = data.as_ptr() as u64;
+
+        assert_eq!(remaining_range(&data, base - 1, 1), None);
+    }
+
+    #[test]
+    fn test_remaining_range_ends_past_buffer() {
+        let data = [1u8, 2, 3, 4, 5, 6];
+        let base = data.as_ptr() as u64;
+
+        assert_eq!(remaining_range(&data, base + 4, 3), None);
+    }
+
+    #[test]
+    fn test_remaining_range_length_overflow() {
+        let data = [1u8, 2, 3, 4, 5, 6];
+        let base = data.as_ptr() as u64;
+
+        assert_eq!(remaining_range(&data, base + 4, u64::MAX), None);
     }
 }
