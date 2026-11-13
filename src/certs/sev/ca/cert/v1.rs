@@ -187,6 +187,9 @@ impl PartialEq for Certificate {
     }
 }
 
+// SAFETY: All fields of Data, recursively, are integers or arrays of integers.
+unsafe impl crate::util::AnyBitPattern for Data {}
+
 impl Decoder<()> for Certificate {
     fn decode(reader: &mut impl Read, _: ()) -> Result<Self> {
         let p = Preamble {

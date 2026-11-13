@@ -393,6 +393,9 @@ impl Default for Vmsa {
     }
 }
 
+// SAFETY: Vmsa and VmcbSegment contain only integers and integer arrays.
+unsafe impl crate::util::AnyBitPattern for Vmsa {}
+
 impl Decoder<()> for Vmsa {
     fn decode(reader: &mut impl Read, _: ()) -> Result<Self, std::io::Error> {
         reader.load()

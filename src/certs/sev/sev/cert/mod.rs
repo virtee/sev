@@ -74,6 +74,11 @@ impl<U: Copy + Into<crate::certs::sev::Usage>> PartialEq<U> for Certificate {
     }
 }
 
+// SAFETY: Certificate is a union of a u32 and a v1 certificate. All fields
+// of the v1 certificate, recursively, are integers, arrays, or unions of
+// these.
+unsafe impl crate::util::AnyBitPattern for Certificate {}
+
 impl Decoder<()> for Certificate {
     fn decode(reader: &mut impl Read, params: ()) -> Result<Self> {
         Ok(match u32::from_le(reader.load()?) {

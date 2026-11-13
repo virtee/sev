@@ -383,6 +383,10 @@ pub struct Start {
     pub session: Session,
 }
 
+// SAFETY: All fields of Start, recursively, are integers, arrays, or unions
+// of these. The bit flag types wrap integers.
+unsafe impl crate::util::AnyBitPattern for Start {}
+
 impl Decoder<()> for Start {
     fn decode(reader: &mut impl Read, _: ()) -> std::io::Result<Self> {
         reader.load()
@@ -460,6 +464,9 @@ pub struct Secret {
     pub ciphertext: Vec<u8>,
 }
 
+// SAFETY: Header contains bit flags over a u32 and byte arrays.
+unsafe impl crate::util::AnyBitPattern for Header {}
+
 impl Decoder<()> for Secret {
     fn decode(reader: &mut impl Read, _: ()) -> std::io::Result<Self> {
         let header = reader.load()?;
@@ -487,6 +494,9 @@ pub struct Measurement {
     /// A random nonce.
     pub mnonce: [u8; 16],
 }
+
+// SAFETY: Measurement contains only byte arrays.
+unsafe impl crate::util::AnyBitPattern for Measurement {}
 
 impl Decoder<()> for Measurement {
     fn decode(reader: &mut impl Read, _: ()) -> std::io::Result<Self> {
