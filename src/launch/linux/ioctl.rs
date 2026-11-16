@@ -16,10 +16,20 @@ use crate::launch::linux::shared;
 
 use std::{
     marker::PhantomData,
-    os::{raw::c_ulong, unix::io::AsRawFd},
+    os::{
+        fd::BorrowedFd,
+        raw::c_ulong,
+        unix::io::AsRawFd,
+    },
 };
 
 use iocuddle::*;
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
+
+/// Bridge `AsRawFd` types (including `kvm_ioctls::VmFd`) to iocuddle 0.3's `AsFd` ioctl bound.
+pub(crate) fn borrow_fd(fd: &impl AsRawFd) -> BorrowedFd<'_> {
+    unsafe { BorrowedFd::borrow_raw(fd.as_raw_fd()) }
+}
 
 // These enum ordinal values are defined in the Linux kernel
 // source code: arch/x86/include/uapi/asm/kvm.h
@@ -165,8 +175,10 @@ pub const SNP_LAUNCH_FINISH: Ioctl<WriteRead, &Command<snp::LaunchFinish>> =
     unsafe { ENC_OP.lie() };
 
 /// Corresponds to the kernel struct `kvm_enc_region`
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
+#[repr(C, packed)]
+#[derive(
+    Debug, Default, Copy, Clone, PartialEq, Eq, FromBytes, IntoBytes, Immutable, KnownLayout, Unaligned,
+)]
 pub struct KvmEncRegion<'a> {
     addr: u64,
     size: u64,
@@ -184,15 +196,17 @@ impl<'a> KvmEncRegion<'a> {
     }
 
     /// Register the encrypted memory region to a virtual machine
-    pub fn register(&mut self, vm_fd: &mut impl AsRawFd) -> std::io::Result<std::os::raw::c_uint> {
-        ENC_REG_REGION.ioctl(vm_fd, self)
+    pub fn register(&mut self, vm_fd: &impl AsRawFd) -> std::io::Result<std::os::raw::c_uint> {
+        ENC_REG_REGION.ioctl(borrow_fd(vm_fd), self)
     }
 }
 
 /// Corresponds to the kernel struct `kvm_memory_attributes`
 #[cfg(feature = "snp")]
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
+#[repr(C, packed)]
+#[derive(
+    Debug, Default, Copy, Clone, PartialEq, Eq, FromBytes, IntoBytes, Immutable, KnownLayout, Unaligned,
+)]
 pub struct KvmSetMemoryAttributes {
     addr: u64,
     size: u64,
@@ -216,16 +230,18 @@ impl KvmSetMemoryAttributes {
     #[cfg(feature = "snp")]
     pub fn set_attributes(
         &mut self,
-        vm_fd: &mut impl AsRawFd,
+        vm_fd: &impl AsRawFd,
     ) -> std::io::Result<std::os::raw::c_uint> {
-        SET_MEMORY_ATTRIBUTES.ioctl(vm_fd, self)
+        SET_MEMORY_ATTRIBUTES.ioctl(borrow_fd(vm_fd), self)
     }
 }
 
 /// A generic SEV command
-#[repr(C)]
+#[repr(C, packed)]
+#[derive(FromBytes, IntoBytes, Immutable, KnownLayout, Unaligned)]
 pub struct Command<'a, T: Id> {
     code: u32,
+    _pad: u32,
     data: u64,
     error: u32,
     sev_fd: u32,
@@ -238,6 +254,7 @@ impl<'a, T: Id> Command<'a, T> {
     pub fn from_mut(sev: &'a impl AsRawFd, subcmd: &'a mut T) -> Self {
         Self {
             code: T::ID,
+            _pad: 0,
             data: subcmd as *mut T as _,
             error: 0,
             sev_fd: sev.as_raw_fd() as _,
@@ -249,6 +266,7 @@ impl<'a, T: Id> Command<'a, T> {
     pub fn from(sev: &'a impl AsRawFd, subcmd: &'a T) -> Self {
         Self {
             code: T::ID,
+            _pad: 0,
             data: subcmd as *const T as _,
             error: 0,
             sev_fd: sev.as_raw_fd() as _,
@@ -258,6 +276,6 @@ impl<'a, T: Id> Command<'a, T> {
 
     /// encapsulate a SEV errors in command as a Firmware error.
     pub fn encapsulate(&self) -> FirmwareError {
-        FirmwareError::from(self.error)
+        FirmwareError::from({ self.error })
     }
 }
