@@ -9,7 +9,8 @@ use openssl::{
     md::Md,
     md_ctx::MdCtx,
     nid::Nid,
-    pkey::{PKey, Private},
+    pkey::{PKey, Private, Public},
+    sha::sha384
 };
 use std::{
     convert::{TryFrom, TryInto},
@@ -34,7 +35,8 @@ pub(crate) const DEFAULT_ID_VERSION: u32 = 1;
 pub(crate) const DEFAULT_ID_POLICY: u64 = 0x30000;
 
 pub(crate) const CURVE_P384_NID: Nid = openssl::nid::Nid::SECP384R1;
-pub(crate) const DEFAULT_KEY_ALGO: u32 = 1;
+/// Default key algorithm for ID block signing (ECDSA P-384).
+pub const DEFAULT_KEY_ALGO: u32 = 1;
 pub(crate) const CURVE_P384: u32 = 2;
 
 pub(crate) const ID_BLK_ID_BITS: usize = 128;
@@ -133,6 +135,23 @@ impl Decoder<()> for SevEcdsaSig {
 
 impl SevEcdsaSig {
     const LEN: usize = 2 * ECDSA_POINT_SIZE_BYTES + ECDSA_SIG_RESERVED;
+
+    /// Verifies whether this signature was generated using the provided data and
+    ///  the private key associated with the supplied public key
+    pub fn verify(&self, data: &[u8], ec_pub_key: &SevEcdsaPubKey) -> Result<bool, IdBlockError> {
+        let ec_pub_key = EcKey::<Public>::try_from(ec_pub_key)?;
+        let digest = sha384(data);
+        let valid = EcdsaSig::try_from(self)?
+            .verify(&digest, &ec_pub_key)
+            .map_err(IdBlockError::CryptoErrorStack)?;
+        if !valid {
+            return Err(IdBlockError::SevEcsdsaSigError(
+                "id_block signature verification failed: public key does not match the signing key"
+                    .to_string(),
+            ));
+        }
+        Ok(valid)
+    }
 }
 
 impl ByteParser<()> for SevEcdsaSig {
@@ -201,10 +220,68 @@ impl TryFrom<(EcKey<Private>, &[u8])> for SevEcdsaSig {
     }
 }
 
+// Conversion from EcdsaSig to SevEcdsaSig
+impl TryFrom<EcdsaSig> for SevEcdsaSig {
+    type Error = IdBlockError;
+
+    fn try_from(ecdsa_sig: EcdsaSig) -> Result<Self, Self::Error> {
+        let mut pad_r = ecdsa_sig
+            .r()
+            .to_vec_padded(ECDSA_POINT_SIZE_BYTES as i32)
+            .map_err(IdBlockError::CryptoErrorStack)?;
+        pad_r.reverse();
+
+        let mut pad_s = ecdsa_sig
+            .s()
+            .to_vec_padded(ECDSA_POINT_SIZE_BYTES as i32)
+            .map_err(IdBlockError::CryptoErrorStack)?;
+        pad_s.reverse();
+
+        let r: [u8; ECDSA_POINT_SIZE_BYTES] = pad_r
+            .try_into()
+            .map_err(|v: Vec<u8>| IdBlockError::BadVectorError(v.len(), ECDSA_POINT_SIZE_BYTES))?;
+
+        let s: [u8; ECDSA_POINT_SIZE_BYTES] = pad_s
+            .try_into()
+            .map_err(|v: Vec<u8>| IdBlockError::BadVectorError(v.len(), ECDSA_POINT_SIZE_BYTES))?;
+
+        Ok(SevEcdsaSig {
+            r,
+            s,
+            ..Default::default()
+        })
+    }
+}
+
+// Conversion from SevEcdsaSig to EcdsaSig
+impl TryFrom<SevEcdsaSig> for EcdsaSig {
+    type Error = IdBlockError;
+
+    fn try_from(sev_sig: SevEcdsaSig) -> Result<Self, Self::Error> {
+        let mut r = sev_sig.r[..ECDSA_POINT_SIZE_BYTES].to_vec();
+        r.reverse();
+        let mut s = sev_sig.s[..ECDSA_POINT_SIZE_BYTES].to_vec();
+        s.reverse();
+
+        let r_bn = BigNum::from_slice(&r).map_err(IdBlockError::CryptoErrorStack)?;
+        let s_bn = BigNum::from_slice(&s).map_err(IdBlockError::CryptoErrorStack)?;
+
+        EcdsaSig::from_private_components(r_bn, s_bn).map_err(IdBlockError::CryptoErrorStack)
+    }
+}
+
+impl TryFrom<&SevEcdsaSig> for EcdsaSig {
+    type Error = IdBlockError;
+
+    fn try_from(sev_sig: &SevEcdsaSig) -> Result<Self, Self::Error> {
+        (*sev_sig).try_into()
+    }
+}
+
 /// Data inside the SEV ECDSA key
 #[repr(C)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct SevEcdsaKeyData {
     /// QX component of the ECDSA public key
     #[cfg_attr(feature = "serde", serde(with = "BigArray"))]
@@ -256,7 +333,7 @@ impl ByteParser<()> for SevEcdsaKeyData {
 
 /// SEV ECDSA public key. Need it in this format to calculate the AUTH-ID.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, PartialEq)]
 pub struct SevEcdsaPubKey {
     /// curve type for the public key (defaults to P384)
     pub curve: u32,
@@ -340,6 +417,26 @@ impl TryFrom<&EcKey<Private>> for SevEcdsaPubKey {
         sev_key.data = key_data;
 
         Ok(sev_key)
+    }
+}
+
+// Create an EC public key from a SEV ECDSA public key
+impl TryFrom<&SevEcdsaPubKey> for EcKey<Public> {
+    type Error = IdBlockError;
+
+    fn try_from(sev_key: &SevEcdsaPubKey) -> Result<Self, Self::Error> {
+        let mut qx = sev_key.data.qx[..ECDSA_POINT_SIZE_BYTES].to_vec();
+        qx.reverse();
+        let mut qy = sev_key.data.qy[..ECDSA_POINT_SIZE_BYTES].to_vec();
+        qy.reverse();
+
+        let group =
+            EcGroup::from_curve_name(CURVE_P384_NID).map_err(IdBlockError::CryptoErrorStack)?;
+        let x_bn = BigNum::from_slice(&qx).map_err(IdBlockError::CryptoErrorStack)?;
+        let y_bn = BigNum::from_slice(&qy).map_err(IdBlockError::CryptoErrorStack)?;
+
+        EcKey::from_public_key_affine_coordinates(&group, &x_bn, &y_bn)
+            .map_err(IdBlockError::CryptoErrorStack)
     }
 }
 
@@ -544,6 +641,72 @@ impl IdAuth {
             id_key_sig,
             author_pub_key,
         }
+    }
+
+    /// Set the ID public key on the IdAuth block.
+    pub fn with_id_pubkey(mut self, id_ec_pub_key: SevEcdsaPubKey) -> Result<Self, IdBlockError> {
+        self.id_pubkey = id_ec_pub_key;
+        Ok(self)
+    }
+
+    /// Set the ID block signature and key algorithm on the IdAuth block.
+    pub fn with_id_block_sig(mut self, id_key_algo: u32, id_block_sig: SevEcdsaSig) -> Result<Self, IdBlockError> {
+        match id_key_algo {
+            DEFAULT_KEY_ALGO => {
+                self.id_block_sig = id_block_sig;
+            },
+            _ => return Err(IdBlockError::UnsupportedKeyAlgo(id_key_algo)),
+        }
+        self.id_key_algo = id_key_algo;
+        Ok(self)
+    }
+
+    /// Verify the ID block signature using the stored ID public key.
+    pub fn verify_id_block_sig(self, id_block: &IdBlock) -> Result<Self, IdBlockError> {
+        // verify that the id public key is present
+        if self.id_pubkey == Default::default() {
+            return Err(IdBlockError::MissingFieldError("id_pubkey".to_string()));
+        }
+        // verify the ID block signature covers the ID block using the stored ID public key
+        self.id_block_sig.verify(
+            &id_block.to_bytes()?,
+            &self.id_pubkey
+        )?;
+        Ok(self)
+    }
+
+    /// Sign the ID block with the given private key and key algorithm.
+    pub fn sign_id_block(mut self, id_key_algo: u32, id_ec_priv_key: EcKey<Private>, id_block: &IdBlock) -> Result<Self, IdBlockError> {
+        match id_key_algo {
+            DEFAULT_KEY_ALGO => {
+                let id_block_bytes = id_block.to_bytes()?;
+                self.id_pubkey = SevEcdsaPubKey::try_from(&id_ec_priv_key)?;
+                self.id_block_sig = SevEcdsaSig::try_from((id_ec_priv_key, id_block_bytes.as_slice()))?;
+            },
+            _ => return Err(IdBlockError::UnsupportedKeyAlgo(id_key_algo)),
+        }
+        self.id_key_algo = id_key_algo;
+        Ok(self)
+    }
+
+    /// Sign the ID key with the author's private key.
+    pub fn sign_id_key(mut self, auth_key_algo: u32, auth_ec_priv_key: EcKey<Private>) -> Result<Self, IdBlockError> {
+        // verify that the id public key is present before signing the id_key
+        if self.id_pubkey == Default::default() {
+            return Err(IdBlockError::MissingFieldError("id_pubkey".to_string()));
+        }
+
+        // If the ID block signature is valid, proceed to sign the ID key
+        match auth_key_algo {
+            DEFAULT_KEY_ALGO => {
+                self.author_pub_key = SevEcdsaPubKey::try_from(&auth_ec_priv_key)?;
+                let id_key_bytes = self.id_pubkey.to_bytes()?;
+                self.id_key_sig = SevEcdsaSig::try_from((auth_ec_priv_key, id_key_bytes.as_slice()))?;
+            },
+            _ => return Err(IdBlockError::UnsupportedKeyAlgo(auth_key_algo)),
+        }
+        self.author_key_algo = auth_key_algo;
+        Ok(self)
     }
 }
 

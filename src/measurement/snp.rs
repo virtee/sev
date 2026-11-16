@@ -6,7 +6,7 @@ use crate::{
     launch::PageType,
     measurement::{
         gctx::{Gctx, Updating, VMSA_GPA},
-        ovmf::{OvmfSevMetadataSectionDesc, SectionType, OVMF},
+        ovmf::{OvmfMeasurement, OvmfSevMetadataSectionDesc, SectionType, OVMF},
         sev_hashes::SevHashes,
         vcpu_types::CpuType,
         vmsa::{GuestFeatures, VMMType, VMSA},
@@ -206,14 +206,28 @@ pub fn calc_snp_ovmf_hash(ovmf_file: PathBuf) -> Result<SnpLaunchDigest, Measure
     Ok(gctx.ld())
 }
 
+/// Get an exportable representation of the OVMF containing the OVMF Hash + OVMF Footer Table & Metadata
+///  which facilitates resuming a launch measurement remotely
+pub fn get_snp_ovmf_measurement(ovmf_file: PathBuf) -> Result<OvmfMeasurement, MeasurementError>{
+    let ovmf = OVMF::new(ovmf_file)?;
+    let mut gctx = Gctx::default();
+
+    gctx.update_page(PageType::Normal, ovmf.gpa(), Some(ovmf.data()), None)?;
+
+    let gctx = gctx.finished();
+
+    OvmfMeasurement::new(&ovmf, Some(gctx.ld()))
+}
+
 /// Arguments required to calculate the SNP measurement
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct SnpMeasurementArgs<'a> {
     /// Number of vcpus
     pub vcpus: u32,
     /// vcpu type
     pub vcpu_type: CpuType,
     /// Path to OVMF file
-    pub ovmf_file: PathBuf,
+    pub ovmf_file: Option<PathBuf>,
     /// Active kernel guest features
     pub guest_features: GuestFeatures,
     /// Path to kernel file
@@ -226,36 +240,46 @@ pub struct SnpMeasurementArgs<'a> {
     pub ovmf_hash_str: Option<&'a str>,
     /// vmm type
     pub vmm_type: Option<VMMType>,
+    /// Already calculated kernel hash
+    pub kernel_hash_str: Option<&'a str>,
+    /// Already calculated initrd hash
+    pub initrd_hash_str: Option<&'a str>,
+    /// Already calculated ovmf hash + metadata & footer fields
+    pub ovmf_measurement: Option<OvmfMeasurement>,
 }
 
 /// Calulate an SEV-SNP launch digest
 pub fn snp_calc_launch_digest(
     snp_measurement: SnpMeasurementArgs,
 ) -> Result<SnpLaunchDigest, MeasurementError> {
-    let ovmf = OVMF::new(snp_measurement.ovmf_file)?;
-
-    let mut gctx: Gctx<Updating> = match snp_measurement.ovmf_hash_str {
-        Some(hash) => {
-            let ovmf_hash = Vec::from_hex(hash)?;
-            Gctx::new(ovmf_hash.as_slice())?
+    
+    let (ovmf, mut gctx) = match (&snp_measurement.ovmf_measurement, &snp_measurement.ovmf_file) {
+        (Some(ovmf_m), _) => {
+            let digest = ovmf_m.digest.ok_or(OVMFError::UnknownError)?;
+            let digest_bytes: Vec<u8> = digest.try_into()?;
+            let ovmf = OVMF::try_from(ovmf_m.clone())?;
+            let gctx = Gctx::new(&digest_bytes)?;
+            (ovmf, gctx)
         }
-        _ => {
-            let mut gctx = Gctx::default();
-
-            gctx.update_page(PageType::Normal, ovmf.gpa(), Some(ovmf.data()), None)?;
-
-            gctx
+        (None, Some(ovmf_file)) => {
+            let ovmf = OVMF::new(ovmf_file.clone())?;
+            let gctx = match snp_measurement.ovmf_hash_str {
+                Some(hash) => {
+                    let ovmf_hash = Vec::from_hex(hash)?;
+                    Gctx::new(ovmf_hash.as_slice())?
+                }
+                _ => {
+                    let mut gctx = Gctx::default();
+                    gctx.update_page(PageType::Normal, ovmf.gpa(), Some(ovmf.data()), None)?;
+                    gctx
+                }
+            };
+            (ovmf, gctx)
         }
+        (None, None) => return Err(OVMFError::UnknownError)?,
     };
 
-    let sev_hashes = match snp_measurement.kernel_file {
-        Some(kernel) => Some(SevHashes::new(
-            kernel,
-            snp_measurement.initrd_file,
-            snp_measurement.append,
-        )?),
-        _ => None,
-    };
+    let sev_hashes: Option<SevHashes> = Option::try_from(&snp_measurement)?;
 
     let official_vmm_type = match snp_measurement.vmm_type {
         Some(vmm) => vmm,
