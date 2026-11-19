@@ -253,10 +253,7 @@ impl CertTableEntry {
     /// Takes in bytes in kernel CertTable format and returns in user API CertTable format.
     #[cfg(target_os = "linux")]
     pub fn vec_bytes_to_cert_table(bytes: &mut [u8]) -> Result<Vec<Self>, CertError> {
-        let cert_bytes_ptr: *mut FFI::types::CertTableEntry =
-            bytes.as_mut_ptr() as *mut FFI::types::CertTableEntry;
-
-        Ok(unsafe { FFI::types::CertTableEntry::parse_table(cert_bytes_ptr).unwrap() })
+        FFI::types::CertTableEntry::parse_table(bytes)
     }
 }
 
