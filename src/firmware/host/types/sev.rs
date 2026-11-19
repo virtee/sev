@@ -5,7 +5,7 @@
 use crate::firmware::host::State;
 pub use crate::firmware::linux::host::types::PlatformStatusFlags;
 use crate::parser::{Decoder, Encoder};
-use crate::util::{TypeLoad, TypeSave};
+use crate::util::{AnyBitPattern, TypeLoad, TypeSave};
 
 #[cfg(feature = "openssl")]
 use std::convert::TryInto;
@@ -79,6 +79,9 @@ impl std::fmt::Display for Build {
         write!(f, "{}.{}", self.version, self.build)
     }
 }
+
+// SAFETY: Build and Version contain only u8 fields.
+unsafe impl AnyBitPattern for Build {}
 
 impl Decoder<()> for Build {
     fn decode(reader: &mut impl Read, _: ()) -> std::io::Result<Self> {
