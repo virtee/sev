@@ -13,6 +13,16 @@ pub struct PubKey {
     modulus: [u8; 512],
 }
 
+impl Default for PubKey {
+    fn default() -> Self {
+        PubKey {
+            modulus_size: 0,
+            pubexp: [0u8; 512],
+            modulus: [0u8; 512],
+        }
+    }
+}
+
 impl PubKey {
     fn bytes(&self) -> Result<usize> {
         match u32::from_le(self.modulus_size) {

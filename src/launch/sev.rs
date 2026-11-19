@@ -17,7 +17,7 @@ use crate::launch::linux::ioctl::*;
 use crate::launch::linux::{sev::*, shared::*};
 use crate::*;
 
-use std::{convert::TryFrom, mem::MaybeUninit, os::unix::io::AsRawFd, result::Result};
+use std::{convert::TryFrom, os::unix::io::AsRawFd, result::Result};
 
 use bitflags::bitflags;
 
@@ -155,7 +155,10 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
 
     /// Request a measurement from the SEV firmware.
     pub fn measure(mut self) -> Result<Launcher<Measured, U, V>, FirmwareError> {
-        let mut measurement = MaybeUninit::uninit();
+        let mut measurement = Measurement {
+            measure: [0; 32],
+            mnonce: [0; 16],
+        };
         let mut launch_measure = LaunchMeasure::new(&mut measurement);
         let mut cmd = Command::from_mut(&self.sev, &mut launch_measure);
         LAUNCH_MEASUREMENT
@@ -163,7 +166,7 @@ impl<U: AsRawFd, V: AsRawFd> Launcher<Started, U, V> {
             .map_err(|_| cmd.encapsulate())?;
 
         let next = Launcher {
-            state: Measured(self.state.0, unsafe { measurement.assume_init() }),
+            state: Measured(self.state.0, measurement),
             vm_fd: self.vm_fd,
             sev: self.sev,
         };

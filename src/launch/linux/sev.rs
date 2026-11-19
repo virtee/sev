@@ -4,10 +4,7 @@
 
 use crate::{certs::sev::sev::Certificate, launch::sev::*};
 
-use std::{
-    marker::PhantomData,
-    mem::{size_of_val, MaybeUninit},
-};
+use std::{marker::PhantomData, mem::size_of_val};
 
 /// Initialize the SEV platform context.
 #[repr(C)]
@@ -118,9 +115,9 @@ pub struct LaunchMeasure<'a> {
 }
 
 impl<'a> LaunchMeasure<'a> {
-    pub fn new(measurement: &'a mut MaybeUninit<Measurement>) -> Self {
+    pub fn new(measurement: &'a mut Measurement) -> Self {
         Self {
-            addr: measurement.as_mut_ptr() as _,
+            addr: measurement as *mut Measurement as _,
             len: size_of_val(measurement) as _,
             _phantom: PhantomData,
         }
