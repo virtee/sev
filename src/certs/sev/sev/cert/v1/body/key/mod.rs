@@ -20,6 +20,18 @@ pub struct PubKey {
     key: PubKeys,
 }
 
+impl Default for PubKey {
+    fn default() -> Self {
+        PubKey {
+            usage: Usage(crate::certs::sev::Usage::INV.0),
+            algo: Algorithm::NONE,
+            key: PubKeys {
+                rsa: rsa::PubKey::default(),
+            },
+        }
+    }
+}
+
 impl std::fmt::Debug for PubKey {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.algo {

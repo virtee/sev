@@ -21,6 +21,24 @@ pub union Certificate {
     v1: v1::Certificate,
 }
 
+impl Default for Certificate {
+    fn default() -> Self {
+        Certificate {
+            v1: v1::Certificate {
+                body: v1::body::Body {
+                    ver: 0,
+                    data: v1::body::Data {
+                        firmware: Default::default(),
+                        reserved: 0,
+                        key: Default::default(),
+                    },
+                },
+                sigs: [Default::default(); 2],
+            },
+        }
+    }
+}
+
 impl std::fmt::Debug for Certificate {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.version() {
